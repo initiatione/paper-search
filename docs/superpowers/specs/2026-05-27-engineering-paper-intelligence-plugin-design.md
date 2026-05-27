@@ -21,6 +21,7 @@ This is not a single skill and not a local script bundle. It is a plugin that pa
 - The paper wiki follows the Ar9av/LLM Wiki pattern: raw source -> compiled wiki -> schema.
 - Raw PDF, MinerU Markdown, LaTeX, images, metadata, reader output, critic output, and run records must be retained.
 - The full pipeline is automated through a state machine. The agent reads `run-state.json` and routes to MCP, scripts, or skills based on missing artifacts and current state.
+- MVP orchestration is single-agent: one Codex agent runs the state machine and calls stage tools. Multi-agent reviewers, parallel critics, and specialized reader agents are explicitly post-MVP.
 - The state machine may skip or reorder stages when that better satisfies the user's goal, but every deviation must be recorded.
 - The critic layer is a hard quality gate before compiled wiki writes.
 - Hard rule: no critic pass, no compiled wiki write.
@@ -43,6 +44,8 @@ The plugin owns workflow intelligence and orchestration:
 - Optional Zotero sync.
 - Run reporting and feedback capture.
 - Skill-aware evolution of profiles, checklists, templates, and routing rules.
+
+The MVP orchestrator is not a general autonomous agent platform. It is a single-agent workflow runner that packages a staged literature pipeline into an installable Codex plugin.
 
 The plugin does not own:
 
@@ -507,6 +510,8 @@ Every activated evolution must have:
 
 The orchestrator owns `run-state.json` under `_runs/<run-id>/`.
 
+MVP orchestration is single-agent. A Codex agent reads the state, selects the next stage, calls the relevant MCP/script/skill, records the result, and repeats. The design must preserve stage boundaries so later versions can replace selected stages with multi-agent reviewers, parallel critics, or specialized readers without changing the paper artifact contract.
+
 Example states:
 
 - `configured`
@@ -723,6 +728,15 @@ Implementation should be split so the first useful version is small and testable
 - Active evolution application.
 - Broader source adapters beyond the wrapped MCP.
 
+### Phase 5: Multi-Agent Expansion
+
+- Multi-agent reviewers for independent quality judgments.
+- Parallel critics for paper, parse, reader, and wiki-promotion review.
+- Specialized reader agents for methods, figures, reproducibility, and implementation transfer.
+- Consensus or disagreement reports that feed back into critic and staging decisions.
+
+Phase 5 must preserve the same artifact contracts and critic gate. It expands who performs the work, not where trusted knowledge is allowed to land.
+
 ## Risks and Mitigations
 
 - Search dependency drift: pin the mature MCP version and record attribution.
@@ -732,6 +746,7 @@ Implementation should be split so the first useful version is small and testable
 - API cost creep: dry-run and budget controls are first-class.
 - Rule drift: skill-aware evolution is staged and reversible.
 - Overgrown plugin scope: keep search, ranking, parsing, reading, critic, wiki, Zotero, and evolution as separate skills/scripts with explicit contracts.
+- Agent-platform scope creep: MVP stays single-agent and defers multi-agent reviewers, parallel critics, and specialized readers to Phase 5.
 
 ## Open Implementation Questions
 
