@@ -1,4 +1,4 @@
-# Engineering Paper Intelligence Plugin Design
+# EPI Plugin Design
 
 Date: 2026-05-27
 Status: design-review
@@ -13,7 +13,9 @@ This is not a single skill and not a local script bundle. It is a plugin that pa
 
 ## Confirmed Decisions
 
-- Plugin name target: `engineering-paper-intelligence`.
+- Plugin identifier and folder name target: `epi`.
+- Marketplace display name target: `EPI`.
+- Expanded workflow name: Engineering Paper Intelligence.
 - Search layer wraps mature infrastructure, primarily `openags/paper-search-mcp`, instead of rebuilding every source adapter from scratch.
 - The existing `mineru-paper-parser` capability becomes one stage inside the larger plugin.
 - A new paper-specific wiki vault must be created at `D:\paper-research-wiki`.
@@ -59,7 +61,7 @@ The plugin does not own:
 Target plugin layout:
 
 ```text
-plugins/engineering-paper-intelligence/
+plugins/epi/
   .codex-plugin/
     plugin.json
   .mcp.json
@@ -67,7 +69,7 @@ plugins/engineering-paper-intelligence/
     paper-discover/
     paper-normalize/
     paper-filter/
-    engineering-paper-ranker/
+    paper-ranker/
     paper-acquire/
     mineru-paper-parser/
     paper-reader/
@@ -690,7 +692,7 @@ Implementation should be split so the first useful version is small and testable
 
 ### Phase 0: Foundation
 
-- Rename or scaffold the target plugin shape for `engineering-paper-intelligence`.
+- Rename or scaffold the target plugin shape for `epi`.
 - Preserve the existing MinerU parser capability as an internal stage.
 - Add config templates for interests, ranking, filters, critic, routing, and paper wiki paths.
 - Add paper wiki initialization templates for `D:\paper-research-wiki`.
