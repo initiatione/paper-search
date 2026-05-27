@@ -1,0 +1,1723 @@
+# Engineering Paper Intelligence Phase 0-1 Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Build the first installable Codex plugin slice for engineering paper discovery: configure, discover, normalize, filter, rank, and report in dry-run mode without downloading PDFs or writing compiled wiki pages.
+
+**Architecture:** Create a new `plugins/engineering-paper-intelligence` plugin that owns orchestration, config, templates, and dry-run artifacts. Keep the existing MinerU parser capability as an internal stage by copying its skill/script into the new plugin without changing runtime behavior. Wrap `openags/paper-search-mcp` behind a small adapter contract so the rest of the pipeline consumes stable JSON files rather than upstream-specific responses.
+
+**Tech Stack:** Codex plugin manifest, Python 3.13 standard library, optional `PyYAML`, PowerShell verification commands, existing MinerU precise batch script, `openags/paper-search-mcp` as an external/pinned MCP dependency.
+
+---
+
+## Scope
+
+This plan implements Phase 0 and Phase 1 only.
+
+Included:
+
+- Marketplace-installable plugin scaffold.
+- Internal MinerU parser stage copied from `plugins/mineru-paper-parser`.
+- Publishable config examples.
+- Dedicated `D:\paper-research-wiki` initializer templates.
+- Attribution and recovery docs.
+- MCP availability probe and adapter contract for `openags/paper-search-mcp`.
+- Dry-run state machine for `configure -> discover -> normalize -> filter -> rank -> report`.
+- JSON and Markdown run outputs under `_runs/<run-id>/`.
+
+Excluded from this plan:
+
+- PDF acquisition.
+- MinerU parsing execution from the new orchestrator.
+- Paper reader generation.
+- Critic gates.
+- Staging and compiled wiki promotion.
+- Zotero writes.
+- Skill-aware evolution activation.
+- Multi-agent reviewers or parallel critics.
+
+## File Structure
+
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\.codex-plugin\plugin.json`
+  - Codex marketplace plugin manifest.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\.mcp.json`
+  - Documents the external `paper-search-mcp` command expected by the plugin.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\skills\engineering-paper-discovery\SKILL.md`
+  - User-facing skill for dry-run literature search and ranking.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\skills\mineru-paper-parser\...`
+  - Internal copy of the already working MinerU parser skill/script.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\__init__.py`
+  - Python package marker.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\config.py`
+  - Config loading, path resolution, budget parsing, and defaults.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\schemas.py`
+  - Dataclass helpers for candidates, stage results, and reports.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\wiki_init.py`
+  - Idempotent initializer for `D:\paper-research-wiki`.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\paper_search_adapter.py`
+  - MCP probe and discovery wrapper. It is the only file that knows upstream invocation details.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\normalize_candidates.py`
+  - Merge and deduplicate raw search records.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\filter_candidates.py`
+  - Apply domain, PDF, duplicate, metadata, and quality filters.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\rank_papers.py`
+  - Score filtered candidates using relevance, venue, citation, freshness, PDF, code, and configured boosts.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\report_run.py`
+  - Write dry-run Markdown and JSON reports.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\orchestrator.py`
+  - Single-agent state machine for Phase 1 dry-run.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\orchestrator.py`
+  - Thin CLI entrypoint that imports `epi.orchestrator`.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\init_paper_wiki.py`
+  - Thin CLI entrypoint that imports `epi.wiki_init`.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\templates\interests.example.yaml`
+  - Default robotics / AI / embodied intelligence / control search profile.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\templates\ranking.example.yaml`
+  - Default ranking weights.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\templates\filter-rules.example.yaml`
+  - Default filter thresholds and exclusion rules.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\templates\critic-checklist.example.yaml`
+  - Stubbed publishable checklist for future critic stages, included so config contracts stay stable.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\templates\routing-rules.example.yaml`
+  - Dry-run routing rules and post-MVP stage names.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\templates\wiki\index.md`
+  - Initial wiki index page.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\templates\wiki\log.md`
+  - Initial wiki log page.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\templates\wiki\hot.md`
+  - Initial wiki hot page.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\templates\wiki\manifest.json`
+  - Initial `.manifest.json` content.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\docs\workflow.md`
+  - Pipeline overview and Phase 1 usage.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\docs\config.md`
+  - Config files, environment keys, token boundaries.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\docs\recovery.md`
+  - Dry-run recovery, rerun, and state inspection.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\docs\attribution.md`
+  - Attribution for `openags/paper-search-mcp`, MinerU, Ar9av LLM Wiki inspiration, and Nature-style reader inspiration.
+- Create `D:\paper-search\plugins\engineering-paper-intelligence\vendor-notices\paper-search-mcp.md`
+  - Upstream dependency notice and pin policy.
+- Create `D:\paper-search\tests\engineering_paper_intelligence\test_config.py`
+  - Unit tests for config and path resolution.
+- Create `D:\paper-search\tests\engineering_paper_intelligence\test_wiki_init.py`
+  - Unit tests for vault directory creation.
+- Create `D:\paper-search\tests\engineering_paper_intelligence\test_normalize_filter_rank.py`
+  - Unit tests for candidate normalization, filtering, and ranking.
+- Create `D:\paper-search\tests\engineering_paper_intelligence\test_orchestrator_dry_run.py`
+  - End-to-end dry-run test using a fixture search result instead of live network.
+- Modify `D:\paper-search\.gitignore`
+  - Ensure `parsed/`, `.env/`, and runtime paper wiki outputs remain ignored.
+- Modify `D:\paper-search\.env_example`
+  - Add publishable example keys for the larger plugin without secrets.
+
+## Task 1: Scaffold Plugin Manifest And Static Metadata
+
+**Files:**
+
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\.codex-plugin\plugin.json`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\.mcp.json`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\docs\workflow.md`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\docs\attribution.md`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\vendor-notices\paper-search-mcp.md`
+
+- [ ] **Step 1: Create the plugin manifest**
+
+Write `D:\paper-search\plugins\engineering-paper-intelligence\.codex-plugin\plugin.json`:
+
+```json
+{
+  "name": "engineering-paper-intelligence",
+  "version": "0.1.0",
+  "description": "Search, rank, preserve, and prepare engineering papers for a dedicated LLM Wiki workflow.",
+  "author": {
+    "name": "liuchf"
+  },
+  "license": "MIT",
+  "keywords": [
+    "papers",
+    "robotics",
+    "ai",
+    "embodied-intelligence",
+    "control",
+    "obsidian",
+    "zotero",
+    "mineru"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Engineering Paper Intelligence",
+    "shortDescription": "Dry-run search, filter, and rank engineering papers before parsing and wiki promotion.",
+    "longDescription": "Engineering Paper Intelligence packages a Codex workflow for configurable paper discovery in robotics, AI, embodied intelligence, and control. It wraps mature paper-search MCP infrastructure, preserves raw run artifacts, initializes a dedicated paper research wiki, and keeps MinerU parsing as an internal stage for future parse runs.",
+    "developerName": "liuchf",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Search high-quality robotics and AI papers in dry-run mode.",
+      "Initialize my dedicated paper research wiki.",
+      "Rank engineering papers for embodied intelligence and control."
+    ]
+  }
+}
+```
+
+- [ ] **Step 2: Create the MCP metadata file**
+
+Write `D:\paper-search\plugins\engineering-paper-intelligence\.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "paper-search-mcp": {
+      "command": "paper-search-mcp",
+      "args": [],
+      "env": {}
+    }
+  },
+  "notes": [
+    "This plugin wraps openags/paper-search-mcp as an external dependency.",
+    "The Phase 1 adapter must probe availability and fail closed when this command is unavailable.",
+    "Runtime search responses are normalized before downstream stages consume them."
+  ]
+}
+```
+
+- [ ] **Step 3: Create workflow documentation**
+
+Write `D:\paper-search\plugins\engineering-paper-intelligence\docs\workflow.md`:
+
+```markdown
+# Engineering Paper Intelligence Workflow
+
+Phase 1 supports dry-run discovery:
+
+`configure -> discover -> normalize -> filter -> rank -> report`
+
+Dry-run mode writes run artifacts under the configured paper wiki `_runs/<run-id>/` directory. It does not download PDFs, call MinerU, write compiled wiki pages, or write Zotero.
+
+Default paper wiki path:
+
+`D:\paper-research-wiki`
+
+Default interest profile:
+
+robotics, AI, embodied intelligence, and control.
+
+Run from the plugin directory:
+
+```powershell
+python scripts\init_paper_wiki.py --vault D:\paper-research-wiki
+python scripts\orchestrator.py dry-run --query "robotics embodied intelligence control" --max-results 20 --vault D:\paper-research-wiki
+```
+
+The dry-run report is written to:
+
+`D:\paper-research-wiki\_runs\<run-id>\report.md`
+```
+
+- [ ] **Step 4: Create attribution documentation**
+
+Write `D:\paper-search\plugins\engineering-paper-intelligence\docs\attribution.md`:
+
+```markdown
+# Attribution
+
+This plugin wraps and learns from mature research tooling while keeping runtime contracts explicit.
+
+## openags/paper-search-mcp
+
+The discovery layer is designed to wrap `openags/paper-search-mcp` as an external dependency. The plugin adapter records the upstream command, version probe result, source names, query, and raw response path for every discovery run.
+
+## MinerU
+
+The PDF parsing stage reuses the existing local MinerU precise batch workflow from `plugins/mineru-paper-parser`. Tokens are read from `MINERU_TOKEN` or `.env/mineru.env` and must not be committed.
+
+## Ar9av LLM Wiki Pattern
+
+The dedicated paper wiki follows the raw source -> compiled wiki -> schema pattern. Raw paper assets remain under `_raw`, while compiled pages live under `references`, `concepts`, and `synthesis`.
+
+## Nature-style Reader Inspiration
+
+Future reader stages can borrow figure-aware and source-grounded reading patterns from Nature-style paper-reader workflows, adapted for engineering papers rather than manuscript submission.
+```
+
+- [ ] **Step 5: Create upstream notice**
+
+Write `D:\paper-search\plugins\engineering-paper-intelligence\vendor-notices\paper-search-mcp.md`:
+
+```markdown
+# paper-search-mcp Notice
+
+Upstream project: `openags/paper-search-mcp`
+
+Phase 1 uses this project as an external MCP dependency. The plugin does not vendor upstream source code by default.
+
+Compatibility policy:
+
+- Probe the installed command before discovery.
+- Record the discovered version or probe output in each run.
+- Keep all upstream-specific response handling inside `scripts/epi/paper_search_adapter.py`.
+- Add license text and a sync record before any future vendored copy is introduced.
+```
+
+- [ ] **Step 6: Validate plugin manifest**
+
+Run:
+
+```powershell
+python 'C:\Users\liuchf\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py' 'D:\paper-search\plugins\engineering-paper-intelligence'
+```
+
+Expected:
+
+```text
+Plugin validation passed
+```
+
+- [ ] **Step 7: Commit the scaffold**
+
+Run:
+
+```powershell
+git add plugins/engineering-paper-intelligence/.codex-plugin/plugin.json plugins/engineering-paper-intelligence/.mcp.json plugins/engineering-paper-intelligence/docs/workflow.md plugins/engineering-paper-intelligence/docs/attribution.md plugins/engineering-paper-intelligence/vendor-notices/paper-search-mcp.md
+git commit -m "feat: scaffold engineering paper intelligence plugin"
+```
+
+Expected:
+
+```text
+[main <hash>] feat: scaffold engineering paper intelligence plugin
+```
+
+## Task 2: Copy Existing MinerU Parser As Internal Stage
+
+**Files:**
+
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\skills\mineru-paper-parser\SKILL.md`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\skills\mineru-paper-parser\scripts\mineru_batch_to_md.py`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\skills\mineru-paper-parser\references\mineru_api.md`
+
+- [ ] **Step 1: Copy the working MinerU skill files**
+
+Run:
+
+```powershell
+New-Item -ItemType Directory -Force -Path 'D:\paper-search\plugins\engineering-paper-intelligence\skills\mineru-paper-parser\scripts' | Out-Null
+New-Item -ItemType Directory -Force -Path 'D:\paper-search\plugins\engineering-paper-intelligence\skills\mineru-paper-parser\references' | Out-Null
+Copy-Item -LiteralPath 'D:\paper-search\plugins\mineru-paper-parser\skills\mineru-precision-batch\SKILL.md' -Destination 'D:\paper-search\plugins\engineering-paper-intelligence\skills\mineru-paper-parser\SKILL.md'
+Copy-Item -LiteralPath 'D:\paper-search\plugins\mineru-paper-parser\skills\mineru-precision-batch\scripts\mineru_batch_to_md.py' -Destination 'D:\paper-search\plugins\engineering-paper-intelligence\skills\mineru-paper-parser\scripts\mineru_batch_to_md.py'
+Copy-Item -LiteralPath 'D:\paper-search\plugins\mineru-paper-parser\skills\mineru-precision-batch\references\mineru_api.md' -Destination 'D:\paper-search\plugins\engineering-paper-intelligence\skills\mineru-paper-parser\references\mineru_api.md'
+```
+
+Expected:
+
+```text
+No error output
+```
+
+- [ ] **Step 2: Rename the copied skill metadata**
+
+Modify the frontmatter in `D:\paper-search\plugins\engineering-paper-intelligence\skills\mineru-paper-parser\SKILL.md` to:
+
+```markdown
+---
+name: mineru-paper-parser
+description: "Use this skill when the engineering paper intelligence plugin needs to parse local PDFs into organized Markdown, LaTeX, and image folders with MinerU's precise batch API. Defaults to token-authenticated precise batch API, relative project paths, VLM model, English language, and one folder per paper."
+---
+```
+
+Keep the rest of the copied instructions intact except for command paths that should point to:
+
+```powershell
+python skills/mineru-paper-parser/scripts/mineru_batch_to_md.py --input-dir paper --output-dir parsed
+```
+
+- [ ] **Step 3: Smoke-test the copied script help**
+
+Run:
+
+```powershell
+python 'D:\paper-search\plugins\engineering-paper-intelligence\skills\mineru-paper-parser\scripts\mineru_batch_to_md.py' --help
+```
+
+Expected:
+
+```text
+usage:
+```
+
+- [ ] **Step 4: Commit the internal MinerU stage**
+
+Run:
+
+```powershell
+git add plugins/engineering-paper-intelligence/skills/mineru-paper-parser
+git commit -m "feat: include mineru parser stage in paper intelligence plugin"
+```
+
+Expected:
+
+```text
+[main <hash>] feat: include mineru parser stage in paper intelligence plugin
+```
+
+## Task 3: Add Config Templates And Environment Boundaries
+
+**Files:**
+
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\templates\interests.example.yaml`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\templates\ranking.example.yaml`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\templates\filter-rules.example.yaml`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\templates\critic-checklist.example.yaml`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\templates\routing-rules.example.yaml`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\docs\config.md`
+- Modify: `D:\paper-search\.env_example`
+- Modify: `D:\paper-search\.gitignore`
+- Test: `D:\paper-search\tests\engineering_paper_intelligence\test_config.py`
+
+- [ ] **Step 1: Write a failing config test**
+
+Create `D:\paper-search\tests\engineering_paper_intelligence\test_config.py`:
+
+```python
+from pathlib import Path
+
+from epi.config import load_config
+
+
+def test_load_config_uses_relative_defaults(tmp_path):
+    plugin_root = tmp_path / "plugin"
+    templates = plugin_root / "templates"
+    templates.mkdir(parents=True)
+    (templates / "interests.example.yaml").write_text(
+        "profile: robotics_ai_control\n"
+        "domains:\n"
+        "  - robotics\n"
+        "budget:\n"
+        "  max_results: 12\n",
+        encoding="utf-8",
+    )
+
+    config = load_config(plugin_root=plugin_root, vault_path=tmp_path / "vault", max_results=None)
+
+    assert config.plugin_root == plugin_root
+    assert config.vault_path == tmp_path / "vault"
+    assert config.runs_dir == tmp_path / "vault" / "_runs"
+    assert config.max_results == 12
+    assert config.profile == "robotics_ai_control"
+```
+
+- [ ] **Step 2: Run the failing config test**
+
+Run:
+
+```powershell
+$env:PYTHONPATH='D:\paper-search\plugins\engineering-paper-intelligence\scripts'
+python -m pytest D:\paper-search\tests\engineering_paper_intelligence\test_config.py -v
+```
+
+Expected:
+
+```text
+ModuleNotFoundError: No module named 'epi'
+```
+
+- [ ] **Step 3: Create the config module**
+
+Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\__init__.py`:
+
+```python
+"""Engineering Paper Intelligence runtime package."""
+```
+
+Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\config.py`:
+
+```python
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+@dataclass(frozen=True)
+class PipelineConfig:
+    plugin_root: Path
+    vault_path: Path
+    runs_dir: Path
+    max_results: int
+    profile: str
+    domains: list[str]
+
+
+def _parse_simple_yaml(path: Path) -> dict[str, Any]:
+    data: dict[str, Any] = {}
+    current_key: str | None = None
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.rstrip()
+        if not line or line.lstrip().startswith("#"):
+            continue
+        if not line.startswith(" ") and ":" in line:
+            key, value = line.split(":", 1)
+            current_key = key.strip()
+            value = value.strip()
+            if value:
+                data[current_key] = value.strip("'\"")
+            else:
+                data[current_key] = [] if current_key in {"domains"} else {}
+            continue
+        if current_key == "domains" and line.strip().startswith("- "):
+            data.setdefault("domains", []).append(line.strip()[2:].strip("'\""))
+        if current_key == "budget" and ":" in line:
+            key, value = line.strip().split(":", 1)
+            data.setdefault("budget", {})[key.strip()] = int(value.strip())
+    return data
+
+
+def load_config(plugin_root: Path, vault_path: Path, max_results: int | None) -> PipelineConfig:
+    plugin_root = plugin_root.resolve()
+    vault_path = vault_path.resolve()
+    interests_path = plugin_root / "templates" / "interests.example.yaml"
+    interests = _parse_simple_yaml(interests_path)
+    budget = interests.get("budget", {})
+    configured_max = int(budget.get("max_results", 20))
+    return PipelineConfig(
+        plugin_root=plugin_root,
+        vault_path=vault_path,
+        runs_dir=vault_path / "_runs",
+        max_results=max_results or configured_max,
+        profile=str(interests.get("profile", "robotics_ai_control")),
+        domains=list(interests.get("domains", ["robotics", "ai", "embodied intelligence", "control"])),
+    )
+```
+
+- [ ] **Step 4: Add publishable config templates**
+
+Write `D:\paper-search\plugins\engineering-paper-intelligence\templates\interests.example.yaml`:
+
+```yaml
+profile: robotics_ai_control
+domains:
+  - robotics
+  - artificial intelligence
+  - embodied intelligence
+  - motion control
+  - navigation
+positive_keywords:
+  - robot learning
+  - humanoid
+  - embodied AI
+  - model predictive control
+  - reinforcement learning
+  - visual navigation
+negative_keywords:
+  - pure survey without engineering relevance
+  - unrelated biomedical trial
+budget:
+  max_results: 20
+```
+
+Write `D:\paper-search\plugins\engineering-paper-intelligence\templates\ranking.example.yaml`:
+
+```yaml
+weights:
+  topic_relevance: 0.35
+  venue_quality: 0.18
+  citation_signal: 0.15
+  freshness: 0.10
+  pdf_available: 0.08
+  code_available: 0.08
+  reproducibility_signal: 0.06
+venue_tiers:
+  icra: 1.0
+  iros: 0.95
+  rss: 1.0
+  corl: 0.98
+  neurips: 1.0
+  iclr: 1.0
+  icml: 1.0
+  science_robotics: 1.0
+```
+
+Write `D:\paper-search\plugins\engineering-paper-intelligence\templates\filter-rules.example.yaml`:
+
+```yaml
+require_pdf: true
+exclude_if_already_in_wiki: true
+exclude_if_already_in_zotero: true
+minimum_year: 2018
+minimum_metadata_fields:
+  - title
+  - authors
+  - year
+  - abstract
+borderline_policy: keep_with_warning
+```
+
+Write `D:\paper-search\plugins\engineering-paper-intelligence\templates\critic-checklist.example.yaml`:
+
+```yaml
+paper_quality_critic:
+  enabled_from_phase: 2
+parse_quality_critic:
+  enabled_from_phase: 2
+reader_quality_critic:
+  enabled_from_phase: 2
+hard_rule: "No critic pass, no compiled wiki write."
+```
+
+Write `D:\paper-search\plugins\engineering-paper-intelligence\templates\routing-rules.example.yaml`:
+
+```yaml
+phase_1:
+  missing_search_record: discover
+  missing_normalized: normalize
+  missing_filter_report: filter
+  missing_rank: rank
+  dry_run_complete: report
+post_phase_1_stage_names:
+  - acquire
+  - parse
+  - read
+  - critic
+  - staging
+  - promote-to-wiki
+  - zotero
+  - feedback
+  - skill-aware-evolve
+```
+
+- [ ] **Step 5: Update environment examples and gitignore**
+
+Append to `D:\paper-search\.env_example`:
+
+```dotenv
+# Engineering Paper Intelligence examples only. Do not put real tokens in this file.
+PAPER_SEARCH_HOME=D:\paper-search
+PAPER_WIKI_VAULT_PATH=D:\paper-research-wiki
+PAPER_SEARCH_MCP_MODE=external
+PAPER_SEARCH_MCP_VERSION=pinned-by-docs
+ZOTERO_ENABLED=false
+ZOTERO_COLLECTION=Engineering Paper Intelligence
+HUMAN_GATE_MODE=before_promote
+PAPER_PIPELINE_BUDGET=max_results=20,max_parse=0
+MINERU_TOKEN=replace_with_local_token_or_use_.env/mineru.env
+```
+
+Ensure `D:\paper-search\.gitignore` contains:
+
+```gitignore
+.env/
+parsed/
+paper-research-wiki/
+plugins/engineering-paper-intelligence/.runtime/
+```
+
+- [ ] **Step 6: Write config documentation**
+
+Write `D:\paper-search\plugins\engineering-paper-intelligence\docs\config.md`:
+
+```markdown
+# Configuration
+
+Publishable examples live under `templates/`.
+
+Private secrets live outside committed files:
+
+- `MINERU_TOKEN` environment variable, or
+- `D:\paper-search\.env\mineru.env`
+
+The committed `.env_example` file is a template only. It must not contain real API tokens.
+
+Default paper wiki:
+
+`D:\paper-research-wiki`
+
+Phase 1 dry-run writes only `_runs/<run-id>/` artifacts. It does not write compiled pages under `references`, `concepts`, or `synthesis`.
+```
+
+- [ ] **Step 7: Run config tests**
+
+Run:
+
+```powershell
+$env:PYTHONPATH='D:\paper-search\plugins\engineering-paper-intelligence\scripts'
+python -m pytest D:\paper-search\tests\engineering_paper_intelligence\test_config.py -v
+```
+
+Expected:
+
+```text
+1 passed
+```
+
+- [ ] **Step 8: Commit config assets**
+
+Run:
+
+```powershell
+git add .env_example .gitignore plugins/engineering-paper-intelligence/templates plugins/engineering-paper-intelligence/docs/config.md plugins/engineering-paper-intelligence/scripts/epi/__init__.py plugins/engineering-paper-intelligence/scripts/epi/config.py tests/engineering_paper_intelligence/test_config.py
+git commit -m "feat: add paper intelligence configuration templates"
+```
+
+Expected:
+
+```text
+[main <hash>] feat: add paper intelligence configuration templates
+```
+
+## Task 4: Implement Dedicated Paper Wiki Initialization
+
+**Files:**
+
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\templates\wiki\index.md`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\templates\wiki\log.md`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\templates\wiki\hot.md`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\templates\wiki\manifest.json`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\wiki_init.py`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\scripts\init_paper_wiki.py`
+- Test: `D:\paper-search\tests\engineering_paper_intelligence\test_wiki_init.py`
+
+- [ ] **Step 1: Write the failing wiki initializer test**
+
+Create `D:\paper-search\tests\engineering_paper_intelligence\test_wiki_init.py`:
+
+```python
+import json
+
+from epi.wiki_init import initialize_paper_wiki
+
+
+def test_initialize_paper_wiki_creates_required_layout(tmp_path):
+    vault = tmp_path / "paper-research-wiki"
+
+    created = initialize_paper_wiki(vault)
+
+    expected_dirs = [
+        "_raw/papers",
+        "_staging/papers",
+        "_quarantine/papers",
+        "_runs",
+        "_evolution/proposals",
+        "_evolution/active",
+        "_evolution/archive",
+        "_meta",
+        "references",
+        "concepts",
+        "synthesis",
+        "entities",
+        "skills",
+        "projects",
+        "journal",
+        ".obsidian",
+    ]
+    for relative_path in expected_dirs:
+        assert (vault / relative_path).is_dir()
+
+    manifest = json.loads((vault / ".manifest.json").read_text(encoding="utf-8"))
+    assert manifest["vault_type"] == "engineering-paper-research"
+    assert "index.md" in created
+```
+
+- [ ] **Step 2: Run the failing wiki initializer test**
+
+Run:
+
+```powershell
+$env:PYTHONPATH='D:\paper-search\plugins\engineering-paper-intelligence\scripts'
+python -m pytest D:\paper-search\tests\engineering_paper_intelligence\test_wiki_init.py -v
+```
+
+Expected:
+
+```text
+ModuleNotFoundError: No module named 'epi.wiki_init'
+```
+
+- [ ] **Step 3: Add wiki templates**
+
+Write `D:\paper-search\plugins\engineering-paper-intelligence\templates\wiki\index.md`:
+
+```markdown
+# Paper Research Wiki
+
+This vault is dedicated to engineering paper research.
+
+Compiled knowledge pages live in:
+
+- `references`
+- `concepts`
+- `synthesis`
+- `entities`
+- `skills`
+- `projects`
+
+Operational artifacts live in underscored directories and should not be treated as compiled wiki pages.
+```
+
+Write `D:\paper-search\plugins\engineering-paper-intelligence\templates\wiki\log.md`:
+
+```markdown
+# Log
+
+## Initialized
+
+- Created dedicated paper research wiki structure.
+```
+
+Write `D:\paper-search\plugins\engineering-paper-intelligence\templates\wiki\hot.md`:
+
+```markdown
+# Hot
+
+No promoted papers yet.
+```
+
+Write `D:\paper-search\plugins\engineering-paper-intelligence\templates\wiki\manifest.json`:
+
+```json
+{
+  "vault_type": "engineering-paper-research",
+  "schema": "raw source -> compiled wiki -> schema",
+  "compiled_dirs": [
+    "references",
+    "concepts",
+    "synthesis",
+    "entities",
+    "skills",
+    "projects",
+    "journal"
+  ],
+  "operational_dirs": [
+    "_raw",
+    "_staging",
+    "_quarantine",
+    "_runs",
+    "_evolution",
+    "_meta"
+  ],
+  "papers": []
+}
+```
+
+- [ ] **Step 4: Implement the initializer**
+
+Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\wiki_init.py`:
+
+```python
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+
+REQUIRED_DIRS = [
+    "_raw/papers",
+    "_staging/papers",
+    "_quarantine/papers",
+    "_runs",
+    "_evolution/proposals",
+    "_evolution/active",
+    "_evolution/archive",
+    "_meta",
+    "references",
+    "concepts",
+    "synthesis",
+    "entities",
+    "skills",
+    "projects",
+    "journal",
+    ".obsidian",
+]
+
+
+def initialize_paper_wiki(vault_path: Path) -> list[str]:
+    vault_path = vault_path.resolve()
+    created: list[str] = []
+    for relative_dir in REQUIRED_DIRS:
+        path = vault_path / relative_dir
+        if not path.exists():
+            created.append(relative_dir)
+        path.mkdir(parents=True, exist_ok=True)
+
+    files = {
+        "index.md": "# Paper Research Wiki\n\nThis vault is dedicated to engineering paper research.\n",
+        "log.md": "# Log\n\n## Initialized\n\n- Created dedicated paper research wiki structure.\n",
+        "hot.md": "# Hot\n\nNo promoted papers yet.\n",
+        ".manifest.json": json.dumps(
+            {
+                "vault_type": "engineering-paper-research",
+                "schema": "raw source -> compiled wiki -> schema",
+                "compiled_dirs": ["references", "concepts", "synthesis", "entities", "skills", "projects", "journal"],
+                "operational_dirs": ["_raw", "_staging", "_quarantine", "_runs", "_evolution", "_meta"],
+                "papers": [],
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+    }
+    for relative_file, content in files.items():
+        path = vault_path / relative_file
+        if not path.exists():
+            path.write_text(content, encoding="utf-8")
+            created.append(relative_file)
+    return created
+
+
+def main() -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Initialize a dedicated engineering paper research wiki.")
+    parser.add_argument("--vault", type=Path, default=Path(r"D:\paper-research-wiki"))
+    args = parser.parse_args()
+    created = initialize_paper_wiki(args.vault)
+    print(f"initialized={args.vault.resolve()}")
+    print(f"created_count={len(created)}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+```
+
+Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\init_paper_wiki.py`:
+
+```python
+from epi.wiki_init import main
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+```
+
+- [ ] **Step 5: Run wiki initializer tests**
+
+Run:
+
+```powershell
+$env:PYTHONPATH='D:\paper-search\plugins\engineering-paper-intelligence\scripts'
+python -m pytest D:\paper-search\tests\engineering_paper_intelligence\test_wiki_init.py -v
+```
+
+Expected:
+
+```text
+1 passed
+```
+
+- [ ] **Step 6: Run initializer against a temporary vault**
+
+Run:
+
+```powershell
+$env:PYTHONPATH='D:\paper-search\plugins\engineering-paper-intelligence\scripts'
+$tmpVault = Join-Path $env:TEMP 'paper-research-wiki-smoke'
+Remove-Item -LiteralPath $tmpVault -Recurse -Force -ErrorAction SilentlyContinue
+python 'D:\paper-search\plugins\engineering-paper-intelligence\scripts\init_paper_wiki.py' --vault $tmpVault
+Test-Path (Join-Path $tmpVault '_raw\papers')
+Test-Path (Join-Path $tmpVault '.manifest.json')
+```
+
+Expected:
+
+```text
+initialized=<temp path>
+created_count=20
+True
+True
+```
+
+- [ ] **Step 7: Commit wiki initialization**
+
+Run:
+
+```powershell
+git add plugins/engineering-paper-intelligence/templates/wiki plugins/engineering-paper-intelligence/scripts/epi/wiki_init.py plugins/engineering-paper-intelligence/scripts/init_paper_wiki.py tests/engineering_paper_intelligence/test_wiki_init.py
+git commit -m "feat: initialize dedicated paper research wiki"
+```
+
+Expected:
+
+```text
+[main <hash>] feat: initialize dedicated paper research wiki
+```
+
+## Task 5: Implement Normalize, Filter, And Rank Core
+
+**Files:**
+
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\schemas.py`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\normalize_candidates.py`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\filter_candidates.py`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\rank_papers.py`
+- Test: `D:\paper-search\tests\engineering_paper_intelligence\test_normalize_filter_rank.py`
+
+- [ ] **Step 1: Write failing normalize/filter/rank tests**
+
+Create `D:\paper-search\tests\engineering_paper_intelligence\test_normalize_filter_rank.py`:
+
+```python
+from epi.filter_candidates import filter_candidates
+from epi.normalize_candidates import normalize_candidates
+from epi.rank_papers import rank_candidates
+
+
+def test_normalize_filter_rank_keeps_relevant_pdf_candidate():
+    raw_records = [
+        {
+            "source": "semantic_scholar",
+            "title": "Learning Agile Humanoid Motion Control",
+            "authors": ["A. Researcher"],
+            "year": 2025,
+            "venue": "ICRA",
+            "abstract": "Robot learning for humanoid motion control with reproducible experiments.",
+            "doi": "10.1000/example",
+            "pdf_url": "https://example.org/paper.pdf",
+            "citation_count": 42,
+            "code_url": "https://github.com/example/code",
+        },
+        {
+            "source": "openalex",
+            "title": "Learning Agile Humanoid Motion Control",
+            "authors": ["A. Researcher"],
+            "year": 2025,
+            "venue": "ICRA",
+            "abstract": "Robot learning for humanoid motion control with reproducible experiments.",
+            "doi": "10.1000/example",
+            "pdf_url": "https://example.org/paper.pdf",
+            "citation_count": 40,
+        },
+    ]
+
+    normalized = normalize_candidates(raw_records)
+    filtered = filter_candidates(normalized, domains=["robotics", "control"], require_pdf=True)
+    ranked = rank_candidates(filtered, positive_keywords=["humanoid", "control"], venue_tiers={"icra": 1.0})
+
+    assert len(normalized) == 1
+    assert filtered[0]["filter_status"] == "kept"
+    assert ranked[0]["score"] > 0.75
+    assert ranked[0]["sources"] == ["openalex", "semantic_scholar"]
+```
+
+- [ ] **Step 2: Run the failing tests**
+
+Run:
+
+```powershell
+$env:PYTHONPATH='D:\paper-search\plugins\engineering-paper-intelligence\scripts'
+python -m pytest D:\paper-search\tests\engineering_paper_intelligence\test_normalize_filter_rank.py -v
+```
+
+Expected:
+
+```text
+ModuleNotFoundError
+```
+
+- [ ] **Step 3: Implement schemas and normalization**
+
+Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\schemas.py`:
+
+```python
+from __future__ import annotations
+
+import re
+
+
+def slugify_title(title: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    return slug[:96] or "untitled-paper"
+
+
+def canonical_key(record: dict) -> str:
+    doi = str(record.get("doi") or "").lower().strip()
+    if doi:
+        return f"doi:{doi}"
+    arxiv_id = str(record.get("arxiv_id") or "").lower().strip()
+    if arxiv_id:
+        return f"arxiv:{arxiv_id}"
+    return f"title:{slugify_title(str(record.get('title') or 'untitled-paper'))}"
+```
+
+Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\normalize_candidates.py`:
+
+```python
+from __future__ import annotations
+
+from epi.schemas import canonical_key, slugify_title
+
+
+def normalize_candidates(raw_records: list[dict]) -> list[dict]:
+    merged: dict[str, dict] = {}
+    for record in raw_records:
+        key = canonical_key(record)
+        current = merged.setdefault(
+            key,
+            {
+                "id": key,
+                "slug": slugify_title(str(record.get("title") or "untitled-paper")),
+                "title": record.get("title") or "",
+                "authors": record.get("authors") or [],
+                "year": record.get("year"),
+                "venue": record.get("venue") or "",
+                "abstract": record.get("abstract") or "",
+                "doi": record.get("doi"),
+                "arxiv_id": record.get("arxiv_id"),
+                "pdf_url": record.get("pdf_url"),
+                "code_url": record.get("code_url"),
+                "citation_count": int(record.get("citation_count") or 0),
+                "sources": [],
+                "raw_records": [],
+            },
+        )
+        source = str(record.get("source") or "unknown")
+        if source not in current["sources"]:
+            current["sources"].append(source)
+        current["sources"].sort()
+        current["raw_records"].append(record)
+        if not current.get("pdf_url") and record.get("pdf_url"):
+            current["pdf_url"] = record.get("pdf_url")
+        if not current.get("code_url") and record.get("code_url"):
+            current["code_url"] = record.get("code_url")
+        current["citation_count"] = max(current["citation_count"], int(record.get("citation_count") or 0))
+    return list(merged.values())
+```
+
+- [ ] **Step 4: Implement filtering and ranking**
+
+Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\filter_candidates.py`:
+
+```python
+from __future__ import annotations
+
+
+def filter_candidates(candidates: list[dict], domains: list[str], require_pdf: bool) -> list[dict]:
+    kept: list[dict] = []
+    domain_terms = [term.lower() for term in domains]
+    for candidate in candidates:
+        haystack = " ".join(
+            [
+                str(candidate.get("title") or ""),
+                str(candidate.get("abstract") or ""),
+                str(candidate.get("venue") or ""),
+            ]
+        ).lower()
+        reasons: list[str] = []
+        if require_pdf and not candidate.get("pdf_url"):
+            reasons.append("missing_pdf")
+        if domain_terms and not any(term in haystack for term in domain_terms):
+            robotics_terms = ["robot", "humanoid", "control", "navigation", "embodied"]
+            if not any(term in haystack for term in robotics_terms):
+                reasons.append("outside_domain")
+        filtered = dict(candidate)
+        filtered["filter_reasons"] = reasons
+        filtered["filter_status"] = "rejected" if reasons else "kept"
+        if not reasons:
+            kept.append(filtered)
+    return kept
+```
+
+Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\rank_papers.py`:
+
+```python
+from __future__ import annotations
+
+from math import log10
+
+
+def rank_candidates(candidates: list[dict], positive_keywords: list[str], venue_tiers: dict[str, float]) -> list[dict]:
+    ranked: list[dict] = []
+    keywords = [keyword.lower() for keyword in positive_keywords]
+    for candidate in candidates:
+        text = f"{candidate.get('title', '')} {candidate.get('abstract', '')}".lower()
+        keyword_hits = sum(1 for keyword in keywords if keyword in text)
+        topic_score = min(1.0, keyword_hits / max(1, len(keywords)))
+        venue_score = venue_tiers.get(str(candidate.get("venue") or "").lower(), 0.45)
+        citation_score = min(1.0, log10(int(candidate.get("citation_count") or 0) + 1) / 3)
+        freshness_score = 1.0 if int(candidate.get("year") or 0) >= 2024 else 0.7
+        pdf_score = 1.0 if candidate.get("pdf_url") else 0.0
+        code_score = 1.0 if candidate.get("code_url") else 0.0
+        score = (
+            topic_score * 0.35
+            + venue_score * 0.18
+            + citation_score * 0.15
+            + freshness_score * 0.10
+            + pdf_score * 0.08
+            + code_score * 0.08
+            + 0.06
+        )
+        ranked_candidate = dict(candidate)
+        ranked_candidate["score"] = round(score, 4)
+        ranked_candidate["ranking_signals"] = {
+            "topic_score": round(topic_score, 4),
+            "venue_score": round(venue_score, 4),
+            "citation_score": round(citation_score, 4),
+            "freshness_score": freshness_score,
+            "pdf_score": pdf_score,
+            "code_score": code_score,
+        }
+        ranked.append(ranked_candidate)
+    return sorted(ranked, key=lambda item: item["score"], reverse=True)
+```
+
+- [ ] **Step 5: Run normalize/filter/rank tests**
+
+Run:
+
+```powershell
+$env:PYTHONPATH='D:\paper-search\plugins\engineering-paper-intelligence\scripts'
+python -m pytest D:\paper-search\tests\engineering_paper_intelligence\test_normalize_filter_rank.py -v
+```
+
+Expected:
+
+```text
+1 passed
+```
+
+- [ ] **Step 6: Commit core ranking pipeline**
+
+Run:
+
+```powershell
+git add plugins/engineering-paper-intelligence/scripts/epi/schemas.py plugins/engineering-paper-intelligence/scripts/epi/normalize_candidates.py plugins/engineering-paper-intelligence/scripts/epi/filter_candidates.py plugins/engineering-paper-intelligence/scripts/epi/rank_papers.py tests/engineering_paper_intelligence/test_normalize_filter_rank.py
+git commit -m "feat: add dry-run normalize filter rank pipeline"
+```
+
+Expected:
+
+```text
+[main <hash>] feat: add dry-run normalize filter rank pipeline
+```
+
+## Task 6: Implement MCP Probe, Dry-Run Orchestrator, And Report
+
+**Files:**
+
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\skills\engineering-paper-discovery\SKILL.md`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\paper_search_adapter.py`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\report_run.py`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\orchestrator.py`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\scripts\orchestrator.py`
+- Create: `D:\paper-search\plugins\engineering-paper-intelligence\docs\recovery.md`
+- Test: `D:\paper-search\tests\engineering_paper_intelligence\test_orchestrator_dry_run.py`
+
+- [ ] **Step 1: Write failing dry-run orchestrator test**
+
+Create `D:\paper-search\tests\engineering_paper_intelligence\test_orchestrator_dry_run.py`:
+
+```python
+import json
+
+from epi.orchestrator import run_dry_run
+
+
+def test_dry_run_writes_phase_1_artifacts(tmp_path):
+    plugin_root = tmp_path / "plugin"
+    templates = plugin_root / "templates"
+    templates.mkdir(parents=True)
+    (templates / "interests.example.yaml").write_text(
+        "profile: robotics_ai_control\n"
+        "domains:\n"
+        "  - robotics\n"
+        "  - control\n"
+        "budget:\n"
+        "  max_results: 5\n",
+        encoding="utf-8",
+    )
+    fixture = tmp_path / "fixture.json"
+    fixture.write_text(
+        json.dumps(
+            [
+                {
+                    "source": "fixture",
+                    "title": "Embodied Navigation Control for Mobile Robots",
+                    "authors": ["B. Engineer"],
+                    "year": 2024,
+                    "venue": "IROS",
+                    "abstract": "Robotics navigation and control with code.",
+                    "pdf_url": "https://example.org/nav.pdf",
+                    "citation_count": 9,
+                    "code_url": "https://github.com/example/nav",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    run_dir = run_dry_run(
+        plugin_root=plugin_root,
+        vault_path=tmp_path / "vault",
+        query="robotics navigation control",
+        max_results=5,
+        fixture_path=fixture,
+    )
+
+    assert (run_dir / "run-state.json").is_file()
+    assert (run_dir / "search-record.json").is_file()
+    assert (run_dir / "normalized.json").is_file()
+    assert (run_dir / "filter-report.json").is_file()
+    assert (run_dir / "rank.json").is_file()
+    assert (run_dir / "report.md").is_file()
+    state = json.loads((run_dir / "run-state.json").read_text(encoding="utf-8"))
+    assert state["state"] == "reported"
+    assert state["dry_run"] is True
+```
+
+- [ ] **Step 2: Run the failing orchestrator test**
+
+Run:
+
+```powershell
+$env:PYTHONPATH='D:\paper-search\plugins\engineering-paper-intelligence\scripts'
+python -m pytest D:\paper-search\tests\engineering_paper_intelligence\test_orchestrator_dry_run.py -v
+```
+
+Expected:
+
+```text
+ModuleNotFoundError: No module named 'epi.orchestrator'
+```
+
+- [ ] **Step 3: Implement MCP adapter and report writer**
+
+Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\paper_search_adapter.py`:
+
+```python
+from __future__ import annotations
+
+import json
+import shutil
+import subprocess
+from pathlib import Path
+
+
+def probe_paper_search_mcp(command: str = "paper-search-mcp") -> dict:
+    resolved = shutil.which(command)
+    if not resolved:
+        return {"available": False, "command": command, "error": "command_not_found"}
+    result = subprocess.run([resolved, "--version"], capture_output=True, text=True, timeout=15)
+    return {
+        "available": result.returncode == 0,
+        "command": resolved,
+        "returncode": result.returncode,
+        "stdout": result.stdout.strip(),
+        "stderr": result.stderr.strip(),
+    }
+
+
+def discover(query: str, max_results: int, fixture_path: Path | None = None) -> dict:
+    if fixture_path:
+        records = json.loads(fixture_path.read_text(encoding="utf-8"))
+        return {
+            "query": query,
+            "max_results": max_results,
+            "source_mode": "fixture",
+            "mcp_probe": {"available": True, "command": "fixture"},
+            "records": records[:max_results],
+        }
+    probe = probe_paper_search_mcp()
+    if not probe["available"]:
+        return {
+            "query": query,
+            "max_results": max_results,
+            "source_mode": "external_mcp",
+            "mcp_probe": probe,
+            "records": [],
+            "error": "paper-search-mcp unavailable; install or configure it before live discovery",
+        }
+    return {
+        "query": query,
+        "max_results": max_results,
+        "source_mode": "external_mcp",
+        "mcp_probe": probe,
+        "records": [],
+        "error": "live MCP invocation contract not enabled in Phase 1 smoke path",
+    }
+```
+
+Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\report_run.py`:
+
+```python
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+
+def write_report(run_dir: Path, ranked: list[dict], errors: list[str]) -> None:
+    report = ["# Engineering Paper Intelligence Dry Run", ""]
+    report.append(f"Accepted candidates: {len(ranked)}")
+    if errors:
+        report.append("")
+        report.append("## Errors")
+        for error in errors:
+            report.append(f"- {error}")
+    report.append("")
+    report.append("## Ranked Papers")
+    for index, paper in enumerate(ranked, start=1):
+        report.append(f"{index}. {paper.get('title')} - score {paper.get('score')}")
+        report.append(f"   - venue: {paper.get('venue')}")
+        report.append(f"   - year: {paper.get('year')}")
+        report.append(f"   - pdf: {paper.get('pdf_url')}")
+    (run_dir / "report.md").write_text("\n".join(report) + "\n", encoding="utf-8")
+    (run_dir / "report.json").write_text(
+        json.dumps({"accepted_count": len(ranked), "errors": errors, "ranked": ranked}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+```
+
+- [ ] **Step 4: Implement the dry-run orchestrator**
+
+Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\epi\orchestrator.py`:
+
+```python
+from __future__ import annotations
+
+import argparse
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+
+from epi.config import load_config
+from epi.filter_candidates import filter_candidates
+from epi.normalize_candidates import normalize_candidates
+from epi.paper_search_adapter import discover
+from epi.rank_papers import rank_candidates
+from epi.report_run import write_report
+from epi.wiki_init import initialize_paper_wiki
+
+
+def _write_json(path: Path, payload: object) -> None:
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def run_dry_run(
+    plugin_root: Path,
+    vault_path: Path,
+    query: str,
+    max_results: int | None,
+    fixture_path: Path | None = None,
+) -> Path:
+    config = load_config(plugin_root=plugin_root, vault_path=vault_path, max_results=max_results)
+    initialize_paper_wiki(config.vault_path)
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    run_dir = config.runs_dir / run_id
+    run_dir.mkdir(parents=True, exist_ok=False)
+
+    state = {
+        "run_id": run_id,
+        "state": "configured",
+        "dry_run": True,
+        "query": query,
+        "profile": config.profile,
+        "vault_path": str(config.vault_path),
+    }
+    _write_json(run_dir / "run-state.json", state)
+
+    search_record = discover(query=query, max_results=config.max_results, fixture_path=fixture_path)
+    _write_json(run_dir / "search-record.json", search_record)
+    state["state"] = "discovered"
+    _write_json(run_dir / "run-state.json", state)
+
+    normalized = normalize_candidates(search_record.get("records", []))
+    _write_json(run_dir / "normalized.json", normalized)
+    state["state"] = "normalized"
+    _write_json(run_dir / "run-state.json", state)
+
+    filtered = filter_candidates(normalized, domains=config.domains, require_pdf=True)
+    _write_json(run_dir / "filter-report.json", filtered)
+    state["state"] = "filtered"
+    _write_json(run_dir / "run-state.json", state)
+
+    ranked = rank_candidates(
+        filtered,
+        positive_keywords=["robot", "humanoid", "embodied", "control", "navigation"],
+        venue_tiers={"icra": 1.0, "iros": 0.95, "rss": 1.0, "corl": 0.98, "neurips": 1.0, "iclr": 1.0, "icml": 1.0},
+    )
+    _write_json(run_dir / "rank.json", ranked)
+    state["state"] = "ranked"
+    _write_json(run_dir / "run-state.json", state)
+
+    errors = [search_record["error"]] if search_record.get("error") else []
+    write_report(run_dir, ranked, errors)
+    state["state"] = "reported"
+    _write_json(run_dir / "run-state.json", state)
+    return run_dir
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Engineering Paper Intelligence orchestrator.")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    dry_run = subparsers.add_parser("dry-run")
+    dry_run.add_argument("--query", required=True)
+    dry_run.add_argument("--max-results", type=int, default=None)
+    dry_run.add_argument("--vault", type=Path, default=Path(r"D:\paper-research-wiki"))
+    dry_run.add_argument("--plugin-root", type=Path, default=Path(__file__).resolve().parents[2])
+    dry_run.add_argument("--fixture", type=Path, default=None)
+    args = parser.parse_args()
+
+    if args.command == "dry-run":
+        run_dir = run_dry_run(
+            plugin_root=args.plugin_root,
+            vault_path=args.vault,
+            query=args.query,
+            max_results=args.max_results,
+            fixture_path=args.fixture,
+        )
+        print(f"run_dir={run_dir}")
+        return 0
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+```
+
+Create `D:\paper-search\plugins\engineering-paper-intelligence\scripts\orchestrator.py`:
+
+```python
+from epi.orchestrator import main
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+```
+
+- [ ] **Step 5: Create discovery skill**
+
+Write `D:\paper-search\plugins\engineering-paper-intelligence\skills\engineering-paper-discovery\SKILL.md`:
+
+```markdown
+---
+name: engineering-paper-discovery
+description: "Use this skill when the user wants to search, normalize, filter, and rank engineering papers for robotics, AI, embodied intelligence, control, navigation, or motion-control research. Phase 1 defaults to dry-run mode and does not download PDFs, parse with MinerU, write compiled wiki pages, or write Zotero."
+---
+
+# Engineering Paper Discovery
+
+Use this skill for Phase 1 paper discovery dry-runs.
+
+Default command from the plugin root:
+
+```powershell
+python scripts\orchestrator.py dry-run --query "robotics embodied intelligence control" --max-results 20 --vault D:\paper-research-wiki
+```
+
+Outputs are written to:
+
+`D:\paper-research-wiki\_runs\<run-id>\`
+
+Expected dry-run artifacts:
+
+- `run-state.json`
+- `search-record.json`
+- `normalized.json`
+- `filter-report.json`
+- `rank.json`
+- `report.md`
+- `report.json`
+
+Dry-run mode must stop before acquisition, MinerU parsing, reader generation, critic, wiki promotion, and Zotero.
+```
+
+- [ ] **Step 6: Create recovery documentation**
+
+Write `D:\paper-search\plugins\engineering-paper-intelligence\docs\recovery.md`:
+
+```markdown
+# Recovery
+
+Phase 1 dry-run is idempotent at the run directory level. Each run writes a new `_runs/<run-id>/` folder.
+
+To inspect a run:
+
+```powershell
+Get-Content D:\paper-research-wiki\_runs\<run-id>\run-state.json
+Get-Content D:\paper-research-wiki\_runs\<run-id>\report.md
+```
+
+If `paper-search-mcp` is unavailable, the run fails closed by writing an error to `search-record.json` and `report.md`. It must not fabricate search results.
+
+Dry-run artifacts may be removed when the user explicitly wants to discard a run. Raw papers and compiled wiki pages are not created by Phase 1.
+```
+
+- [ ] **Step 7: Run dry-run tests**
+
+Run:
+
+```powershell
+$env:PYTHONPATH='D:\paper-search\plugins\engineering-paper-intelligence\scripts'
+python -m pytest D:\paper-search\tests\engineering_paper_intelligence\test_orchestrator_dry_run.py -v
+```
+
+Expected:
+
+```text
+1 passed
+```
+
+- [ ] **Step 8: Run all Phase 0-1 tests**
+
+Run:
+
+```powershell
+$env:PYTHONPATH='D:\paper-search\plugins\engineering-paper-intelligence\scripts'
+python -m pytest D:\paper-search\tests\engineering_paper_intelligence -v
+```
+
+Expected:
+
+```text
+4 passed
+```
+
+- [ ] **Step 9: Run a fixture dry-run smoke test**
+
+Create a temporary fixture:
+
+```powershell
+$fixture = Join-Path $env:TEMP 'epi-fixture.json'
+@'
+[
+  {
+    "source": "fixture",
+    "title": "Embodied Navigation Control for Mobile Robots",
+    "authors": ["B. Engineer"],
+    "year": 2024,
+    "venue": "IROS",
+    "abstract": "Robotics navigation and control with code.",
+    "pdf_url": "https://example.org/nav.pdf",
+    "citation_count": 9,
+    "code_url": "https://github.com/example/nav"
+  }
+]
+'@ | Set-Content -LiteralPath $fixture -Encoding UTF8
+$env:PYTHONPATH='D:\paper-search\plugins\engineering-paper-intelligence\scripts'
+python 'D:\paper-search\plugins\engineering-paper-intelligence\scripts\orchestrator.py' dry-run --query 'robotics navigation control' --max-results 5 --vault "$env:TEMP\paper-research-wiki-smoke" --fixture $fixture
+```
+
+Expected:
+
+```text
+run_dir=<temp path>\paper-research-wiki-smoke\_runs\<run-id>
+```
+
+- [ ] **Step 10: Commit orchestrator and discovery skill**
+
+Run:
+
+```powershell
+git add plugins/engineering-paper-intelligence/skills/engineering-paper-discovery plugins/engineering-paper-intelligence/scripts/epi/paper_search_adapter.py plugins/engineering-paper-intelligence/scripts/epi/report_run.py plugins/engineering-paper-intelligence/scripts/epi/orchestrator.py plugins/engineering-paper-intelligence/scripts/orchestrator.py plugins/engineering-paper-intelligence/docs/recovery.md tests/engineering_paper_intelligence/test_orchestrator_dry_run.py
+git commit -m "feat: add paper discovery dry-run orchestrator"
+```
+
+Expected:
+
+```text
+[main <hash>] feat: add paper discovery dry-run orchestrator
+```
+
+## Task 7: Validate Installable Plugin Boundary
+
+**Files:**
+
+- Modify only if validation exposes issues:
+  - `D:\paper-search\plugins\engineering-paper-intelligence\.codex-plugin\plugin.json`
+  - `D:\paper-search\plugins\engineering-paper-intelligence\skills\engineering-paper-discovery\SKILL.md`
+  - `D:\paper-search\plugins\engineering-paper-intelligence\skills\mineru-paper-parser\SKILL.md`
+
+- [ ] **Step 1: Validate plugin manifest**
+
+Run:
+
+```powershell
+python 'C:\Users\liuchf\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py' 'D:\paper-search\plugins\engineering-paper-intelligence'
+```
+
+Expected:
+
+```text
+Plugin validation passed
+```
+
+- [ ] **Step 2: Check that no secrets are tracked**
+
+Run:
+
+```powershell
+git status --short
+git ls-files | Select-String -Pattern '^\.env/|mineru\.env|parsed/|paper-research-wiki'
+```
+
+Expected:
+
+```text
+No output from Select-String
+```
+
+- [ ] **Step 3: Check that dry-run does not write compiled wiki pages**
+
+Run:
+
+```powershell
+$vault = Join-Path $env:TEMP 'paper-research-wiki-smoke'
+Get-ChildItem -LiteralPath (Join-Path $vault 'references') -Force
+Get-ChildItem -LiteralPath (Join-Path $vault 'concepts') -Force
+Get-ChildItem -LiteralPath (Join-Path $vault 'synthesis') -Force
+```
+
+Expected:
+
+```text
+No promoted paper pages listed
+```
+
+- [ ] **Step 4: Commit validation fixes if any were required**
+
+If files changed in Step 1 or Step 2, run:
+
+```powershell
+git add plugins/engineering-paper-intelligence
+git commit -m "fix: satisfy paper intelligence plugin validation"
+```
+
+Expected when changes exist:
+
+```text
+[main <hash>] fix: satisfy paper intelligence plugin validation
+```
+
+Expected when no changes exist:
+
+```text
+No commit needed
+```
+
+## Self-Review
+
+Spec coverage:
+
+- Plugin marketplace boundary is covered by Task 1 and Task 7.
+- Existing MinerU parser preservation is covered by Task 2.
+- Config templates and secret boundaries are covered by Task 3.
+- Dedicated `D:\paper-research-wiki` initialization is covered by Task 4.
+- `openags/paper-search-mcp` probe and stable adapter boundary are covered by Task 6.
+- `configure -> discover -> normalize -> filter -> rank -> report` dry-run is covered by Tasks 3, 5, and 6.
+- No PDF acquisition, MinerU execution, reader, critic, promotion, or Zotero writes are included in this plan, matching Phase 0-1 scope.
+
+Placeholder scan:
+
+- This plan contains concrete paths, commands, code blocks, and expected outputs for every implementation task.
+- Post-Phase 1 items are explicitly out of scope rather than left undefined inside an implementation step.
+
+Type and interface consistency:
+
+- `load_config()` returns `PipelineConfig` with `plugin_root`, `vault_path`, `runs_dir`, `max_results`, `profile`, and `domains`.
+- `run_dry_run()` accepts `plugin_root`, `vault_path`, `query`, `max_results`, and optional `fixture_path`, and returns the created run directory.
+- JSON artifact names match the design spec: `search-record.json`, `normalized.json`, `filter-report.json`, `rank.json`, and `run-state.json`.
+- The orchestrator state sequence ends at `reported` in dry-run mode.
