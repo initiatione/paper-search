@@ -501,6 +501,7 @@ def run_dry_run(
         run_dir,
         ranked,
         errors,
+        run_id=run_id,
         rejected=rejected,
         quarantined=[],
         critic_failures=[],

@@ -42,6 +42,8 @@ def write_report(
 
     if workflow_type == "dry-run":
         report = ["# EPI Dry Run", ""]
+        if run_id:
+            report.append(f"Run ID: {run_id}")
         report.append(f"Accepted candidates: {len(ranked)}")
         report.append(f"Rejected candidates: {len(rejected)}")
         report.append(f"Quarantined candidates: {len(quarantined)}")

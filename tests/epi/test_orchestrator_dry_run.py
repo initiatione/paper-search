@@ -117,6 +117,7 @@ def test_dry_run_writes_phase_1_artifacts(tmp_path):
     assert state["output_artifact_hashes"]["filter-report.json"] == file_sha256(run_dir / "filter-report.json")
     assert state["output_artifact_hashes"]["rank.json"] == file_sha256(run_dir / "rank.json")
     assert state["output_artifact_hashes"]["report.md"] == file_sha256(run_dir / "report.md")
+    assert report["run_id"] == run_dir.name
     assert report["accepted"][0]["title"] == "Embodied Navigation Control for Mobile Robots"
     assert report["rejected"][0]["title"] == "Graph Theory Notes"
     assert sorted(report["rejected"][0]["filter_reasons"]) == ["missing_pdf", "outside_domain"]
@@ -130,6 +131,7 @@ def test_dry_run_writes_phase_1_artifacts(tmp_path):
         "Review accepted dry-run candidates before advancing ranked papers.",
         "Refine the query or domain profile if too many candidates were rejected.",
     ]
+    assert f"Run ID: {run_dir.name}" in report_md
     assert "## Budget Usage" in report_md
     assert "## Next Actions" in report_md
     assert index_payload["runs"][0]["run_id"] == run_dir.name
