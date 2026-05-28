@@ -11,6 +11,19 @@ Private secrets live outside committed files:
 
 The committed `.env_example` file is a template only. It must not contain real API tokens.
 
+Run first-use diagnostics from the installed plugin directory:
+
+```powershell
+python scripts\orchestrator.py doctor
+python scripts\orchestrator.py doctor --json
+```
+
+If `paper-search` or `MINERU_TOKEN` is missing, `doctor` reports warnings and includes setup links plus PowerShell examples. It does not open a browser by default. To open the setup pages for the currently missing items:
+
+```powershell
+python scripts\orchestrator.py doctor --open-setup
+```
+
 Default paper wiki:
 
 `D:\paper-research-wiki`

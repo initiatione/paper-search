@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import webbrowser
 from pathlib import Path
 
 from epi.paper_search_adapter import probe_paper_search_mcp
@@ -22,6 +23,30 @@ REQUIRED_PATHS = [
     "docs",
     "metric-packs/epi-quality-gates",
 ]
+
+PAPER_SEARCH_SETUP_URL = "https://github.com/openags/paper-search-mcp"
+MINERU_TOKEN_SETUP_URL = "https://mineru.net/apiManage/docs?openApplyModal=true"
+
+SETUP_GUIDES = {
+    "paper_search_cli": {
+        "summary": "Configure paper-search CLI",
+        "url": PAPER_SEARCH_SETUP_URL,
+        "description": "Install the upstream CLI or point EPI_PAPER_SEARCH_COMMAND at a local wrapper.",
+        "commands": [
+            "uvx --from git+https://github.com/openags/paper-search-mcp.git paper-search --help",
+            "$env:EPI_PAPER_SEARCH_COMMAND='D:\\paper-search\\.env\\paper-search-live.ps1'",
+        ],
+    },
+    "mineru_token": {
+        "summary": "Configure MINERU_TOKEN",
+        "url": MINERU_TOKEN_SETUP_URL,
+        "description": "Create a MinerU API token, then expose it to EPI as MINERU_TOKEN.",
+        "commands": [
+            "$env:MINERU_TOKEN='<your MinerU token>'",
+            "[Environment]::SetEnvironmentVariable('MINERU_TOKEN', '<your MinerU token>', 'User')",
+        ],
+    },
+}
 
 
 def _check_path(plugin_root: Path, relative_path: str) -> dict:
@@ -73,23 +98,45 @@ def _load_plugin_metadata(plugin_root: Path) -> tuple[dict, dict]:
     )
 
 
-def _check_paper_search(command: str) -> dict:
-    probe = probe_paper_search_mcp(command)
+def _setup_guide(check_name: str) -> dict | None:
+    guide = SETUP_GUIDES.get(check_name)
+    if not guide:
+        return None
+    return {
+        "summary": guide["summary"],
+        "url": guide["url"],
+        "description": guide["description"],
+        "commands": list(guide["commands"]),
+    }
+
+
+def _with_setup(check: dict) -> dict:
+    guide = _setup_guide(check["name"])
+    if guide and check["status"] == "warning":
+        return {**check, "setup": guide}
+    return check
+
+
+def _check_paper_search(command: str | None) -> dict:
+    selected_command = command or os.environ.get("EPI_PAPER_SEARCH_COMMAND") or "paper-search"
+    probe = probe_paper_search_mcp(selected_command)
     if probe.get("available"):
         return {
             "name": "paper_search_cli",
             "status": "ok",
-            "command": probe.get("command", command),
+            "command": probe.get("command", selected_command),
             "message": probe.get("stdout") or "available",
             "probe": probe,
         }
-    return {
-        "name": "paper_search_cli",
-        "status": "warning",
-        "command": command,
-        "message": probe.get("error", "unavailable"),
-        "probe": probe,
-    }
+    return _with_setup(
+        {
+            "name": "paper_search_cli",
+            "status": "warning",
+            "command": selected_command,
+            "message": probe.get("error", "unavailable"),
+            "probe": probe,
+        }
+    )
 
 
 def _check_mineru_command(plugin_root: Path, command: str | None) -> dict:
@@ -111,18 +158,44 @@ def _check_mineru_command(plugin_root: Path, command: str | None) -> dict:
 
 def _check_mineru_token() -> dict:
     token_present = bool(os.environ.get("MINERU_TOKEN"))
-    return {
-        "name": "mineru_token",
-        "status": "ok" if token_present else "warning",
-        "message": "MINERU_TOKEN is set" if token_present else "MINERU_TOKEN is not set",
-    }
+    return _with_setup(
+        {
+            "name": "mineru_token",
+            "status": "ok" if token_present else "warning",
+            "message": "MINERU_TOKEN is set" if token_present else "MINERU_TOKEN is not set",
+        }
+    )
+
+
+def setup_links_for_report(report: dict) -> list[dict]:
+    links = []
+    seen_urls = set()
+    for check in report.get("checks", []):
+        setup = check.get("setup")
+        if not setup:
+            continue
+        url = setup["url"]
+        if url in seen_urls:
+            continue
+        seen_urls.add(url)
+        links.append({"name": check["name"], "summary": setup["summary"], "url": url})
+    return links
+
+
+def open_setup_links(report: dict) -> list[str]:
+    opened_urls = []
+    for link in setup_links_for_report(report):
+        url = link["url"]
+        webbrowser.open(url)
+        opened_urls.append(url)
+    return opened_urls
 
 
 def collect_doctor_report(
     *,
     plugin_root: Path,
     vault_path: Path,
-    paper_search_command: str,
+    paper_search_command: str | None,
     mineru_command: str | None = None,
 ) -> dict:
     plugin_root = plugin_root.resolve()
@@ -134,13 +207,17 @@ def collect_doctor_report(
     checks.append(_check_mineru_command(plugin_root, mineru_command))
     checks.append(_check_mineru_token())
     overall_status = "error" if any(check["status"] == "error" for check in checks) else "ok"
-    return {
+    report = {
         "overall_status": overall_status,
         "plugin_root": str(plugin_root),
         "plugin": plugin_metadata,
         "default_vault": str(vault_path),
         "checks": checks,
     }
+    setup_links = setup_links_for_report(report)
+    report["setup_required"] = bool(setup_links)
+    report["setup_links"] = setup_links
+    return report
 
 
 def render_doctor_report(report: dict) -> str:
@@ -157,5 +234,21 @@ def render_doctor_report(report: dict) -> str:
     ]
     for check in report["checks"]:
         lines.append(f"- {check['name']}: {check['status']} - {check.get('message', '')}")
+    if report.get("setup_required"):
+        lines.extend(["", "First-use setup:"])
+        for check in report["checks"]:
+            setup = check.get("setup")
+            if not setup:
+                continue
+            lines.append(f"- {check['name']}: {setup['summary']}")
+            lines.append(f"  url: {setup['url']}")
+            lines.append(f"  note: {setup['description']}")
+            if setup.get("commands"):
+                lines.append("  commands:")
+                lines.extend(f"    - {command}" for command in setup["commands"])
+        lines.append("  Run doctor --open-setup to open these setup pages in your browser.")
+    if report.get("opened_setup_urls"):
+        lines.extend(["", "Opened setup pages:"])
+        lines.extend(f"- {url}" for url in report["opened_setup_urls"])
     lines.append("")
     return "\n".join(lines)

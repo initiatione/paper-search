@@ -6,6 +6,14 @@
 python scripts\orchestrator.py doctor --json
 ```
 
+如果本机还没配置 `paper-search` CLI 或 `MINERU_TOKEN`，`doctor` 会把它们标记为 warning，并给出首次配置链接和 PowerShell 示例。默认检查不会打开浏览器；只有用户明确要求时才打开当前缺失项的配置页面：
+
+```powershell
+python scripts\orchestrator.py doctor --open-setup
+```
+
+`paper-search` 引导指向 `https://github.com/openags/paper-search-mcp`，建议通过 `EPI_PAPER_SEARCH_COMMAND` 指向本机 wrapper。`MINERU_TOKEN` 引导指向 `https://mineru.net/apiManage/docs?openApplyModal=true`，用户拿到 token 后再设置本机环境变量。EPI 不保存、不打印真实 token。
+
 配置缺失时，EPI 必须先完成纯对话初始化。不要直接运行论文流程，不要启动 `dry-run`、`ingest`、MinerU 或 Zotero。初始化只负责把用户确认过的设置写入所选 paper wiki 的 `_meta\epi-config.yaml`，历史备份写入 `_meta\config-history`。更新配置时也必须保留 `_raw`、`_runs`、`_staging`、`references` 和 Zotero 记录。
 
 ## 聊天式初始化脚本

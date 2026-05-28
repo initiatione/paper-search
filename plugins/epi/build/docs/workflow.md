@@ -4,6 +4,8 @@ Phase 1 supports dry-run discovery:
 
 `configure -> discover -> normalize -> filter -> rank -> report`
 
+Use `python scripts\orchestrator.py doctor` before a run when installation or dependency state is unclear. If first-use dependencies such as `paper-search` or `MINERU_TOKEN` are missing, `doctor` prints setup links and PowerShell examples. It opens setup pages only when called with `--open-setup`.
+
 Dry-run mode writes run artifacts under the configured paper wiki `_runs/<run-id>/` directory. It does not download PDFs, call MinerU, write compiled wiki pages, or write Zotero.
 
 The routing state source is `run-state.json`. Later phases must preserve the hard gate: No critic pass, no compiled wiki write. The critic gate must pass before promote-to-wiki can write compiled pages.

@@ -59,6 +59,8 @@ def _run_orchestrator_cli(monkeypatch, capsys, *args):
 
 
 def test_doctor_text_reports_ok_with_external_dependency_warnings(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("MINERU_TOKEN", raising=False)
+    monkeypatch.delenv("EPI_PAPER_SEARCH_COMMAND", raising=False)
     plugin_root = _seed_plugin_root(tmp_path)
 
     exit_code, output = _run_orchestrator_cli(
@@ -80,9 +82,15 @@ def test_doctor_text_reports_ok_with_external_dependency_warnings(tmp_path, monk
     assert "default_vault=" in output
     assert "paper_search_cli: warning" in output
     assert "mineru_token: warning" in output
+    assert "First-use setup:" in output
+    assert "paper_search_cli: Configure paper-search CLI" in output
+    assert "mineru_token: Configure MINERU_TOKEN" in output
+    assert "doctor --open-setup" in output
 
 
 def test_doctor_json_reports_structured_checks(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("MINERU_TOKEN", raising=False)
+    monkeypatch.delenv("EPI_PAPER_SEARCH_COMMAND", raising=False)
     plugin_root = _seed_plugin_root(tmp_path)
 
     exit_code, output = _run_orchestrator_cli(
@@ -106,6 +114,72 @@ def test_doctor_json_reports_structured_checks(tmp_path, monkeypatch, capsys):
     assert payload["plugin"]["version"] == "0.1.0-test"
     assert payload["default_vault"] == str((tmp_path / "vault").resolve())
     assert {check["name"]: check["status"] for check in payload["checks"]}["paper_search_cli"] == "warning"
+    assert payload["setup_required"] is True
+    setup_by_check = {check["name"]: check.get("setup") for check in payload["checks"]}
+    assert setup_by_check["paper_search_cli"]["summary"] == "Configure paper-search CLI"
+    assert setup_by_check["paper_search_cli"]["url"] == "https://github.com/openags/paper-search-mcp"
+    assert setup_by_check["mineru_token"]["summary"] == "Configure MINERU_TOKEN"
+    assert setup_by_check["mineru_token"]["url"] == "https://mineru.net/apiManage/docs?openApplyModal=true"
+
+
+def test_doctor_default_does_not_open_setup_pages(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("MINERU_TOKEN", raising=False)
+    monkeypatch.delenv("EPI_PAPER_SEARCH_COMMAND", raising=False)
+    plugin_root = _seed_plugin_root(tmp_path)
+    opened = []
+    monkeypatch.setattr("epi.cli.open_setup_links", lambda report: opened.append(report), raising=False)
+
+    exit_code, output = _run_orchestrator_cli(
+        monkeypatch,
+        capsys,
+        "doctor",
+        "--plugin-root",
+        str(plugin_root),
+        "--vault",
+        str(tmp_path / "vault"),
+        "--paper-search-command",
+        "definitely-missing-paper-search-command",
+    )
+
+    assert exit_code == 0
+    assert "First-use setup:" in output
+    assert opened == []
+
+
+def test_doctor_open_setup_opens_only_missing_dependency_pages(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("MINERU_TOKEN", raising=False)
+    monkeypatch.delenv("EPI_PAPER_SEARCH_COMMAND", raising=False)
+    plugin_root = _seed_plugin_root(tmp_path)
+    opened_reports = []
+
+    def fake_open_setup_links(report):
+        opened_reports.append(report)
+        return ["https://github.com/openags/paper-search-mcp", "https://mineru.net/apiManage/docs?openApplyModal=true"]
+
+    monkeypatch.setattr("epi.cli.open_setup_links", fake_open_setup_links, raising=False)
+
+    exit_code, output = _run_orchestrator_cli(
+        monkeypatch,
+        capsys,
+        "doctor",
+        "--plugin-root",
+        str(plugin_root),
+        "--vault",
+        str(tmp_path / "vault"),
+        "--paper-search-command",
+        "definitely-missing-paper-search-command",
+        "--open-setup",
+        "--json",
+    )
+
+    payload = json.loads(output)
+
+    assert exit_code == 0
+    assert len(opened_reports) == 1
+    assert payload["opened_setup_urls"] == [
+        "https://github.com/openags/paper-search-mcp",
+        "https://mineru.net/apiManage/docs?openApplyModal=true",
+    ]
 
 
 def test_doctor_returns_nonzero_when_plugin_structure_is_missing(tmp_path, monkeypatch, capsys):

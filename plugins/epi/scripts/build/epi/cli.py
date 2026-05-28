@@ -8,7 +8,7 @@ from typing import Callable
 from epi import orchestrator as workflows
 from epi.artifacts import file_sha256, raw_paper_root, utc_now
 from epi.config import apply_config_update, config_status as get_config_status, init_config, propose_config_update
-from epi.doctor import collect_doctor_report, render_doctor_report
+from epi.doctor import collect_doctor_report, open_setup_links, render_doctor_report
 
 
 Handler = Callable[[argparse.Namespace], int]
@@ -37,8 +37,9 @@ def build_parser() -> argparse.ArgumentParser:
     doctor = subparsers.add_parser("doctor")
     doctor.add_argument("--plugin-root", type=Path, default=_default_plugin_root())
     doctor.add_argument("--vault", type=Path, default=_default_vault())
-    doctor.add_argument("--paper-search-command", default="paper-search")
+    doctor.add_argument("--paper-search-command", default=None)
     doctor.add_argument("--mineru-command", default=None)
+    doctor.add_argument("--open-setup", action="store_true")
     doctor.add_argument("--json", action="store_true")
 
     config_status = subparsers.add_parser("config-status")
@@ -180,6 +181,8 @@ def _handle_doctor(args: argparse.Namespace) -> int:
         paper_search_command=args.paper_search_command,
         mineru_command=args.mineru_command,
     )
+    if args.open_setup:
+        report["opened_setup_urls"] = open_setup_links(report)
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     else:
