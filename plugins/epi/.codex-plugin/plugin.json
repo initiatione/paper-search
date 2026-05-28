@@ -1,0 +1,39 @@
+{
+  "name": "epi",
+  "version": "0.1.0+codex.20260528043040",
+  "description": "Search, rank, preserve, and prepare engineering papers for a dedicated LLM Wiki workflow.",
+  "author": {
+    "name": "liuchf"
+  },
+  "license": "MIT",
+  "keywords": [
+    "papers",
+    "robotics",
+    "ai",
+    "embodied-intelligence",
+    "control",
+    "obsidian",
+    "zotero",
+    "mineru"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "EPI",
+    "shortDescription": "Dry-run search, filter, and rank engineering papers before parsing and wiki promotion.",
+    "longDescription": "EPI (Engineering Paper Intelligence) packages a Codex workflow for configurable paper discovery in robotics, AI, embodied intelligence, and control. It wraps mature paper-search MCP infrastructure, preserves raw run artifacts, initializes a dedicated paper research wiki, and keeps MinerU parsing as an internal stage for future parse runs.",
+    "developerName": "liuchf",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/initiatione/paper-search",
+    "privacyPolicyURL": "https://github.com/initiatione/paper-search/blob/main/plugins/epi/docs/privacy.md",
+    "termsOfServiceURL": "https://github.com/initiatione/paper-search/blob/main/plugins/epi/docs/terms.md",
+    "defaultPrompt": [
+      "Search high-quality robotics and AI papers in dry-run mode.",
+      "Initialize my dedicated paper research wiki.",
+      "Rank engineering papers for embodied intelligence and control."
+    ]
+  }
+}

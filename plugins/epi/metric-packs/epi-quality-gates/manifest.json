@@ -1,0 +1,12 @@
+{
+  "name": "epi-quality-gates",
+  "version": "0.1.0",
+  "supportedTargetKinds": [
+    "plugin",
+    "directory"
+  ],
+  "command": [
+    "node",
+    "./emit-epi-quality-gates.js"
+  ]
+}

@@ -1,0 +1,374 @@
+from __future__ import annotations
+
+import json
+import shutil
+from pathlib import Path
+
+from epi.artifacts import utc_now, write_json_atomic, write_text_atomic
+from epi.run_critic import HARD_RULE
+
+
+def _read_json(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _paper_root(vault_path: Path, slug: str) -> Path:
+    return vault_path.resolve() / "_raw" / "papers" / slug
+
+
+def _staging_root(vault_path: Path, slug: str) -> Path:
+    return vault_path.resolve() / "_staging" / "papers" / slug
+
+
+def _manifest_path(vault_path: Path) -> Path:
+    return vault_path.resolve() / ".manifest.json"
+
+
+def _log_path(vault_path: Path) -> Path:
+    return vault_path.resolve() / "log.md"
+
+
+def _index_path(vault_path: Path) -> Path:
+    return vault_path.resolve() / "index.md"
+
+
+def _hot_path(vault_path: Path) -> Path:
+    return vault_path.resolve() / "hot.md"
+
+
+def _compiled_target_path(vault_path: Path, target: str) -> Path:
+    return vault_path.resolve() / Path(target)
+
+
+def _backup_path_for_target(
+    backup_dir: Path,
+    vault_path: Path,
+    compiled_path: Path,
+    backup_stamp: str,
+) -> Path:
+    relative_name = "__".join(compiled_path.relative_to(vault_path).parts)
+    return backup_dir / f"{relative_name}.{backup_stamp}.bak"
+
+
+def _page_transactions(vault_path: Path, staging_root: Path, slug: str) -> list[dict]:
+    plan = _read_json(staging_root / "promotion-plan.json")
+    staged_paths = [Path(plan.get("staged_reference") or (staging_root / "references" / f"{slug}.md"))]
+    staged_paths.extend(Path(path) for path in plan.get("staged_concepts", []))
+    staged_paths.extend(Path(path) for path in plan.get("staged_synthesis", []))
+    compiled_targets = plan.get("compiled_targets") or [f"references/{slug}.md"]
+    if len(staged_paths) != len(compiled_targets):
+        raise ValueError("promotion-plan staged paths and compiled targets are out of sync")
+    return [
+        {
+            "staged_path": str(staged_path),
+            "compiled_path": str(_compiled_target_path(vault_path, compiled_target)),
+        }
+        for staged_path, compiled_target in zip(staged_paths, compiled_targets)
+    ]
+
+
+def _load_manifest(vault_path: Path) -> dict:
+    path = _manifest_path(vault_path)
+    if path.exists():
+        manifest = _read_json(path)
+    else:
+        manifest = {"vault_type": "engineering-paper-research", "papers": []}
+    manifest.setdefault("papers", [])
+    return manifest
+
+
+def _upsert_paper(manifest: dict, entry: dict) -> None:
+    papers = manifest.setdefault("papers", [])
+    for index, paper in enumerate(papers):
+        if paper.get("slug") == entry["slug"]:
+            papers[index] = {**paper, **entry}
+            return
+    papers.append(entry)
+
+
+def _append_log(vault_path: Path, line: str) -> None:
+    log_path = _log_path(vault_path)
+    existing = log_path.read_text(encoding="utf-8") if log_path.exists() else "# Log\n"
+    if not existing.endswith("\n"):
+        existing += "\n"
+    write_text_atomic(log_path, existing + line + "\n")
+
+
+def _replace_managed_section(existing: str, start_marker: str, end_marker: str, body: str) -> str:
+    if not existing.endswith("\n"):
+        existing += "\n"
+    section = f"{start_marker}\n{body.rstrip()}\n{end_marker}\n"
+    start_index = existing.find(start_marker)
+    end_index = existing.find(end_marker)
+    if start_index != -1 and end_index != -1 and end_index > start_index:
+        end_index += len(end_marker)
+        return existing[:start_index] + section.rstrip("\n") + existing[end_index:]
+    return existing + "\n" + section
+
+
+def _paper_link(paper: dict) -> str:
+    slug = paper["slug"]
+    title = paper.get("title") or slug
+    return f"[[references/{slug}|{title}]]"
+
+
+def _render_index_section(manifest: dict) -> str:
+    papers = [
+        paper
+        for paper in manifest.get("papers", [])
+        if paper.get("promotion_status") == "promoted" and paper.get("slug")
+    ]
+    if not papers:
+        return "## Promoted Papers\n\nNo promoted papers yet."
+    lines = ["## Promoted Papers", ""]
+    for paper in sorted(papers, key=lambda item: (item.get("title") or item["slug"]).lower()):
+        suffix = f" (DOI: {paper['doi']})" if paper.get("doi") else ""
+        lines.append(f"- {_paper_link(paper)}{suffix}")
+    return "\n".join(lines)
+
+
+def _render_hot_section(manifest: dict) -> str:
+    papers = [
+        paper
+        for paper in manifest.get("papers", [])
+        if paper.get("promotion_status") == "promoted" and paper.get("slug")
+    ]
+    if not papers:
+        return "## Hot Papers\n\nNo promoted papers yet."
+    lines = ["## Hot Papers", ""]
+    for paper in sorted(papers, key=lambda item: item.get("promoted_at") or "", reverse=True)[:10]:
+        promoted_at = f" - promoted at {paper['promoted_at']}" if paper.get("promoted_at") else ""
+        lines.append(f"- {_paper_link(paper)}{promoted_at}")
+    return "\n".join(lines)
+
+
+def _refresh_index_and_hot(vault_path: Path, manifest: dict) -> None:
+    index_path = _index_path(vault_path)
+    hot_path = _hot_path(vault_path)
+    index_existing = (
+        index_path.read_text(encoding="utf-8")
+        if index_path.exists()
+        else "# Paper Research Wiki\n\nThis vault is dedicated to engineering paper research.\n"
+    )
+    hot_existing = hot_path.read_text(encoding="utf-8") if hot_path.exists() else "# Hot\n\nNo promoted papers yet.\n"
+    write_text_atomic(
+        index_path,
+        _replace_managed_section(
+            index_existing,
+            "<!-- EPI:PROMOTED-PAPERS:START -->",
+            "<!-- EPI:PROMOTED-PAPERS:END -->",
+            _render_index_section(manifest),
+        ),
+    )
+    write_text_atomic(
+        hot_path,
+        _replace_managed_section(
+            hot_existing,
+            "<!-- EPI:HOT-PAPERS:START -->",
+            "<!-- EPI:HOT-PAPERS:END -->",
+            _render_hot_section(manifest),
+        ),
+    )
+
+
+def _snapshot_state_file(source_path: Path, backup_dir: Path, backup_name: str, default_text: str) -> str:
+    backup_path = backup_dir / backup_name
+    backup_path.parent.mkdir(parents=True, exist_ok=True)
+    if source_path.exists():
+        shutil.copyfile(source_path, backup_path)
+    else:
+        backup_path.write_text(default_text, encoding="utf-8")
+    return str(backup_path)
+
+
+def promote_paper(vault_path: Path, slug: str, approved_by: str | None = None) -> dict:
+    vault_path = vault_path.resolve()
+    paper_root = _paper_root(vault_path, slug)
+    staging_root = _staging_root(vault_path, slug)
+    critic_report = _read_json(paper_root / "critic" / "critic-report.json")
+    outcome = critic_report.get("outcome")
+    if outcome != "pass":
+        raise ValueError(f"critic outcome must be pass before promotion, got {outcome}")
+    if critic_report.get("hard_rule") != HARD_RULE:
+        raise ValueError("critic report does not preserve the hard gate invariant")
+    if not approved_by:
+        raise ValueError("human gate approval required before promotion")
+
+    page_transactions = _page_transactions(vault_path, staging_root, slug)
+    staged_reference = Path(page_transactions[0]["staged_path"])
+    if not staged_reference.exists():
+        raise FileNotFoundError(f"missing staged reference draft: {staged_reference}")
+
+    compiled_reference = Path(page_transactions[0]["compiled_path"])
+    backup_dir = paper_root / "promotion-backups"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    backup_stamp = utc_now().replace(":", "").replace("+", "Z")
+    state_backup_dir = backup_dir / "state" / backup_stamp
+    previous_state_snapshot_paths = {
+        "manifest": _snapshot_state_file(
+            _manifest_path(vault_path),
+            state_backup_dir,
+            "manifest.json",
+            json.dumps({"vault_type": "engineering-paper-research", "papers": []}, indent=2) + "\n",
+        ),
+        "log": _snapshot_state_file(_log_path(vault_path), state_backup_dir, "log.md", "# Log\n"),
+        "index": _snapshot_state_file(
+            _index_path(vault_path),
+            state_backup_dir,
+            "index.md",
+            "# Paper Research Wiki\n\nThis vault is dedicated to engineering paper research.\n",
+        ),
+        "hot": _snapshot_state_file(
+            _hot_path(vault_path),
+            state_backup_dir,
+            "hot.md",
+            "# Hot\n\nNo promoted papers yet.\n",
+        ),
+    }
+    backup_paths: list[str] = []
+    for page in page_transactions:
+        staged_path = Path(page["staged_path"])
+        compiled_path = Path(page["compiled_path"])
+        if not staged_path.exists():
+            raise FileNotFoundError(f"missing staged draft: {staged_path}")
+        previous_snapshot_path = None
+        if compiled_path.exists():
+            backup_path = _backup_path_for_target(backup_dir, vault_path, compiled_path, backup_stamp)
+            backup_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(compiled_path, backup_path)
+            previous_snapshot_path = str(backup_path)
+            backup_paths.append(previous_snapshot_path)
+        page["previous_snapshot_path"] = previous_snapshot_path
+
+    for page in page_transactions:
+        compiled_path = Path(page["compiled_path"])
+        compiled_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(page["staged_path"], compiled_path)
+
+    metadata = _read_json(paper_root / "metadata.json")
+    manifest = _load_manifest(vault_path)
+    promoted_at = utc_now()
+    human_gate_decision = {
+        "status": "approved",
+        "approved_by": approved_by,
+        "approved_at": promoted_at,
+    }
+    _upsert_paper(
+        manifest,
+        {
+            "slug": slug,
+            "title": metadata.get("title", ""),
+            "doi": metadata.get("doi"),
+            "promotion_status": "promoted",
+            "promoted_at": promoted_at,
+            "compiled_reference": str(compiled_reference),
+            "critic_report": str(paper_root / "critic" / "critic-report.json"),
+        },
+    )
+    write_json_atomic(_manifest_path(vault_path), manifest)
+    _refresh_index_and_hot(vault_path, manifest)
+    _append_log(vault_path, f"- Promoted {slug} at {promoted_at}.")
+    manifest_update_summary = {
+        "paper_slug": slug,
+        "manifest_path": str(_manifest_path(vault_path)),
+        "log_path": str(_log_path(vault_path)),
+        "index_path": str(_index_path(vault_path)),
+        "hot_path": str(_hot_path(vault_path)),
+        "operation": "upsert-promoted-paper-refresh-index-hot-and-append-log",
+    }
+
+    record = {
+        "stage": "promote-to-wiki",
+        "status": "promoted",
+        "paper_slug": slug,
+        "promoted_at": promoted_at,
+        "critic_outcome": outcome,
+        "staged_draft_paths": [page["staged_path"] for page in page_transactions],
+        "promoted_page_paths": [page["compiled_path"] for page in page_transactions],
+        "previous_page_snapshot_paths": backup_paths,
+        "page_transactions": page_transactions,
+        "previous_state_snapshot_paths": previous_state_snapshot_paths,
+        "manifest_update_summary": manifest_update_summary,
+        "backup_paths": backup_paths,
+        "hard_rule": HARD_RULE,
+        "human_gate_decision": human_gate_decision,
+    }
+    write_json_atomic(paper_root / "promotion-record.json", record)
+    return record
+
+
+def rollback_promotion(vault_path: Path, slug: str) -> dict:
+    vault_path = vault_path.resolve()
+    paper_root = _paper_root(vault_path, slug)
+    record = _read_json(paper_root / "promotion-record.json")
+    page_transactions = record.get("page_transactions") or []
+    if not page_transactions:
+        compiled_paths = [Path(path) for path in record.get("promoted_page_paths", [])]
+        backup_paths = [Path(path) for path in record.get("previous_page_snapshot_paths", [])]
+        page_transactions = []
+        for index, compiled_path in enumerate(compiled_paths):
+            snapshot_path = str(backup_paths[index]) if index < len(backup_paths) else None
+            page_transactions.append(
+                {
+                    "compiled_path": str(compiled_path),
+                    "previous_snapshot_path": snapshot_path,
+                }
+            )
+    state_snapshot_paths = record.get("previous_state_snapshot_paths", {})
+    restored_paths: list[str] = []
+    removed_paths: list[str] = []
+    restored_state_paths: dict[str, str] = {}
+
+    for page in page_transactions:
+        compiled_path = Path(page["compiled_path"])
+        snapshot_path = page.get("previous_snapshot_path")
+        if snapshot_path:
+            backup_path = Path(snapshot_path)
+            shutil.copyfile(backup_path, compiled_path)
+            restored_paths.append(str(compiled_path))
+        elif compiled_path.exists():
+            compiled_path.unlink()
+            removed_paths.append(str(compiled_path))
+
+    rolled_back_at = utc_now()
+    manifest_snapshot = state_snapshot_paths.get("manifest")
+    if manifest_snapshot:
+        shutil.copyfile(manifest_snapshot, _manifest_path(vault_path))
+        restored_state_paths["manifest"] = str(_manifest_path(vault_path))
+    else:
+        manifest = _load_manifest(vault_path)
+        _upsert_paper(
+            manifest,
+            {
+                "slug": slug,
+                "promotion_status": "rolled_back",
+                "rolled_back_at": rolled_back_at,
+            },
+        )
+        write_json_atomic(_manifest_path(vault_path), manifest)
+        restored_state_paths["manifest"] = str(_manifest_path(vault_path))
+    log_snapshot = state_snapshot_paths.get("log")
+    if log_snapshot:
+        shutil.copyfile(log_snapshot, _log_path(vault_path))
+        restored_state_paths["log"] = str(_log_path(vault_path))
+    index_snapshot = state_snapshot_paths.get("index")
+    if index_snapshot:
+        shutil.copyfile(index_snapshot, _index_path(vault_path))
+        restored_state_paths["index"] = str(_index_path(vault_path))
+    hot_snapshot = state_snapshot_paths.get("hot")
+    if hot_snapshot:
+        shutil.copyfile(hot_snapshot, _hot_path(vault_path))
+        restored_state_paths["hot"] = str(_hot_path(vault_path))
+    _append_log(vault_path, f"- Rolled back {slug} at {rolled_back_at}.")
+
+    rollback_record = {
+        "stage": "rollback",
+        "status": "rolled_back",
+        "paper_slug": slug,
+        "rolled_back_at": rolled_back_at,
+        "restored_paths": restored_paths,
+        "removed_paths": removed_paths,
+        "restored_state_paths": restored_state_paths,
+    }
+    write_json_atomic(paper_root / "rollback-record.json", rollback_record)
+    return rollback_record

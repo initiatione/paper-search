@@ -1,0 +1,40 @@
+import json
+import subprocess
+from pathlib import Path
+
+
+def test_epi_metric_pack_checks_core_workflow_contracts(tmp_path):
+    plugin_root = tmp_path / "epi"
+    docs = plugin_root / "docs"
+    scripts = plugin_root / "scripts"
+    docs.mkdir(parents=True)
+    scripts.mkdir(parents=True)
+    (docs / "workflow.md").write_text(
+        "The orchestrator writes run-state.json. "
+        "No critic pass, no compiled wiki write. "
+        "The critic gate must pass before promote-to-wiki. "
+        "Raw artifacts include paper.pdf and metadata.json.",
+        encoding="utf-8",
+    )
+    script = (
+        Path(__file__).resolve().parents[2]
+        / "plugins"
+        / "epi"
+        / "metric-packs"
+        / "epi-quality-gates"
+        / "emit-epi-quality-gates.js"
+    )
+
+    result = subprocess.run(
+        ["node", str(script), str(plugin_root), "plugin"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    checks = {check["id"]: check for check in payload["checks"]}
+    assert checks["epi-run-state-contract"]["status"] == "pass"
+    assert checks["epi-critic-gate-contract"]["status"] == "pass"
+    assert checks["epi-no-critic-no-wiki-write"]["status"] == "pass"
+    assert checks["epi-raw-artifact-retention"]["status"] == "pass"

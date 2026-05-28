@@ -1,0 +1,22 @@
+{
+  "vault_type": "engineering-paper-research",
+  "schema": "raw source -> compiled wiki -> schema",
+  "compiled_dirs": [
+    "references",
+    "concepts",
+    "synthesis",
+    "entities",
+    "skills",
+    "projects",
+    "journal"
+  ],
+  "operational_dirs": [
+    "_raw",
+    "_staging",
+    "_quarantine",
+    "_runs",
+    "_evolution",
+    "_meta"
+  ],
+  "papers": []
+}

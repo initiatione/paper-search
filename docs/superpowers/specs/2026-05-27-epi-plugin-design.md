@@ -135,6 +135,13 @@ Required behavior:
 
 The wrapper boundary prevents the rest of the pipeline from depending on upstream response quirks. Only `paper_search_adapter.py` should know the exact `paper-search-mcp` invocation details.
 
+Implementation note from Phase 1 live-boundary work:
+
+- The stdio MCP server entry is `python -m paper_search_mcp.server` for an installed Python package.
+- The EPI discovery adapter uses the upstream `paper-search search` CLI contract for live search.
+- Verified PyPI `paper-search-mcp==0.1.3` does not publish console-script executables, so live CLI search must come from a PATH `paper-search` command from upstream GitHub `main` or a configured `EPI_PAPER_SEARCH_COMMAND` wrapper.
+- CLI search returns JSON with `query`, `sources_used`, `source_results`, `errors`, `total`, and `papers`; EPI normalizes only inside `paper_search_adapter.py`.
+
 ## Dedicated Paper Wiki
 
 Default vault:
@@ -331,6 +338,13 @@ Requirements:
 - Avoid overwriting existing raw PDFs unless explicitly rerunning acquisition.
 - Prefer open/legal sources.
 
+Phase 2.6 implementation note:
+
+- `acquire-paper` downloads a selected candidate's `pdf_url` into `_raw/papers/<slug>/paper.pdf`.
+- Success records `mode: url`, HTTP status, output path, and byte size in `acquire-record.json`.
+- Missing URLs, HTTP failures, network failures, empty responses, and overwrite attempts write `status: failed` records without fabricating `paper.pdf`.
+- Fixture ingest still uses local-file acquisition for deterministic tests and user-provided PDFs.
+
 ### parse
 
 Calls MinerU API to parse the PDF. It produces Markdown, LaTeX, images, and parse metadata.
@@ -341,6 +355,14 @@ Requirements:
 - Produce one paper directory with `paper.md`, `paper.tex`, and `images/`.
 - Verify image links.
 - Record parse job ID, timestamps, and failures.
+
+Phase 2.5 implementation note:
+
+- `parse-paper` calls a configurable MinerU command boundary after acquisition.
+- Default command resolution uses `EPI_MINERU_COMMAND` or the bundled `skills/mineru-paper-parser/scripts/mineru_batch_to_md.py`.
+- Successful command outputs are normalized into `_raw/papers/<slug>/mineru/paper.md`, `paper.tex`, `images/`, and `mineru-manifest.json`.
+- Command stdout/stderr are retained under `_raw/papers/<slug>/mineru-command/`.
+- Failed commands write `parse-record.json` with `status: failed` and do not fabricate parser Markdown.
 
 ### read
 
@@ -406,6 +428,13 @@ Staging must include:
 ### promote-to-wiki
 
 Promotes staged drafts into compiled wiki only after critic approval and any configured human gate.
+
+Phase 3 implementation note:
+
+- The default human gate for `promote-to-wiki` is explicit approval through `approved_by` / `--approved-by`.
+- Missing approval is a hard failure before any compiled page write.
+- `promotion-record.json` records `human_gate_decision` with approval status, approver, and timestamp.
+- Promotion snapshots the prior compiled page, `.manifest.json`, `index.md`, `hot.md`, and `log.md`; rollback restores those snapshots and appends a rollback log entry.
 
 Promotion must:
 
@@ -826,7 +855,7 @@ Phase 5 must preserve the same artifact contracts and critic gate. It expands wh
 
 ## Open Implementation Questions
 
-- Exact command and environment mechanism for invoking `openags/paper-search-mcp` from an installed Codex plugin.
+- Exact command and environment mechanism for invoking `openags/paper-search-mcp` from an installed Codex plugin is settled for Phase 1: use `paper-search search` through `EPI_PAPER_SEARCH_COMMAND` or PATH, and keep MCP server config separate as `python -m paper_search_mcp.server`.
 - Whether the paper wiki initializer should be a skill, script, or both.
 - Exact MinerU LaTeX output availability and naming contract.
 - First-pass reader model and prompt format.

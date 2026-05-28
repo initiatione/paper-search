@@ -1,0 +1,7 @@
+paper_quality_critic:
+  enabled_from_phase: 2
+parse_quality_critic:
+  enabled_from_phase: 2
+reader_quality_critic:
+  enabled_from_phase: 2
+hard_rule: "No critic pass, no compiled wiki write."

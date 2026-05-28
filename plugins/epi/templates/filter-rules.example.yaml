@@ -1,0 +1,10 @@
+require_pdf: true
+exclude_if_already_in_wiki: true
+exclude_if_already_in_zotero: true
+minimum_year: 2018
+minimum_metadata_fields:
+  - title
+  - authors
+  - year
+  - abstract
+borderline_policy: keep_with_warning

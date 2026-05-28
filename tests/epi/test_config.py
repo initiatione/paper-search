@@ -1,0 +1,25 @@
+from pathlib import Path
+
+from epi.config import load_config
+
+
+def test_load_config_uses_relative_defaults(tmp_path):
+    plugin_root = tmp_path / "plugin"
+    templates = plugin_root / "templates"
+    templates.mkdir(parents=True)
+    (templates / "interests.example.yaml").write_text(
+        "profile: robotics_ai_control\n"
+        "domains:\n"
+        "  - robotics\n"
+        "budget:\n"
+        "  max_results: 12\n",
+        encoding="utf-8",
+    )
+
+    config = load_config(plugin_root=plugin_root, vault_path=tmp_path / "vault", max_results=None)
+
+    assert config.plugin_root == plugin_root
+    assert config.vault_path == tmp_path / "vault"
+    assert config.runs_dir == tmp_path / "vault" / "_runs"
+    assert config.max_results == 12
+    assert config.profile == "robotics_ai_control"

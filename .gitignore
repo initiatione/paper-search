@@ -1,2 +1,9 @@
 .env/
 parsed/
+.pytest_cache/
+.pytest_tmp/
+__pycache__/
+*.py[cod]
+paper-research-wiki/
+plugins/epi/.runtime/
+plugins/epi/.plugin-eval/

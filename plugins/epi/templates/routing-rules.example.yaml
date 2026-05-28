@@ -1,0 +1,16 @@
+phase_1:
+  missing_search_record: discover
+  missing_normalized: normalize
+  missing_filter_report: filter
+  missing_rank: rank
+  dry_run_complete: report
+post_phase_1_stage_names:
+  - acquire
+  - parse
+  - read
+  - critic
+  - staging
+  - promote-to-wiki
+  - zotero
+  - feedback
+  - skill-aware-evolve
