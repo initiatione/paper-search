@@ -2,13 +2,21 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Callable
 
 from epi import orchestrator as workflows
 from epi.artifacts import file_sha256, raw_paper_root, utc_now
-from epi.config import apply_config_update, config_status as get_config_status, init_config, propose_config_update
+from epi.config import (
+    apply_config_update,
+    config_status as get_config_status,
+    init_config,
+    load_wiki_config,
+    propose_config_update,
+)
 from epi.doctor import collect_doctor_report, open_setup_links, render_doctor_report
+from epi.runtime_config import apply_runtime_config
 from epi.run_index import RESEARCH_QUEUE_BUCKETS
 
 
@@ -46,6 +54,8 @@ def build_parser() -> argparse.ArgumentParser:
     config_status = subparsers.add_parser("config-status")
     _add_common_vault(config_status)
     config_status.add_argument("--json", action="store_true")
+    config_status.add_argument("--include-values", action="store_true")
+    config_status.add_argument("--include-runtime", action="store_true")
 
     init_config = subparsers.add_parser("init-config")
     _add_common_vault(init_config)
@@ -241,12 +251,21 @@ def _handle_doctor(args: argparse.Namespace) -> int:
 
 def _handle_config_status(args: argparse.Namespace) -> int:
     status = get_config_status(args.vault)
+    if args.include_values:
+        status["config"] = load_wiki_config(args.vault)
+    if args.include_runtime:
+        runtime = apply_runtime_config()
+        status["runtime_config"] = runtime
+        status["mineru_token"] = "set" if os.environ.get("MINERU_TOKEN") else "missing"
     if args.json:
         print(json.dumps(status, ensure_ascii=False, indent=2))
     else:
         print(f"configured={str(status['configured']).lower()}")
         print(f"needs_onboarding={str(status['needs_onboarding']).lower()}")
         print(f"config_path={status['config_path']}")
+        if args.include_runtime:
+            print(f"runtime_config_path={status['runtime_config']['path']}")
+            print(f"MINERU_TOKEN={status['mineru_token']}")
     return 0 if status["configured"] else 1
 
 

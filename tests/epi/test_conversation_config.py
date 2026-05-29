@@ -55,6 +55,43 @@ def test_config_status_reports_missing_config(tmp_path, monkeypatch, capsys):
     assert payload["config_path"].endswith("_meta\\epi-config.yaml") or payload["config_path"].endswith("_meta/epi-config.yaml")
 
 
+def test_config_status_can_include_values_and_fast_runtime_status(tmp_path, monkeypatch, capsys):
+    vault = tmp_path / "vault"
+    answers_path = tmp_path / "answers.json"
+    runtime_path = tmp_path / "runtime.json"
+    _write_json(answers_path, _answers(profile="robotics_ai_control_research"))
+    _write_json(
+        runtime_path,
+        {
+            "schema_version": "epi-runtime-config-v1",
+            "paper_search_mcp": {"command": "python", "args": ["-m", "paper_search_mcp.server"]},
+            "paper_search_cli": {"command": "paper-search"},
+            "mineru": {"env_file": str(tmp_path / "missing-mineru.env")},
+        },
+    )
+    monkeypatch.setenv("EPI_RUNTIME_CONFIG", str(runtime_path))
+    monkeypatch.delenv("MINERU_TOKEN", raising=False)
+    _run_orchestrator_cli(monkeypatch, capsys, "init-config", "--vault", str(vault), "--answers-json", str(answers_path))
+
+    exit_code, output = _run_orchestrator_cli(
+        monkeypatch,
+        capsys,
+        "config-status",
+        "--vault",
+        str(vault),
+        "--json",
+        "--include-values",
+        "--include-runtime",
+    )
+    payload = json.loads(output)
+
+    assert exit_code == 0
+    assert payload["config"]["profile"] == "robotics_ai_control_research"
+    assert payload["runtime_config"]["path"] == str(runtime_path)
+    assert payload["mineru_token"] == "missing"
+    assert "secret-token" not in output
+
+
 def test_init_config_writes_wiki_config_state_and_history(tmp_path, monkeypatch, capsys):
     vault = tmp_path / "vault"
     answers_path = tmp_path / "answers.json"

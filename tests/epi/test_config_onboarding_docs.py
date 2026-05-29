@@ -39,6 +39,8 @@ def test_config_doc_defines_plain_chinese_eight_step_onboarding_script():
     assert r"C:\Users\liuchf\.codex\plugins\paper-search\epi\runtime.json" in text
     assert "runtime.json 不保存 token 明文" in text
     assert "mineru.env" in text
+    assert "默认看方法/系统/实验论文，不默认看综述" in text
+    assert "config-status --vault D:\\paper-research-wiki --json --include-values --include-runtime" in text
 
 
 def test_config_setup_skill_owns_initialization_and_update_onboarding():
@@ -50,6 +52,9 @@ def test_config_setup_skill_owns_initialization_and_update_onboarding():
     assert "修改" in text
     assert "doctor" in text
     assert "config-status" in text
+    assert "--include-values --include-runtime" in text
+    assert "Only run `doctor`" in text
+    assert "默认不是综述论文" in text
     assert "一次只问一个问题" in text
     assert "每个问题必须说明影响" in text
     assert "参考方向" in text

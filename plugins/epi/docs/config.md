@@ -26,8 +26,8 @@ EPI 有两层配置，边界不要混：
 八步确认：
 
 1. 第一步，先定论文库放哪里。推荐 `D:\paper-research-wiki`。
-2. 第二步，我需要知道你主要看哪类论文。推荐“机器人控制”。
-3. 第三步，告诉我哪些词算有用，哪些词要避开。
+2. 第二步，我需要知道你主要看哪类论文。推荐“机器人控制、具身智能、AI，默认看方法/系统/实验论文，不默认看综述”。
+3. 第三步，告诉我哪些词算有用，哪些词要避开。默认把 review / survey / systematic review / literature review / meta-analysis 作为避开词；只有用户明确要求综述时才加入综述偏好。
 4. 第四步，先定搜索从哪里来。推荐 `paper-search` + arxiv / semantic / openalex。
 5. 第五步，定每次先看多少篇。推荐 20。
 6. 第六步，MinerU 先怎么接。推荐 `MINERU_TOKEN` + 默认命令；初始化不调用 MinerU。
@@ -38,6 +38,12 @@ EPI 有两层配置，边界不要混：
 
 ```powershell
 python scripts\orchestrator.py init-config --vault D:\paper-research-wiki --answers-json <answers.json>
+```
+
+用户要求输出当前配置时，走快路径，不跑 `doctor`：
+
+```powershell
+python scripts\orchestrator.py config-status --vault D:\paper-research-wiki --json --include-values --include-runtime
 ```
 
 用户要求重新配置时，先说明当前值、目标值和影响；一次只问一个修改目标；确认后才运行 `apply-config-update`。最终确认前不得运行 `apply-config-update`。
