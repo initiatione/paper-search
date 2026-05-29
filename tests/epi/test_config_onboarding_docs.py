@@ -104,3 +104,16 @@ def test_paper_discovery_skill_documents_quality_first_chat_recommendations():
     assert "not only the top few" in discovery
     assert "-review -survey" in discovery
     assert "source_mode=paper_search_mcp" in discovery
+
+
+def test_paper_discovery_skill_defines_stronger_high_quality_search_protocol():
+    discovery = _read(SKILL_DIR / "paper-discovery" / "SKILL.md")
+
+    assert "Treat `paper_search_mcp` as a search transport" in discovery
+    assert "concept blocks" in discovery
+    assert "3-5 query variants" in discovery
+    assert "source routing" in discovery
+    assert "Deduplicate across variants by DOI first" in discovery
+    assert "quality gate" in discovery
+    assert "Tier A" in discovery
+    assert "recall gap" in discovery
