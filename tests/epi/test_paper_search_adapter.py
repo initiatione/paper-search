@@ -2,6 +2,7 @@ import json
 import subprocess
 
 from epi.paper_search_adapter import COMMAND_UNAVAILABLE
+from epi.paper_search_adapter import SEARCH_TIMEOUT_SECONDS
 from epi.paper_search_adapter import discover
 from epi.paper_search_adapter import probe_paper_search_mcp
 
@@ -144,6 +145,45 @@ def test_live_cli_discovery_treats_empty_stdout_with_stderr_as_upstream_failure(
     assert result["error"] == "paper-search search failed"
     assert result["upstream"]["returncode"] == 0
     assert "Git operation failed" in result["upstream"]["stderr"]
+
+
+def test_live_cli_discovery_treats_search_timeout_as_upstream_failure(tmp_path, monkeypatch):
+    raw_response_path = tmp_path / "raw-search.json"
+    monkeypatch.setattr("epi.paper_search_adapter._resolve_command", lambda command: command)
+
+    def _run_command(resolved_command, args, timeout_seconds):
+        if args == ["--version"]:
+            return subprocess.CompletedProcess(
+                args=[resolved_command, *args],
+                returncode=0,
+                stdout="paper-search 0.1.4\n",
+                stderr="",
+            )
+        raise subprocess.TimeoutExpired(
+            cmd=[resolved_command, *args],
+            timeout=timeout_seconds,
+            output="partial stdout",
+            stderr="partial stderr",
+        )
+
+    monkeypatch.setattr("epi.paper_search_adapter._run_command", _run_command)
+
+    result = discover(
+        query="robotics",
+        max_results=2,
+        command="paper-search",
+        sources=["arxiv"],
+        raw_response_path=raw_response_path,
+    )
+
+    assert result["records"] == []
+    assert result["error"] == "paper-search search timed out"
+    assert result["upstream"]["returncode"] is None
+    assert result["upstream"]["timeout_seconds"] == SEARCH_TIMEOUT_SECONDS
+    assert result["raw_response_path"] == str(raw_response_path)
+    raw_payload = json.loads(raw_response_path.read_text(encoding="utf-8"))
+    assert raw_payload["timeout_seconds"] == SEARCH_TIMEOUT_SECONDS
+    assert raw_payload["stderr"] == "partial stderr"
 
 
 def test_probe_paper_search_fails_closed_on_timeout(monkeypatch):

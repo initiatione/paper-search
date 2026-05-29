@@ -11,6 +11,7 @@ from pathlib import Path
 DEFAULT_SOURCES = ["arxiv", "semantic", "openalex", "crossref", "dblp"]
 COMMAND_UNAVAILABLE = "paper-search command unavailable; install paper-search-mcp or configure EPI_PAPER_SEARCH_COMMAND"
 PROBE_TIMEOUT_SECONDS = 60
+SEARCH_TIMEOUT_SECONDS = 180
 
 
 def _resolve_command(command: str) -> str | None:
@@ -157,6 +158,14 @@ def _write_raw_response(raw_response_path: Path | None, payload: dict) -> str | 
     return str(raw_response_path)
 
 
+def _timeout_text(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
 def discover(
     query: str,
     max_results: int,
@@ -164,7 +173,7 @@ def discover(
     command: str | None = None,
     sources: list[str] | None = None,
     raw_response_path: Path | None = None,
-    timeout_seconds: int = 90,
+    timeout_seconds: int = SEARCH_TIMEOUT_SECONDS,
 ) -> dict:
     if fixture_path:
         records = json.loads(fixture_path.read_text(encoding="utf-8"))
@@ -189,7 +198,38 @@ def discover(
         }
     resolved_command = probe["command"]
     args = ["search", query, "-n", str(max_results), "-s", ",".join(selected_sources)]
-    result = _run_command(resolved_command, args, timeout_seconds=timeout_seconds)
+    try:
+        result = _run_command(resolved_command, args, timeout_seconds=timeout_seconds)
+    except subprocess.TimeoutExpired as exc:
+        stdout = _timeout_text(exc.output)
+        stderr = _timeout_text(exc.stderr)
+        raw_path = _write_raw_response(
+            raw_response_path,
+            {
+                "stdout": stdout,
+                "stderr": stderr,
+                "returncode": None,
+                "timeout_seconds": timeout_seconds,
+            },
+        )
+        return {
+            "query": query,
+            "max_results": max_results,
+            "source_mode": "paper_search_cli",
+            "mcp_probe": probe,
+            "raw_response_path": raw_path,
+            "records": [],
+            "error": "paper-search search timed out",
+            "upstream": {
+                "package": "paper-search-mcp",
+                "cli_command": resolved_command,
+                "version_probe": probe,
+                "sources_requested": selected_sources,
+                "returncode": None,
+                "stderr": stderr.strip(),
+                "timeout_seconds": timeout_seconds,
+            },
+        }
     if result.returncode != 0 or not result.stdout.strip():
         raw_path = _write_raw_response(
             raw_response_path,
