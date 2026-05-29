@@ -205,6 +205,147 @@ def test_dry_run_live_search_preserves_raw_upstream_response(tmp_path):
     assert json.loads(raw_response.read_text(encoding="utf-8"))["papers"][0]["paper_id"] == "2401.12345"
 
 
+def test_dry_run_uses_configured_paper_search_command_and_sources(tmp_path):
+    plugin_root = tmp_path / "plugin"
+    _write_minimal_plugin_template(plugin_root)
+    fake_command = tmp_path / "configured-paper-search.ps1"
+    args_path = tmp_path / "configured-args.json"
+    fake_payload = {
+        "query": "robotics survey",
+        "sources_used": ["arxiv", "semantic", "openalex"],
+        "source_results": {"arxiv": 1, "semantic": 0, "openalex": 0},
+        "errors": {},
+        "total": 1,
+        "papers": [
+            {
+                "paper_id": "2401.12345",
+                "title": "Robot Control Survey for Embodied AI",
+                "authors": "A. Researcher",
+                "abstract": "Robotics control survey with embodied AI benchmark coverage.",
+                "doi": "",
+                "published_date": "2025-01-02T00:00:00",
+                "pdf_url": "https://arxiv.org/pdf/2401.12345",
+                "url": "https://arxiv.org/abs/2401.12345",
+                "source": "arxiv",
+                "citations": 3,
+                "extra": {},
+            }
+        ],
+    }
+    fake_command.write_text(
+        "$args_json = $args | ConvertTo-Json -Compress\n"
+        "if ($args -contains '--version') { Write-Output 'paper-search 0.1.4'; exit 0 }\n"
+        f"$payload = @'\n{json.dumps(fake_payload)}\n'@\n"
+        "$payload | Write-Output\n"
+        f"$args_json | Set-Content -Encoding UTF8 -LiteralPath {json.dumps(str(args_path))}\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    vault = tmp_path / "vault"
+    meta = vault / "_meta"
+    meta.mkdir(parents=True)
+    (meta / "epi-config.yaml").write_text(
+        "profile: robotics_ai_control\n"
+        "domains:\n"
+        "  - robotics\n"
+        "positive_keywords:\n"
+        "  - survey\n"
+        "budget:\n"
+        "  max_results: 10\n"
+        "paper_search:\n"
+        f"  command: {fake_command}\n"
+        "  sources:\n"
+        "    - arxiv\n"
+        "    - semantic\n"
+        "    - openalex\n",
+        encoding="utf-8",
+    )
+
+    run_dir = run_dry_run(
+        plugin_root=plugin_root,
+        vault_path=vault,
+        query="robotics survey",
+        max_results=None,
+        paper_search_command=None,
+        sources=None,
+    )
+
+    search_record = json.loads((run_dir / "search-record.json").read_text(encoding="utf-8"))
+    invoked_args = json.loads(args_path.read_text(encoding="utf-8-sig"))
+
+    assert search_record["upstream"]["cli_command"].endswith("configured-paper-search.ps1")
+    assert search_record["upstream"]["sources_requested"] == ["arxiv", "semantic", "openalex"]
+    assert invoked_args == ["search", "robotics survey", "-n", "10", "-s", "arxiv,semantic,openalex"]
+
+
+def test_dry_run_keeps_environment_command_override_for_default_config_command(tmp_path, monkeypatch):
+    plugin_root = tmp_path / "plugin"
+    _write_minimal_plugin_template(plugin_root)
+    env_command = tmp_path / "env-paper-search.ps1"
+    args_path = tmp_path / "env-args.json"
+    fake_payload = {
+        "query": "robotics control",
+        "sources_used": ["arxiv"],
+        "source_results": {"arxiv": 1},
+        "errors": {},
+        "total": 1,
+        "papers": [
+            {
+                "paper_id": "2401.12345",
+                "title": "Robot Control Survey",
+                "authors": "A. Researcher",
+                "abstract": "Robotics control survey with benchmark evidence.",
+                "published_date": "2025-01-02T00:00:00",
+                "pdf_url": "https://arxiv.org/pdf/2401.12345",
+                "url": "https://arxiv.org/abs/2401.12345",
+                "source": "arxiv",
+                "citations": 3,
+                "extra": {},
+            }
+        ],
+    }
+    env_command.write_text(
+        "$args_json = $args | ConvertTo-Json -Compress\n"
+        "if ($args -contains '--version') { Write-Output 'paper-search 0.1.4'; exit 0 }\n"
+        f"$payload = @'\n{json.dumps(fake_payload)}\n'@\n"
+        "$payload | Write-Output\n"
+        f"$args_json | Set-Content -Encoding UTF8 -LiteralPath {json.dumps(str(args_path))}\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("EPI_PAPER_SEARCH_COMMAND", str(env_command))
+    vault = tmp_path / "vault"
+    meta = vault / "_meta"
+    meta.mkdir(parents=True)
+    (meta / "epi-config.yaml").write_text(
+        "profile: robotics_ai_control\n"
+        "domains:\n"
+        "  - robotics\n"
+        "budget:\n"
+        "  max_results: 3\n"
+        "paper_search:\n"
+        "  command: paper-search\n"
+        "  sources:\n"
+        "    - arxiv\n",
+        encoding="utf-8",
+    )
+
+    run_dir = run_dry_run(
+        plugin_root=plugin_root,
+        vault_path=vault,
+        query="robotics control",
+        max_results=None,
+        paper_search_command=None,
+        sources=None,
+    )
+
+    search_record = json.loads((run_dir / "search-record.json").read_text(encoding="utf-8"))
+    invoked_args = json.loads(args_path.read_text(encoding="utf-8-sig"))
+
+    assert search_record["upstream"]["cli_command"].endswith("env-paper-search.ps1")
+    assert invoked_args == ["search", "robotics control", "-n", "3", "-s", "arxiv"]
+
+
 def test_dry_run_ranking_uses_configured_interest_profile_keywords(tmp_path):
     plugin_root = tmp_path / "plugin"
     _write_minimal_plugin_template(plugin_root)

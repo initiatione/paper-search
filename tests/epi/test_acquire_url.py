@@ -101,6 +101,50 @@ def test_acquire_paper_from_url_records_http_failure_without_pdf(tmp_path):
     assert json.loads((paper_root / "acquire-record.json").read_text(encoding="utf-8")) == record
 
 
+def test_acquire_paper_from_candidate_prefers_paper_search_cli_download(tmp_path, monkeypatch):
+    fake_command = tmp_path / "paper-search-download.ps1"
+    args_path = tmp_path / "download-args.json"
+    fake_command.write_text(
+        "$args_json = $args | ConvertTo-Json -Compress\n"
+        "if ($args -contains '--version') { Write-Output 'paper-search 0.1.4'; exit 0 }\n"
+        "$output_index = [Array]::IndexOf($args, '--save-path')\n"
+        "if ($output_index -lt 0) { Write-Error 'missing --save-path'; exit 2 }\n"
+        "$output_dir = $args[$output_index + 1]\n"
+        "New-Item -ItemType Directory -Force -Path $output_dir | Out-Null\n"
+        "$bytes = [System.Text.Encoding]::ASCII.GetBytes('%PDF-1.4 paper-search fixture')\n"
+        "[System.IO.File]::WriteAllBytes((Join-Path $output_dir 'downloaded.pdf'), $bytes)\n"
+        f"$args_json | Set-Content -Encoding UTF8 -LiteralPath {json.dumps(str(args_path))}\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("EPI_PAPER_SEARCH_COMMAND", str(fake_command))
+    candidate = _candidate("https://example.org/fallback.pdf", slug="paper-search-cli-paper")
+    candidate["sources"] = ["arxiv"]
+    candidate["raw_records"] = [
+        {
+            "source": "arxiv",
+            "arxiv_id": "2401.12345",
+            "raw_record": {"paper_id": "2401.12345", "source": "arxiv"},
+        }
+    ]
+    vault = tmp_path / "vault"
+
+    record = acquire_paper_from_candidate(vault, candidate)
+
+    paper_root = vault / "_raw" / "papers" / "paper-search-cli-paper"
+    invoked_args = json.loads(args_path.read_text(encoding="utf-8-sig"))
+
+    assert record["status"] == "success"
+    assert record["mode"] == "paper_search_cli_download"
+    assert record["source"] == "arxiv"
+    assert record["paper_id"] == "2401.12345"
+    assert record["upstream"]["package"] == "paper-search-mcp"
+    assert invoked_args[:3] == ["download", "arxiv", "2401.12345"]
+    assert "--save-path" in invoked_args
+    assert (paper_root / "paper.pdf").read_bytes().startswith(b"%PDF-1.4")
+    assert json.loads((paper_root / "acquire-record.json").read_text(encoding="utf-8")) == record
+
+
 def test_acquire_paper_from_candidate_uses_vault_slug_boundary(tmp_path):
     server_root = tmp_path / "server"
     server_root.mkdir()

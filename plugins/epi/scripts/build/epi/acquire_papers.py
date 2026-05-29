@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import os
 import shutil
+import tempfile
 import urllib.error
 import urllib.request
 from pathlib import Path
 
 from epi.artifacts import file_sha256, json_sha256, utc_now, write_json_atomic
+from epi.paper_search_adapter import download_paper_pdf
 
 
 def _metadata_from_candidate(candidate: dict) -> dict:
@@ -20,7 +22,29 @@ def _metadata_from_candidate(candidate: dict) -> dict:
         "pdf_url": candidate.get("pdf_url"),
         "score": candidate.get("score"),
         "sources": candidate.get("sources", []),
+        "arxiv_id": candidate.get("arxiv_id"),
+        "raw_records": candidate.get("raw_records", []),
     }
+
+
+def _candidate_download_identity(candidate: dict) -> tuple[str, str] | None:
+    for record in candidate.get("raw_records") or []:
+        if not isinstance(record, dict):
+            continue
+        raw_record = record.get("raw_record") if isinstance(record.get("raw_record"), dict) else {}
+        source = str(raw_record.get("source") or record.get("source") or "").strip().lower()
+        paper_id = raw_record.get("paper_id") or record.get("paper_id")
+        if not paper_id and source == "arxiv":
+            paper_id = record.get("arxiv_id") or candidate.get("arxiv_id")
+        if source and paper_id:
+            return source, str(paper_id)
+    sources = candidate.get("sources") or []
+    if isinstance(sources, str):
+        sources = [sources]
+    normalized_sources = [str(source).strip().lower() for source in sources]
+    if "arxiv" in normalized_sources and candidate.get("arxiv_id"):
+        return "arxiv", str(candidate["arxiv_id"])
+    return None
 
 
 def _write_failed_acquire_record(
@@ -130,6 +154,58 @@ def acquire_paper_from_url(
         )
 
     temp_pdf = target_pdf.with_suffix(".pdf.tmp")
+    download_identity = _candidate_download_identity(candidate)
+    if download_identity is not None:
+        source, paper_id = download_identity
+        with tempfile.TemporaryDirectory(prefix="epi-paper-search-") as temp_dir:
+            download_record = download_paper_pdf(
+                source=source,
+                paper_id=paper_id,
+                output_dir=Path(temp_dir),
+                timeout_seconds=timeout_seconds,
+            )
+            if download_record["status"] == "success":
+                downloaded_pdf = Path(download_record["downloaded_pdf"])
+                shutil.copyfile(downloaded_pdf, temp_pdf)
+                size_bytes = temp_pdf.stat().st_size
+                if size_bytes <= 0:
+                    temp_pdf.unlink(missing_ok=True)
+                    return _write_failed_acquire_record(
+                        paper_root,
+                        candidate,
+                        mode="paper_search_cli_download",
+                        error=f"downloaded PDF is empty: {source}:{paper_id}",
+                        started_at=started_at,
+                        candidate_metadata_hash=candidate_metadata_hash,
+                    )
+                os.replace(temp_pdf, target_pdf)
+                record = {
+                    "stage": "acquire",
+                    "mode": "paper_search_cli_download",
+                    "status": "success",
+                    "started_at": started_at,
+                    "finished_at": utc_now(),
+                    "retrieved_at": utc_now(),
+                    "exit_status": 0,
+                    "source": source,
+                    "paper_id": paper_id,
+                    "pdf_url": pdf_url,
+                    "output_path": str(target_pdf),
+                    "size_bytes": target_pdf.stat().st_size,
+                    "mcp_probe": download_record.get("mcp_probe"),
+                    "upstream": download_record.get("upstream"),
+                }
+                write_json_atomic(paper_root / "metadata.json", metadata)
+                record["input_artifact_hashes"] = {
+                    "candidate_metadata": candidate_metadata_hash,
+                }
+                record["output_artifact_hashes"] = {
+                    "paper.pdf": file_sha256(target_pdf),
+                    "metadata.json": file_sha256(paper_root / "metadata.json"),
+                }
+                write_json_atomic(paper_root / "acquire-record.json", record)
+                return record
+
     http_status: int | None = None
     try:
         request = urllib.request.Request(pdf_url, headers={"User-Agent": "EPI/0.1"})

@@ -242,3 +242,80 @@ def discover(
             "total": payload.get("total"),
         },
     }
+
+
+def download_paper_pdf(
+    *,
+    source: str,
+    paper_id: str,
+    output_dir: Path,
+    command: str | None = None,
+    timeout_seconds: int = 120,
+) -> dict:
+    selected_command = command or os.environ.get("EPI_PAPER_SEARCH_COMMAND") or "paper-search"
+    probe = probe_paper_search_mcp(selected_command)
+    if not probe["available"]:
+        return {
+            "status": "failed",
+            "mode": "paper_search_cli_download",
+            "source": source,
+            "paper_id": paper_id,
+            "mcp_probe": probe,
+            "error": COMMAND_UNAVAILABLE,
+        }
+    output_dir.mkdir(parents=True, exist_ok=True)
+    resolved_command = probe["command"]
+    args = ["download", source, paper_id, "--save-path", str(output_dir)]
+    result = _run_command(resolved_command, args, timeout_seconds=timeout_seconds)
+    pdf_paths = sorted(
+        path
+        for path in output_dir.rglob("*")
+        if path.is_file() and path.suffix.lower() == ".pdf" and path.stat().st_size > 0
+    )
+    if result.returncode != 0:
+        return {
+            "status": "failed",
+            "mode": "paper_search_cli_download",
+            "source": source,
+            "paper_id": paper_id,
+            "mcp_probe": probe,
+            "upstream": {
+                "package": "paper-search-mcp",
+                "cli_command": resolved_command,
+                "returncode": result.returncode,
+                "stdout": result.stdout.strip(),
+                "stderr": result.stderr.strip(),
+            },
+            "error": "paper-search download failed",
+        }
+    if not pdf_paths:
+        return {
+            "status": "failed",
+            "mode": "paper_search_cli_download",
+            "source": source,
+            "paper_id": paper_id,
+            "mcp_probe": probe,
+            "upstream": {
+                "package": "paper-search-mcp",
+                "cli_command": resolved_command,
+                "returncode": result.returncode,
+                "stdout": result.stdout.strip(),
+                "stderr": result.stderr.strip(),
+            },
+            "error": "paper-search download produced no PDF",
+        }
+    return {
+        "status": "success",
+        "mode": "paper_search_cli_download",
+        "source": source,
+        "paper_id": paper_id,
+        "mcp_probe": probe,
+        "downloaded_pdf": str(pdf_paths[0]),
+        "upstream": {
+            "package": "paper-search-mcp",
+            "cli_command": resolved_command,
+            "returncode": result.returncode,
+            "stdout": result.stdout.strip(),
+            "stderr": result.stderr.strip(),
+        },
+    }

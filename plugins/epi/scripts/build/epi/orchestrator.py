@@ -507,6 +507,11 @@ def run_dry_run(
     sources: list[str] | None = None,
 ) -> Path:
     config = load_config(plugin_root=plugin_root, vault_path=vault_path, max_results=max_results)
+    configured_paper_search_command = (
+        config.paper_search_command if config.paper_search_command not in {None, "", "paper-search"} else None
+    )
+    effective_paper_search_command = paper_search_command or configured_paper_search_command
+    effective_sources = sources or config.paper_search_sources
     run_id, run_dir = _new_run_dir(config.vault_path)
     started_at = utc_now()
 
@@ -536,8 +541,8 @@ def run_dry_run(
         query=query,
         max_results=config.max_results,
         fixture_path=fixture_path,
-        command=paper_search_command,
-        sources=sources,
+        command=effective_paper_search_command,
+        sources=effective_sources,
         raw_response_path=run_dir / "paper-search-raw.json",
     )
     _write_json(run_dir / "search-record.json", search_record)
@@ -604,7 +609,7 @@ def run_dry_run(
             {
                 "query": query,
                 "max_results": config.max_results,
-                "sources": sources or [],
+                "sources": effective_sources,
                 "profile": config.profile,
             }
         )

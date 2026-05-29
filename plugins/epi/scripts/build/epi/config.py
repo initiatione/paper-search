@@ -20,6 +20,8 @@ class PipelineConfig:
     domains: list[str]
     positive_keywords: list[str]
     negative_keywords: list[str]
+    paper_search_command: str | None
+    paper_search_sources: list[str]
 
 
 @dataclass(frozen=True)
@@ -446,6 +448,8 @@ def load_config(plugin_root: Path, vault_path: Path, max_results: int | None) ->
         interests = _parse_simple_yaml(interests_path) if interests_path.exists() else {}
     budget = interests.get("budget", {})
     configured_max = int(budget.get("max_results", 20))
+    paper_search = interests.get("paper_search") if isinstance(interests.get("paper_search"), dict) else {}
+    paper_search_command = paper_search.get("command")
     return PipelineConfig(
         plugin_root=plugin_root,
         vault_path=vault_path,
@@ -455,4 +459,6 @@ def load_config(plugin_root: Path, vault_path: Path, max_results: int | None) ->
         domains=list(interests.get("domains", ["robotics", "ai", "embodied intelligence", "control"])),
         positive_keywords=list(interests.get("positive_keywords") or []),
         negative_keywords=list(interests.get("negative_keywords") or []),
+        paper_search_command=str(paper_search_command) if paper_search_command else None,
+        paper_search_sources=[str(source) for source in _as_list(paper_search.get("sources"))],
     )
