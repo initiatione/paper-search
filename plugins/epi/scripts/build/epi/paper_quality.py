@@ -211,16 +211,14 @@ def _performance_claim_contexts(reader_text: str, mineru_text: str) -> list[str]
             reader_contexts.append(block_text)
 
     if not reader_contexts:
-        reader_contexts = _local_regex_contexts(reader_text, PERFORMANCE_CLAIM_RE)
+        return []
 
     mineru_contexts = _local_regex_contexts(mineru_text, PERFORMANCE_CLAIM_RE)
-    if reader_contexts:
-        supplemental_context = "\n".join(mineru_contexts)
-        return [
-            "\n".join(context for context in [reader_context, supplemental_context] if context).strip()
-            for reader_context in reader_contexts
-        ]
-    return mineru_contexts
+    supplemental_context = "\n".join(mineru_contexts)
+    return [
+        "\n".join(context for context in [reader_context, supplemental_context] if context).strip()
+        for reader_context in reader_contexts
+    ]
 
 
 def _check_benchmark_integrity(reader_text: str, mineru_text: str) -> dict:

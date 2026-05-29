@@ -494,6 +494,23 @@ def _write_repair_routed_report(
         input_artifact_hashes=input_artifact_hashes,
         changed_artifacts=changed_artifacts,
     )
+    paper_root = raw_paper_root(vault_path.resolve(), slug)
+    if workflow_type in {"recritic", "redo-read-recritic"}:
+        stage_record = json.loads((paper_root / "critic" / "critic-report.json").read_text(encoding="utf-8"))
+    else:
+        stage_record = record
+    _write_paper_run_state(
+        paper_root,
+        _paper_run_state(
+            paper_root=paper_root,
+            slug=slug,
+            state=paper_state["state"],
+            last_action=paper_state["last_action"],
+            next_action=paper_state["next_action"],
+            stage_record=stage_record,
+            human_gate_required=paper_state.get("human_gate_required", False),
+        ),
+    )
     _refresh_run_index(vault_path)
 
 

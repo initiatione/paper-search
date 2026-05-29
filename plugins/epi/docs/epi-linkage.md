@@ -101,7 +101,7 @@ paper-quality 重点检查工程论文可靠性：
 
 - `paper_identity`：title、来源 URL、DOI、arXiv ID、venue 至少有稳定身份信息。
 - `claim_support`：核心贡献、性能提升、SOTA、泛化声明必须有 Evidence。
-- `benchmark_integrity`：better/outperform/SOTA 需要 baseline、metric、dataset/task 或实验设置。
+- `benchmark_integrity`：reader artifact 自己写出的 better/outperform/SOTA 断言需要 baseline、metric、dataset/task 或实验设置；源论文全文中的综述性 improvement/better 词汇不能单独把 reader 打回。
 - `engineering_reproducibility`：code/data/model/config/simulator/hardware 缺失只 warning。
 - `scope_overclaim`：防止 simulation/demo/small-scale 被写成真实部署或通用结论。
 - `parse_vs_paper_failure`：防止 MinerU 缺图/公式导致误判论文没有相关内容。

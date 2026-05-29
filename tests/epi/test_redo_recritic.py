@@ -570,4 +570,10 @@ def test_recritic_cli_writes_routed_report_with_changed_artifacts(tmp_path, monk
     )
     run_state = json.loads((run_dir / "run-state.json").read_text(encoding="utf-8"))
     assert run_state["input_artifact_hashes"]["reader/reader.md"] == expected_reader_hash
+    paper_run_state = json.loads((paper_root / "run-state.json").read_text(encoding="utf-8"))
+    assert paper_run_state["paper_slug"] == slug
+    assert paper_run_state["state"] == "critic_passed"
+    assert paper_run_state["last_action"] == "recritic"
+    assert paper_run_state["next_action"] == "stage"
+    assert paper_run_state["stage_record"]["outcome"] == "pass"
     assert _redo_events(paper_root)[-1]["stage"] == "recritic"

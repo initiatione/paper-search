@@ -270,6 +270,31 @@ def test_paper_quality_does_not_use_unrelated_benchmark_terms_for_performance_cl
     assert report["paper_quality_checks"]["benchmark_integrity"]["status"] == "fail"
 
 
+def test_paper_quality_does_not_fail_when_only_source_survey_mentions_improvement(tmp_path):
+    paper_root = _write_protocol_fixture(
+        tmp_path,
+        metadata=_stable_metadata(title="Robotics Foundation Model Survey"),
+        mineru_text=(
+            "# Abstract\n\n"
+            "This survey reviews foundation models for robotics and discusses how recent systems "
+            "can improve planning, control, and generalization in embodied AI.\n\n"
+            "# Benchmarks\n\n"
+            "The paper catalogs datasets, simulators, and benchmarks without making a new method-level "
+            "outperform claim in the reader artifact.\n"
+        ),
+        reader_text=(
+            "# Reader\n\n"
+            "- Claim 1: The paper surveys foundation-model use in robotics and embodied AI.\n"
+            "  Evidence: source=mineru/paper.md; heading=Abstract\n"
+        ),
+    )
+
+    report = run_critics(paper_root)
+
+    assert report["outcome"] == "pass"
+    assert report["paper_quality_checks"]["benchmark_integrity"]["status"] == "pass"
+
+
 def test_paper_quality_accepts_local_plural_baseline_metric_and_task_context(tmp_path):
     paper_root = _write_protocol_fixture(
         tmp_path,

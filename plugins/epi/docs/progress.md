@@ -25,30 +25,45 @@ EPI 当前聚焦“高质量论文收集和整理 -> Obsidian/LLM Wiki 知识沉
 
 ## 当前未提交工作
 
-当前源码树还有配置引导相关未提交改动，范围集中在：
+当前源码树本轮新增修复集中在完整链路实测暴露的问题：
 
-- `plugins/epi/skills/config-setup/SKILL.md`
-- `plugins/epi/docs/config.md`
+- `plugins/epi/scripts/build/epi/paper_quality.py`
+- `plugins/epi/scripts/build/epi/orchestrator.py`
 - `plugins/epi/docs/epi-linkage.md`
-- `plugins/epi/docs/structure.md`
 - `plugins/epi/docs/progress.md`
 - `plugins/epi/.codex-plugin/plugin.json`
-- 现有 EPI skill 中对 `config-setup` 和 `docs\config.md` 的引用
-- `tests/epi/test_config_onboarding_docs.py`
+- `tests/epi/test_paper_quality_critic_protocol.py`
+- `tests/epi/test_redo_recritic.py`
 
-这些改动的目标是：当用户首次使用时，如果本机还没有配置 `paper-search` CLI、`MINERU_TOKEN` 或 `_meta\epi-config.yaml`，EPI 不直接启动论文流程，而是通过 `config-setup` 用自然语言逐步引导，并提供必要链接。
+这些改动的目标是：用仓库源插件 `D:\paper-search\plugins\epi` 跑通发现、下载、MinerU 解析、reader、critic、staging、paper-gate、wiki-ingest-handoff 的原链路。修复点包括：综述论文正文里的 `improve/better` 词汇不能在 reader 未写出性能断言时误触发 `benchmark_integrity` 阻断；`recritic`/`redo-read-recritic` 成功后必须同步论文自身 `run-state.json`，避免 dashboard 和 research queue 继续显示旧的 `critic_failed`。
 
 ## 最近验证
 
 本轮已验证：
 
 ```powershell
-python -m pytest tests\epi\test_config_onboarding_docs.py -q --basetemp .pytest_tmp_handoff_config
+python -m pytest tests\epi\test_paper_quality_critic_protocol.py -q --basetemp=.pytest_tmp_green_paper_quality
+python -m pytest tests\epi\test_redo_recritic.py::test_recritic_cli_writes_routed_report_with_changed_artifacts tests\epi\test_paper_quality_critic_protocol.py -q --basetemp=.pytest_tmp_green_recritic_and_quality
+python -m pytest tests\epi -q --basetemp=.pytest_tmp_full_chain_fix
+python -m pytest tests\epi -q --basetemp=.pytest_tmp_release_full_chain_fix2
+python -m coverage run -m pytest tests\epi -q --basetemp=.pytest_tmp_release_cov_full_chain_fix
+python -m coverage xml -o plugins\epi\coverage\coverage.xml
+python C:\Users\liuchf\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py D:\paper-search\plugins\epi
+python C:\Users\liuchf\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py D:\paper-search\plugins\mineru-paper-parser
+node C:\Users\liuchf\.codex\plugins\cache\openai-curated\plugin-eval\719ed655\scripts\plugin-eval.js analyze D:\paper-search\plugins\epi --format markdown
 ```
 
-结果：`3 passed in 0.21s`。
+结果：目标回归测试通过；发布前全量 `tests\epi` 为 `202 passed in 23.51s`，coverage run 为 `202 passed in 25.00s`，`plugins\epi\coverage\coverage.xml` 已刷新。EPI 与 MinerU 两个 plugin validation 均 passed。Plugin Eval 结果为 `87/100`、`0 fail, 3 warn`、coverage `93.76%`；三个 warning 为已知 token budget 和 Windows 路径下 `py-tests-missing` 识别限制。
 
-上一轮开发摘要记录过更大范围结果：`tests\epi plugins\epi` 通过、EPI 插件 validation 通过、Plugin Eval 达到 `91/100` 且 `0 fail, 2 warn`。这些结果在当前配置引导改动后尚未本轮重跑，因此发布前必须重新验证。
+真实链路实测结果：
+
+- 发现 run：`D:\paper-research-wiki\_runs\20260529T191647886910Z`，MCP 优先调用，MCP 返回 0 篇后记录 fallback，CLI fallback 找到 `A Survey on Robotics with Foundation Models: toward Embodied AI`。
+- 论文 raw root：`D:\paper-research-wiki\_raw\papers\a-survey-on-robotics-with-foundation-models-toward-embodied-ai`。
+- 修复前状态：`critic_failed`，阻断项为 `benchmark_integrity`。
+- 修复后 `recritic`：`critic-quorum.json` 六个 reviewer 全部 pass，`paper-quality-critic` 记录 `benchmark_integrity: no explicit outperform/SOTA claim detected`。
+- `advance-paper` 后状态：`staged`，`next_action=run-wiki-ingest-agent`。
+- `paper-gate --json`：`status=waiting_for_human_gate`，`failure_checks=[]`，仅 `human-approval` action required。
+- `wiki-ingest-handoff --json`：`ready_for_agent=true`，handoff artifacts 位于 `_staging\papers\<slug>`。
 
 ## 发布前必须重跑
 
@@ -71,12 +86,10 @@ node C:\Users\liuchf\.codex\plugins\cache\openai-curated\plugin-eval\719ed655\sc
 
 ## 下一步计划
 
-1. 完成当前配置引导文档和 `config-setup` skill 的审查，确认 `plugin.json` 的版本 bump 是发布意图而不是误改。
-2. 跑文档/配置相关测试，再跑完整 `tests\epi`。
-3. 跑 EPI 与 MinerU 插件 validation。
-4. 将配置引导、结构文档和进度文档作为一个 scoped commit 提交。
-5. 需要发布时刷新 coverage 和 Plugin Eval，并推送 GitHub，让 Codex marketplace 从 `main` 升级。
-6. 升级安装副本后，从新 Codex thread 用 `@epi` 运行 `doctor --json`、`config-status --json`、dry-run fixture smoke 和 `research-queue` 验证安装体验。
+1. 发布本轮修复 commit，并从 GitHub/marketplace 重新安装 EPI，确认安装 cache 版本变为 `0.1.0+codex.20260530034504`。
+2. 升级安装副本后，从新 Codex thread 用 `@epi` 运行 `doctor --json`、`config-status --json`、dry-run fixture smoke 和 `research-queue` 验证安装体验。
+3. 对 `D:\paper-research-wiki` 补齐目标 vault contract 文件（例如 `AGENTS.md` 和 `_meta/*.md`），这样 wiki-ingest agent 能按本 vault 的最终规则落页，而不是只依赖 EPI suggested routes。
+4. 记录 human approval 后，交给 wiki-ingest agent 消费 `_staging\papers\a-survey-on-robotics-with-foundation-models-toward-embodied-ai\wiki-ingest-brief.json` 和 reading report。
 
 ## 已知风险
 
@@ -85,4 +98,3 @@ node C:\Users\liuchf\.codex\plugins\cache\openai-curated\plugin-eval\719ed655\sc
 - `MINERU_TOKEN` 不得写入文档、日志、报告或配置预览，只能显示 set/missing。
 - 当前安装 cache 不是开发源；源码提交并经 marketplace 升级后，安装副本才会变化。
 - 最终 Obsidian/LLM Wiki 写入依赖目标 vault contract。EPI 只能提供 handoff 和 suggested routes，不能把固定脚本当成最终沉淀机制。
-
