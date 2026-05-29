@@ -95,25 +95,29 @@ def test_epi_skills_document_precise_one_to_three_prepare_ranked_path():
 def test_paper_discovery_skill_documents_quality_first_chat_recommendations():
     discovery = _read(SKILL_DIR / "paper-discovery" / "SKILL.md")
 
-    assert "推荐优先看" in discovery
-    assert "EPI 实测证据" in discovery
-    assert "引用数" in discovery
-    assert "影响因子/分区" in discovery
-    assert "未核实" in discovery
-    assert "every paper found and kept" in discovery
-    assert "not only the top few" in discovery
-    assert "-review -survey" in discovery
-    assert "source_mode=paper_search_mcp" in discovery
+    assert "references/output-format.md" in discovery
+    assert "references/search-protocol.md" in discovery
+    assert "references/quality-gate.md" in discovery
+    assert "The full EPI chain stays documented" in discovery
 
 
 def test_paper_discovery_skill_defines_stronger_high_quality_search_protocol():
     discovery = _read(SKILL_DIR / "paper-discovery" / "SKILL.md")
 
-    assert "Treat `paper_search_mcp` as a search transport" in discovery
-    assert "concept blocks" in discovery
-    assert "3-5 query variants" in discovery
-    assert "source routing" in discovery
-    assert "Deduplicate across variants by DOI first" in discovery
-    assert "quality gate" in discovery
-    assert "Tier A" in discovery
-    assert "recall gap" in discovery
+    assert "references/search-protocol.md" in discovery
+    assert "references/quality-gate.md" in discovery
+    assert "references/output-format.md" in discovery
+    assert "The full EPI chain stays documented" in discovery
+
+
+def test_paper_discovery_reference_files_exist_and_hold_split_protocol():
+    search_protocol = _read(SKILL_DIR / "paper-discovery" / "references" / "search-protocol.md")
+    quality_gate = _read(SKILL_DIR / "paper-discovery" / "references" / "quality-gate.md")
+    output_format = _read(SKILL_DIR / "paper-discovery" / "references" / "output-format.md")
+
+    assert "3-5 query variants" in search_protocol
+    assert "paper_search_mcp" in search_protocol
+    assert "Tier A" in quality_gate
+    assert "recall gap" in quality_gate
+    assert "推荐优先看" in output_format
+    assert "EPI 实测证据" in output_format
