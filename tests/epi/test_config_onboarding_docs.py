@@ -17,6 +17,8 @@ def test_config_doc_defines_plain_chinese_eight_step_onboarding_script():
     assert "不要直接运行论文流程" in text
     assert "不懂可以直接回复：默认" in text
     assert "不要用字段名当问题标题" in text
+    assert "一次只问一个问题" in text
+    assert "最终确认前不得运行 `init-config`" in text
 
     for phrase in [
         "第一步，先定论文库放哪里",
@@ -36,6 +38,24 @@ def test_config_doc_defines_plain_chinese_eight_step_onboarding_script():
     assert "等用户明确确认后" in text
 
 
+def test_config_setup_skill_owns_initialization_and_update_onboarding():
+    skill_path = SKILL_DIR / "config-setup" / "SKILL.md"
+    text = _read(skill_path)
+
+    assert "name: config-setup" in text
+    assert "初始化" in text
+    assert "修改" in text
+    assert "doctor" in text
+    assert "config-status" in text
+    assert "一次只问一个问题" in text
+    assert "每个问题必须说明影响" in text
+    assert "参考方向" in text
+    assert "最终确认前不得运行 `init-config`" in text
+    assert "最终确认前不得运行 `apply-config-update`" in text
+    assert "不要一次性输出完整默认配置" in text
+    assert "你刚刚选了什么" in text
+
+
 def test_epi_skills_delegate_onboarding_wording_to_config_doc():
     for skill_name in [
         "paper-discovery",
@@ -47,4 +67,6 @@ def test_epi_skills_delegate_onboarding_wording_to_config_doc():
 
         assert "docs\\config.md" in text
         assert "聊天式初始化脚本" in text
+        assert "config-setup" in text
         assert "不要自由发挥成技术字段问卷" in text
+        assert "不要一次性输出完整默认配置" in text

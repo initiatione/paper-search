@@ -5,7 +5,7 @@ description: "Use when ingesting selected papers into EPI raw artifacts, readers
 
 # Paper Ingest
 
-Use after dry-run ranking selects candidate papers. Keep the chain aligned with `docs\epi-linkage.md`: high-quality paper collection -> LLM Wiki deposition -> low-burden reading report. If config is missing, follow `docs\config.md` 的 `## 聊天式初始化脚本`，不要自由发挥成技术字段问卷.
+Use after dry-run ranking selects candidate papers. Keep the chain aligned with `docs\epi-linkage.md`: high-quality paper collection -> LLM Wiki deposition -> low-burden reading report. If config is missing, stop ingest and use `config-setup`; config onboarding lives in `docs\config.md` 的 `## 聊天式初始化脚本`，不要自由发挥成技术字段问卷，不要一次性输出完整默认配置.
 
 ```powershell
 python scripts\orchestrator.py advance-ranked --run-id <dry-run-id> --max-papers 3 --vault D:\paper-research-wiki

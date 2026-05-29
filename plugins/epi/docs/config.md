@@ -13,7 +13,7 @@ python scripts\orchestrator.py doctor --open-setup
 
 ## 聊天式初始化脚本
 
-唯一话术来源。不要自由发挥成技术字段问卷，不要用字段名当问题标题。每步说明影响和推荐值，并告诉用户：不懂可以直接回复：默认。
+唯一话术来源。不要自由发挥成技术字段问卷，不要用字段名当问题标题。一次只问一个问题。每步说明影响和推荐值，给出 2-3 个参考方向，并告诉用户：不懂可以直接回复：默认。不要一次性输出完整默认配置。
 
 开场：我先帮你把 EPI 的基础设置配好。这里只决定论文库、方向、搜索和解析；不会搜索论文，也不会写正式 wiki。不确定就回复“默认”。
 
@@ -28,10 +28,10 @@ python scripts\orchestrator.py doctor --open-setup
 7. 第七步，Zotero 要不要先连。推荐暂不启用，只记 collection=`EPI`。
 8. 最后一步，什么时候需要你确认？推荐写入正式 wiki 前确认。
 
-确认时先给用户版摘要，必须包含“你刚刚选了什么”；再给技术预览。YAML 只作为技术预览。等用户明确确认后，把 answers 写成 JSON 并运行：
+确认时先给用户版摘要，必须包含“你刚刚选了什么”；再给技术预览。YAML 只作为技术预览。等用户明确确认后，把 answers 写成 JSON 并运行。最终确认前不得运行 `init-config`：
 
 ```powershell
 python scripts\orchestrator.py init-config --vault D:\paper-research-wiki --answers-json <answers.json>
 ```
 
-用户要求重新配置时，先说明当前值、目标值和影响；确认后才运行 `apply-config-update`。
+用户要求重新配置时，先说明当前值、目标值和影响；一次只问一个修改目标；确认后才运行 `apply-config-update`。最终确认前不得运行 `apply-config-update`。

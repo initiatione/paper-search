@@ -35,9 +35,9 @@ EPI 不能把 Obsidian Wiki 写入规则简化成“调用本机 `llm-wiki` / `w
 
 ### 1. 初始诊断与配置
 
-入口：`doctor`、`config-status`、`init-config`、`propose-config-update`、`apply-config-update`。
+入口：`doctor`、`config-status`、`config-setup` skill、`init-config`、`propose-config-update`、`apply-config-update`。
 
-职责：检查插件结构、模板、技能目录、默认 vault、`paper-search` CLI、MinerU 命令、`MINERU_TOKEN` 和 EPI vault 配置。外部依赖缺失只提示 warning，插件结构缺失才 error。用户初次使用时按 `docs/config.md` 做聊天式引导，不把字段名直接丢给用户。skill-aware evolution 不直接改用户配置。
+职责：检查插件结构、模板、技能目录、默认 vault、`paper-search` CLI、MinerU 命令、`MINERU_TOKEN` 和 EPI vault 配置。外部依赖缺失只提示 warning，插件结构缺失才 error。用户初次使用或修改配置时必须走 `config-setup` skill：一次只问一个问题，每步说明影响、推荐值和参考方向，不把字段名直接丢给用户，不一次性输出完整默认配置；最终确认前不得运行 `init-config` 或 `apply-config-update`。skill-aware evolution 不直接改用户配置。
 
 ### 2. 论文发现与排序
 

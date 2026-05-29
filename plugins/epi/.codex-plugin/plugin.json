@@ -1,6 +1,6 @@
 {
   "name": "epi",
-  "version": "0.1.0+codex.20260529233025",
+  "version": "0.1.0+codex.20260530003007",
   "description": "Search and rank engineering papers for an EPI wiki.",
   "author": {
     "name": "liuchf"
@@ -31,9 +31,9 @@
     "privacyPolicyURL": "https://github.com/initiatione/paper-search/blob/main/plugins/epi/docs/privacy.md",
     "termsOfServiceURL": "https://github.com/initiatione/paper-search/blob/main/plugins/epi/docs/terms.md",
     "defaultPrompt": [
+      "Set up EPI configuration.",
       "Search and rank high-quality papers.",
-      "Check EPI paper gate.",
-      "Prepare wiki ingest handoff."
+      "Check paper gate and prepare wiki ingest handoff."
     ]
   }
 }

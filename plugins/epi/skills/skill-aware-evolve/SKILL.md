@@ -9,7 +9,7 @@ Use run evidence, feedback, Plugin Eval, or benchmark reports to propose staged 
 
 Acceptance gates with `metric`, `operator`, and `value` are real non-regression gates. For example, `plugin_eval_score >= 91` must be present in `--validation-result-json`; `passed: true` alone is not enough if the metric regresses, is missing, or cannot be compared.
 
-If config is missing, follow `docs\config.md` 的 `## 聊天式初始化脚本`，不要自由发挥成技术字段问卷.
+If config is missing, record the issue and use `config-setup`; config onboarding lives in `docs\config.md` 的 `## 聊天式初始化脚本`，不要自由发挥成技术字段问卷，不要一次性输出完整默认配置.
 
 ```powershell
 python scripts\orchestrator.py propose-evolution --reflection-type OPTIMIZATION --evidence-type plugin_eval_warning --target-asset templates\ranking.example.yaml --rationale <text> --proposed-change-json <json> --before-metrics-json <json> --acceptance-gates-json <json> --evidence <artifact>
