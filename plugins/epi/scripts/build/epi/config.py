@@ -18,6 +18,8 @@ class PipelineConfig:
     max_results: int
     profile: str
     domains: list[str]
+    positive_keywords: list[str]
+    negative_keywords: list[str]
 
 
 @dataclass(frozen=True)
@@ -451,4 +453,6 @@ def load_config(plugin_root: Path, vault_path: Path, max_results: int | None) ->
         max_results=max_results if max_results is not None else configured_max,
         profile=str(interests.get("profile", "robotics_ai_control")),
         domains=list(interests.get("domains", ["robotics", "ai", "embodied intelligence", "control"])),
+        positive_keywords=list(interests.get("positive_keywords") or []),
+        negative_keywords=list(interests.get("negative_keywords") or []),
     )

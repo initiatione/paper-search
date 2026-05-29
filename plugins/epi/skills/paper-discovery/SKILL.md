@@ -5,22 +5,11 @@ description: "Use when running EPI paper search/ranking dry-runs without acquisi
 
 # Engineering Paper Discovery
 
-Use this for search, normalize, filter, and rank dry-runs. Check config first:
-
-```powershell
-python scripts\orchestrator.py config-status --vault D:\paper-research-wiki --json
-```
-
-If config is missing, stop before discovery and follow `docs\config.md` 的 `## 聊天式初始化脚本`. 不要自由发挥成技术字段问卷, and do not run search, dry-run, ingest, MinerU, or Zotero before the user confirms the summary. After confirmation, write answers JSON and run:
+Use only for search/rank dry-runs. The full EPI chain is documented in `docs\epi-linkage.md` and stays focused on high-quality paper collection, LLM Wiki deposition, and low-burden reading reports. If setup is unclear, run `doctor` or `config-status`; config onboarding lives in `docs\config.md` 的 `## 聊天式初始化脚本`，不要自由发挥成技术字段问卷.
 
 ```powershell
 python scripts\orchestrator.py init-config --vault D:\paper-research-wiki --answers-json <answers.json>
-```
-
-Run discovery:
-
-```powershell
 python scripts\orchestrator.py dry-run --query "robotics embodied intelligence control" --max-results 20 --vault D:\paper-research-wiki
 ```
 
-Dry-run writes only `_runs/<run-id>/`. Use `doctor` first when installation or dependency state is unclear.
+Safety: dry-run writes only `_runs/<run-id>/`; it does not acquire PDFs, parse papers, promote wiki pages, or sync Zotero.

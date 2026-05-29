@@ -96,6 +96,7 @@ def test_dry_run_writes_phase_1_artifacts(tmp_path):
     assert (run_dir / "rank.json").is_file()
     assert (run_dir / "report.md").is_file()
     state = json.loads((run_dir / "run-state.json").read_text(encoding="utf-8"))
+    ranked = json.loads((run_dir / "rank.json").read_text(encoding="utf-8"))
     report = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
     report_md = (run_dir / "report.md").read_text(encoding="utf-8")
     index_payload = json.loads((run_dir.parent / "index.json").read_text(encoding="utf-8"))
@@ -120,6 +121,21 @@ def test_dry_run_writes_phase_1_artifacts(tmp_path):
     assert report["workflow_type"] == "paper-discovery-dry-run"
     assert report["run_id"] == run_dir.name
     assert report["accepted"][0]["title"] == "Embodied Navigation Control for Mobile Robots"
+    assert ranked[0]["ranking_protocol"]["schema_version"] == "epi-ranking-protocol-v1"
+    assert ranked[0]["ranking_protocol"]["lenses"]["editorial"]["signals"] == [
+        "venue_tier",
+        "freshness",
+        "topic_relevance",
+    ]
+    assert ranked[0]["ranking_protocol"]["decision"] in {"advance-candidate", "review-candidate"}
+    assert report["accepted"][0]["ranking_protocol"] == ranked[0]["ranking_protocol"]
+    assert report["research_queue"]["advance_candidates"] or report["research_queue"]["review_candidates"]
+    queued_titles = [
+        paper["title"]
+        for group in report["research_queue"].values()
+        for paper in group
+    ]
+    assert "Embodied Navigation Control for Mobile Robots" in queued_titles
     assert report["rejected"][0]["title"] == "Graph Theory Notes"
     assert sorted(report["rejected"][0]["filter_reasons"]) == ["missing_pdf", "outside_domain"]
     assert report["quarantined"] == []
@@ -139,6 +155,7 @@ def test_dry_run_writes_phase_1_artifacts(tmp_path):
     assert index_payload["runs"][0]["run_id"] == run_dir.name
     assert index_payload["runs"][0]["workflow_type"] == "paper-discovery-dry-run"
     assert run_dir.name in dashboard_text
+    assert sorted(path.name for path in (tmp_path / "vault").iterdir()) == ["_runs"]
 
 
 def test_dry_run_live_search_preserves_raw_upstream_response(tmp_path):
@@ -186,6 +203,76 @@ def test_dry_run_live_search_preserves_raw_upstream_response(tmp_path):
     assert search_record["source_mode"] == "paper_search_cli"
     assert search_record["raw_response_path"] == str(raw_response)
     assert json.loads(raw_response.read_text(encoding="utf-8"))["papers"][0]["paper_id"] == "2401.12345"
+
+
+def test_dry_run_ranking_uses_configured_interest_profile_keywords(tmp_path):
+    plugin_root = tmp_path / "plugin"
+    _write_minimal_plugin_template(plugin_root)
+    vault = tmp_path / "vault"
+    meta = vault / "_meta"
+    meta.mkdir(parents=True)
+    (meta / "epi-config.yaml").write_text(
+        "profile: humanoid_control\n"
+        "domains:\n"
+        "  - robotics\n"
+        "  - control\n"
+        "positive_keywords:\n"
+        "  - sim2real\n"
+        "  - humanoid\n"
+        "negative_keywords:\n"
+        "  - biomedical trial\n"
+        "budget:\n"
+        "  max_results: 5\n",
+        encoding="utf-8",
+    )
+    fixture = tmp_path / "fixture.json"
+    fixture.write_text(
+        json.dumps(
+            [
+                {
+                    "source": "fixture",
+                    "title": "Humanoid Sim2Real Control with Open Benchmarks",
+                    "authors": ["A. Researcher"],
+                    "year": 2025,
+                    "venue": "ICRA",
+                    "abstract": "Robotics control with sim2real benchmark ablations and open code.",
+                    "pdf_url": "https://example.org/fit.pdf",
+                    "citation_count": 10,
+                    "code_url": "https://github.com/example/fit",
+                },
+                {
+                    "source": "fixture",
+                    "title": "Robot Control for Biomedical Trial Screening",
+                    "authors": ["B. Researcher"],
+                    "year": 2025,
+                    "venue": "ICRA",
+                    "abstract": "Robotics control benchmark with open code for a biomedical trial workflow.",
+                    "pdf_url": "https://example.org/negative.pdf",
+                    "citation_count": 10,
+                    "code_url": "https://github.com/example/negative",
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    run_dir = run_dry_run(
+        plugin_root=plugin_root,
+        vault_path=vault,
+        query="robotics control",
+        max_results=None,
+        fixture_path=fixture,
+    )
+
+    ranked = json.loads((run_dir / "rank.json").read_text(encoding="utf-8"))
+
+    assert [candidate["title"] for candidate in ranked] == [
+        "Humanoid Sim2Real Control with Open Benchmarks",
+        "Robot Control for Biomedical Trial Screening",
+    ]
+    assert ranked[0]["ranking_protocol"]["matched_positive_keywords"] == ["sim2real", "humanoid"]
+    assert ranked[1]["ranking_protocol"]["matched_negative_keywords"] == ["biomedical trial"]
+    assert "negative_keyword_overlap: biomedical trial" in ranked[1]["ranking_protocol"]["cautions"]
 
 
 def test_dry_run_uses_unique_run_ids_within_same_second(tmp_path, monkeypatch):

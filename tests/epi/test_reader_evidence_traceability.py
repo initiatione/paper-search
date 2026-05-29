@@ -35,13 +35,34 @@ def test_generate_reader_outputs_emits_structured_evidence_addresses(tmp_path):
     reader_text = (paper_root / "reader" / "reader.md").read_text(encoding="utf-8")
     figures_text = (paper_root / "reader" / "figures.md").read_text(encoding="utf-8")
     reproducibility_text = (paper_root / "reader" / "reproducibility.md").read_text(encoding="utf-8")
+    evidence_map = json.loads((paper_root / "reader" / "evidence-map.json").read_text(encoding="utf-8"))
 
     assert "Evidence: source=mineru/paper.md; heading=Abstract" in reader_text
     assert "Evidence: source=metadata.json; field=venue" in reader_text
     assert "Evidence: source=mineru/images; image=figure-1.png" in figures_text
     assert "Evidence: source=metadata.json; field=sources" in reproducibility_text
+    assert evidence_map["schema_version"] == "epi-reader-evidence-map-v1"
+    assert evidence_map["paper_title"] == "Embodied Navigation Control for Mobile Robots"
+    assert set(evidence_map["reader_roles"]) == {
+        "nature-sci-editor",
+        "peer-reviewer",
+        "senior-domain-researcher",
+    }
+    assert {claim["reader_role"] for claim in evidence_map["claims"]} == {
+        "nature-sci-editor",
+        "peer-reviewer",
+        "senior-domain-researcher",
+    }
+    for claim in evidence_map["claims"]:
+        assert claim["claim_id"]
+        assert claim["claim"]
+        assert claim["reader_artifact"].startswith("reader/")
+        assert claim["source"] in {"mineru/paper.md", "metadata.json", "mineru/images", "inference"}
+        assert isinstance(claim["locator"], dict)
+        assert claim["evidence_address"].startswith(f"source={claim['source']}")
 
     assert reader_record["reader_dir"] == str(paper_root / "reader")
+    assert reader_record["evidence_count"] == len(evidence_map["claims"])
     assert reader_record["started_at"]
     assert reader_record["finished_at"]
     assert reader_record["exit_status"] == 0
@@ -51,3 +72,4 @@ def test_generate_reader_outputs_emits_structured_evidence_addresses(tmp_path):
     assert reader_record["output_artifact_hashes"]["figures.md"]
     assert reader_record["output_artifact_hashes"]["reproducibility.md"]
     assert reader_record["output_artifact_hashes"]["implementation-ideas.md"]
+    assert reader_record["output_artifact_hashes"]["evidence-map.json"]

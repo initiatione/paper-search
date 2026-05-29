@@ -113,7 +113,7 @@ def test_advance_paper_once_routes_one_safe_stage_at_a_time(tmp_path):
         "read",
         "critic",
         "staging",
-        "awaiting-promotion",
+        "awaiting-wiki-ingest",
     ]
     assert [record["state"] for record in records] == [
         "acquired",
@@ -123,7 +123,7 @@ def test_advance_paper_once_routes_one_safe_stage_at_a_time(tmp_path):
         "staged",
         "staged",
     ]
-    assert records[-1]["next_action"] == "promote-to-wiki"
+    assert records[-1]["next_action"] == "run-wiki-ingest-agent"
     assert records[-1]["human_gate_required"] is True
 
     paper_root = vault / "_raw" / "papers" / "routed-paper"

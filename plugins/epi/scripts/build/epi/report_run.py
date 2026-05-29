@@ -6,6 +6,104 @@ from pathlib import Path
 from epi.artifacts import write_json_atomic, write_text_atomic
 
 
+def _research_queue(ranked: list[dict]) -> dict[str, list[dict]]:
+    queue = {
+        "advance_candidates": [],
+        "review_candidates": [],
+        "unknown_decision": [],
+    }
+    for paper in ranked:
+        decision = (paper.get("ranking_protocol") or {}).get("decision")
+        if decision == "advance-candidate":
+            queue["advance_candidates"].append(paper)
+        elif decision == "review-candidate":
+            queue["review_candidates"].append(paper)
+        else:
+            queue["unknown_decision"].append(paper)
+    return queue
+
+
+def _append_queue_section(report: list[str], title: str, papers: list[dict]) -> None:
+    report.append(f"### {title}")
+    if not papers:
+        report.append("- None.")
+        return
+    for index, paper in enumerate(papers, start=1):
+        protocol = paper.get("ranking_protocol") or {}
+        reasons = "; ".join(protocol.get("reasons") or [])
+        cautions = "; ".join(protocol.get("cautions") or [])
+        report.append(f"{index}. {paper.get('title')} - score {paper.get('score')}")
+        if reasons:
+            report.append(f"   - reasons: {reasons}")
+        if cautions:
+            report.append(f"   - cautions: {cautions}")
+        rationale = paper.get("ranking_rationale") or {}
+        if rationale.get("one_sentence"):
+            report.append(f"   - rationale: {rationale['one_sentence']}")
+        role_views = rationale.get("role_views") if isinstance(rationale.get("role_views"), dict) else {}
+        role_labels = {
+            "nature_sci_editor": "nature-sci-editor",
+            "peer_reviewer": "peer-reviewer",
+            "senior_domain_researcher": "senior-domain-researcher",
+        }
+        for role_key, role_label in role_labels.items():
+            role_view = role_views.get(role_key) or {}
+            if role_view.get("take"):
+                report.append(f"   - {role_label}: {role_view['take']}")
+
+
+def _append_research_decision_section(report: list[str], decisions: list[dict]) -> None:
+    report.append("## Research Decisions")
+    if not decisions:
+        report.append("- None.")
+        return
+    for index, decision in enumerate(decisions, start=1):
+        title = decision.get("title") or decision.get("slug")
+        recommendation = decision.get("recommendation")
+        next_action = decision.get("next_action")
+        report.append(f"{index}. {title} - {recommendation}")
+        if next_action:
+            report.append(f"   - next_action: {next_action}")
+        role_verdicts = decision.get("role_verdicts") or {}
+        for lens, verdict in role_verdicts.items():
+            report.append(f"   - {lens}: {verdict}")
+        for item in decision.get("action_items") or []:
+            lens = item.get("lens")
+            action = item.get("action")
+            if lens and action:
+                report.append(f"   - {lens} -> {action}")
+
+
+def _append_reader_revision_plan_section(report: list[str], plans: list[dict]) -> None:
+    report.append("## Reader Revision Plans")
+    if not plans:
+        report.append("- None.")
+        return
+    for index, plan in enumerate(plans, start=1):
+        title = plan.get("title") or plan.get("slug")
+        next_action = plan.get("next_action") or "-"
+        report.append(f"{index}. {title} - {next_action}")
+        if plan.get("plan_path"):
+            report.append(f"   - plan: {plan['plan_path']}")
+        report.append(f"   - blocking repairs: {plan.get('blocking_count', 0)}")
+        report.append(f"   - warning follow-ups: {plan.get('warning_count', 0)}")
+
+
+def _append_reproduction_plan_section(report: list[str], plans: list[dict]) -> None:
+    report.append("## Reproducibility Caveats")
+    if not plans:
+        report.append("- None.")
+        return
+    for index, plan in enumerate(plans, start=1):
+        title = plan.get("title") or plan.get("slug")
+        report.append(f"{index}. {title} - review-reproducibility-caveats")
+        if plan.get("plan_path"):
+            report.append(f"   - plan: {plan['plan_path']}")
+        report.append(f"   - missing checklist items: {plan.get('missing_count', 0)}")
+        report.append(f"   - human_gate_required: {plan.get('human_gate_required')}")
+        report.append("   - note: keep reproduction as a short verification cue unless the user asks for a full run.")
+
+
 def write_report(
     run_dir: Path,
     ranked: list[dict],
@@ -26,6 +124,9 @@ def write_report(
     restored_paths: list[str] | None = None,
     removed_paths: list[str] | None = None,
     changed_artifacts: list[str] | None = None,
+    research_decisions: list[dict] | None = None,
+    reader_revision_plans: list[dict] | None = None,
+    reproduction_plans: list[dict] | None = None,
 ) -> None:
     rejected = rejected or []
     quarantined = quarantined or []
@@ -39,6 +140,10 @@ def write_report(
     restored_paths = restored_paths or []
     removed_paths = removed_paths or []
     changed_artifacts = changed_artifacts or []
+    research_decisions = research_decisions or []
+    reader_revision_plans = reader_revision_plans or []
+    reproduction_plans = reproduction_plans or []
+    research_queue = _research_queue(ranked)
 
     if workflow_type in {"dry-run", "paper-discovery-dry-run"}:
         report = ["# EPI Dry Run", ""]
@@ -65,6 +170,11 @@ def write_report(
             report.append("## Errors")
             for error in errors:
                 report.append(f"- {error}")
+        report.append("")
+        report.append("## Research Queue")
+        _append_queue_section(report, "Advance Candidates", research_queue["advance_candidates"])
+        _append_queue_section(report, "Review Candidates", research_queue["review_candidates"])
+        _append_queue_section(report, "Unknown Decision", research_queue["unknown_decision"])
         report.append("")
         report.append("## Ranked Papers")
         for index, paper in enumerate(ranked, start=1):
@@ -131,6 +241,12 @@ def write_report(
             report.append("## Changed Artifacts")
             for path in changed_artifacts:
                 report.append(f"- {path}")
+        report.append("")
+        _append_research_decision_section(report, research_decisions)
+        report.append("")
+        _append_reader_revision_plan_section(report, reader_revision_plans)
+        report.append("")
+        _append_reproduction_plan_section(report, reproduction_plans)
         if human_gate:
             report.append("")
             report.append("## Human Gate")
@@ -167,6 +283,10 @@ def write_report(
             "restored_paths": restored_paths,
             "removed_paths": removed_paths,
             "changed_artifacts": changed_artifacts,
+            "research_decisions": research_decisions,
+            "reader_revision_plans": reader_revision_plans,
+            "reproduction_plans": reproduction_plans,
+            "research_queue": research_queue,
             "accepted_count": len(ranked),
             "errors": errors,
             "ranked": ranked,

@@ -68,3 +68,57 @@ def test_write_report_emits_routed_run_fields_and_markdown_shape(tmp_path):
     assert "## Paper States" in report_md
     assert "## Failed Papers" in report_md
     assert "# EPI Dry Run" not in report_md
+
+
+def test_write_report_surfaces_research_decisions_for_routed_runs(tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir(parents=True)
+
+    decision = {
+        "slug": "embodied-control",
+        "title": "Embodied Control for Mobile Robots",
+        "recommendation": "revise-reader",
+        "next_action": "revise-reader",
+        "role_verdicts": {
+            "nature-sci-editor": "pass",
+            "peer-reviewer": "fail",
+            "senior-domain-researcher": "pass",
+        },
+        "action_items": [
+            {
+                "lens": "peer-reviewer",
+                "action": "revise",
+                "rationale": "peer-reviewer reviewer requires reader repair before promotion.",
+            }
+        ],
+    }
+
+    write_report(
+        run_dir,
+        ranked=[],
+        errors=[],
+        workflow_type="advance-batch",
+        run_id="20260528T123000Z-batch",
+        paper_states=[
+            {
+                "slug": "embodied-control",
+                "title": "Embodied Control for Mobile Robots",
+                "state": "critic_failed",
+                "last_action": "critic",
+                "next_action": "revise-reader",
+                "human_gate_required": False,
+            }
+        ],
+        failed_papers=[],
+        research_decisions=[decision],
+        next_actions=["revise-reader"],
+    )
+
+    report_json = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
+    report_md = (run_dir / "report.md").read_text(encoding="utf-8")
+
+    assert report_json["research_decisions"] == [decision]
+    assert "## Research Decisions" in report_md
+    assert "Embodied Control for Mobile Robots - revise-reader" in report_md
+    assert "peer-reviewer: fail" in report_md
+    assert "peer-reviewer -> revise" in report_md

@@ -1,7 +1,13 @@
 paper_quality_critic:
-  enabled_from_phase: 2
+  hard_fail_checks: ["paper_identity", "claim_support", "benchmark_integrity", "scope_overclaim"]
+  warning_checks: ["engineering_reproducibility", "parse_vs_paper_failure"]
 parse_quality_critic:
-  enabled_from_phase: 2
+  hard_fail_checks: ["mineru_paper_markdown_exists"]
+  warning_checks: ["parse_limitations_need_pdf_inspection"]
 reader_quality_critic:
-  enabled_from_phase: 2
+  hard_fail_checks: ["structured_evidence_lines", "evidence_map_schema", "role_claim_coverage", "evidence_address_resolution"]
+role_critics:
+  editorial_significance: ["reader/editorial-summary.md", "Central Claim", "Why It Matters", "Editorial Caveat"]
+  peer_review_methods: ["reader/technical-reading.md", "Method Decomposition", "Reproducibility Hooks", "Reviewer Checkpoint"]
+  domain_fit: ["reader/research-notes.md", "Fit To Research Direction", "Follow-up Experiments"]
 hard_rule: "No critic pass, no compiled wiki write."

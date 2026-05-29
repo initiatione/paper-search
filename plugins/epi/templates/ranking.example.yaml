@@ -6,6 +6,16 @@ weights:
   pdf_available: 0.08
   code_available: 0.08
   reproducibility_signal: 0.06
+protocol:
+  schema_version: epi-ranking-protocol-v1
+  lenses:
+    editorial: ["venue_tier", "freshness", "topic_relevance"]
+    peer_review: ["citation_signal", "benchmark_signal", "pdf_available"]
+    domain_fit: ["positive_keyword_overlap", "negative_keyword_penalty"]
+    reproducibility: ["code_available", "reproducibility_terms"]
+profile_fit:
+  positive_keywords: "advance papers matching the user's research interests and profile"
+  negative_keywords: "demote or review papers matching excluded topics"
 venue_tiers:
   icra: 1.0
   iros: 0.95

@@ -29,9 +29,13 @@ def test_write_report_supports_redo_read_changed_artifacts(tmp_path):
         next_actions=["recritic the regenerated reader outputs"],
         changed_artifacts=[
             "reader/reader.md",
+            "reader/editorial-summary.md",
+            "reader/technical-reading.md",
+            "reader/research-notes.md",
             "reader/figures.md",
             "reader/reproducibility.md",
             "reader/implementation-ideas.md",
+            "reader/evidence-map.json",
         ],
     )
 
@@ -39,9 +43,13 @@ def test_write_report_supports_redo_read_changed_artifacts(tmp_path):
     assert report_json["workflow_type"] == "redo-read"
     assert report_json["changed_artifacts"] == [
         "reader/reader.md",
+        "reader/editorial-summary.md",
+        "reader/technical-reading.md",
+        "reader/research-notes.md",
         "reader/figures.md",
         "reader/reproducibility.md",
         "reader/implementation-ideas.md",
+        "reader/evidence-map.json",
     ]
     assert report_json["wiki_pages_written"] == []
     assert report_json["next_actions"] == ["recritic the regenerated reader outputs"]

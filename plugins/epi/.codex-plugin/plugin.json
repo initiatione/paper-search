@@ -19,8 +19,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "EPI",
-    "shortDescription": "Dry-run search, filter, and rank engineering papers before parsing and wiki promotion.",
-    "longDescription": "EPI (Engineering Paper Intelligence) packages a Codex workflow for configurable paper discovery in robotics, AI, embodied intelligence, and control. It wraps mature paper-search MCP infrastructure, preserves raw run artifacts, initializes a dedicated paper research wiki, and keeps MinerU parsing as an internal stage for future parse runs.",
+    "shortDescription": "Find, vet, and stage high-quality engineering papers for agent-mediated Obsidian wiki ingest.",
+    "longDescription": "EPI (Engineering Paper Intelligence) packages a Codex workflow for configurable paper discovery, evidence-grounded reader/critic review, MinerU parsing, and low-burden reading reports. It preserves raw artifacts and prepares wiki-ingest handoffs for an agent to write into the target Obsidian/LLM Wiki according to that vault's contract.",
     "developerName": "liuchf",
     "category": "Productivity",
     "capabilities": [
@@ -31,9 +31,9 @@
     "privacyPolicyURL": "https://github.com/initiatione/paper-search/blob/main/plugins/epi/docs/privacy.md",
     "termsOfServiceURL": "https://github.com/initiatione/paper-search/blob/main/plugins/epi/docs/terms.md",
     "defaultPrompt": [
-      "Dry-run paper search.",
-      "Initialize paper wiki.",
-      "Rank EPI candidates."
+      "Search and rank high-quality papers.",
+      "Check EPI paper gate.",
+      "Prepare wiki ingest handoff."
     ]
   }
 }

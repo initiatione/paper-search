@@ -5,24 +5,16 @@ description: "Use when EPI evidence suggests controlled changes to profiles, fil
 
 # Skill-Aware Evolve
 
-Evolution is staged and reversible. It must not directly edit plugin code. Check config first:
+Use run evidence, feedback, Plugin Eval, or benchmark reports to propose staged changes. Follow `docs\epi-linkage.md`: classify evidence as `skill_change`, `execution_lapse`, or `configuration_change`; execution lapses and configuration changes are record-only and must not mutate valid guidance or templates. Activation requires human approval and accepted chain changes must update `docs\epi-linkage.md`.
+
+Acceptance gates with `metric`, `operator`, and `value` are real non-regression gates. For example, `plugin_eval_score >= 91` must be present in `--validation-result-json`; `passed: true` alone is not enough if the metric regresses, is missing, or cannot be compared.
+
+If config is missing, follow `docs\config.md` 的 `## 聊天式初始化脚本`，不要自由发挥成技术字段问卷.
 
 ```powershell
-python scripts\orchestrator.py config-status --vault D:\paper-research-wiki --json
+python scripts\orchestrator.py propose-evolution --reflection-type OPTIMIZATION --evidence-type plugin_eval_warning --target-asset templates\ranking.example.yaml --rationale <text> --proposed-change-json <json> --before-metrics-json <json> --acceptance-gates-json <json> --evidence <artifact>
+python scripts\orchestrator.py evolution-query --status pending_validation --json
+python scripts\orchestrator.py activate-evolution --proposal-id <proposal-id> --approved --validation-result-json <json>
 ```
 
-If config is missing, stop before proposing or activating evolution and follow `docs\config.md` 的 `## 聊天式初始化脚本`. 不要自由发挥成技术字段问卷. User config changes must use the config proposal/apply flow in that doc, separate from plugin evolution.
-
-Create proposals from run evidence, feedback, Plugin Eval output, or benchmark reports:
-
-```powershell
-python scripts\orchestrator.py propose-evolution --reflection-type OPTIMIZATION --target-asset templates\ranking.example.yaml --rationale "Boost reproducibility after user feedback" --proposed-change-json "{\"weights\":{\"reproducibility_signal\":0.12}}" --evidence "_runs\feedback.jsonl#1"
-```
-
-Activate only after human approval:
-
-```powershell
-python scripts\orchestrator.py activate-evolution --proposal-id <proposal-id> --approved
-```
-
-Config changes use the separate proposal/apply flow in `docs\config.md`.
+Config changes use the separate proposal/apply flow in `docs\config.md`; `evolution-query` should point them to `propose-config-update`.

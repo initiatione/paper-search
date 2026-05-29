@@ -12,16 +12,25 @@ from epi.feedback import record_feedback
 from epi.filter_candidates import filter_candidates, filter_candidates_with_report
 from epi.generate_reader import generate_reader_outputs
 from epi.normalize_candidates import normalize_candidates
+from epi.paper_gate import build_paper_gate, render_paper_gate
 from epi.paper_search_adapter import discover
 from epi.promote_to_wiki import promote_paper, rollback_promotion
 from epi.rank_papers import rank_candidates
-from epi.redo import redo_acquire, redo_parse, redo_read, recritic
+from epi.redo import redo_acquire, redo_parse, redo_read, redo_read_recritic, recritic
 from epi.report_run import write_report
-from epi.run_index import query_runs, refresh_run_index, render_runs_query
+from epi.run_index import (
+    query_research_queue,
+    query_runs,
+    refresh_run_index,
+    render_research_queue_query,
+    render_runs_query,
+)
 from epi.run_critic import run_critics
 from epi.run_mineru_parse import materialize_mineru_fixture, run_mineru_command
-from epi.skill_aware_evolve import activate_evolution, propose_evolution
+from epi.skill_aware_evolve import activate_evolution, propose_evolution, query_evolution, render_evolution_query
 from epi.stage_wiki import stage_paper
+from epi.wiki_ingest_handoff import build_wiki_ingest_handoff, render_wiki_ingest_handoff
+from epi.wiki_query import query_wiki, render_wiki_query
 from epi.wiki_init import initialize_paper_wiki
 from epi.zotero_sync import sync_zotero_record
 
@@ -97,6 +106,28 @@ def _append_report_sections(
             sections.append("- None.")
     if sections:
         write_text_atomic(report_md_path, existing + "\n\n" + "\n".join(sections) + "\n")
+
+
+def _append_revision_delta_section(report_md_path: Path, revision_delta: dict | None) -> None:
+    if not revision_delta:
+        return
+    existing = report_md_path.read_text(encoding="utf-8").rstrip()
+    before = revision_delta.get("before") or {}
+    after = revision_delta.get("after") or {}
+    lines = [
+        "## Revision Delta",
+        f"- before blocking repairs: {before.get('blocking_count', 0)}",
+        f"- before warning follow-ups: {before.get('warning_count', 0)}",
+        f"- after blocking repairs: {after.get('blocking_count', 0)}",
+        f"- after warning follow-ups: {after.get('warning_count', 0)}",
+        "- resolved blocking checks: "
+        + (", ".join(revision_delta.get("resolved_blocking_checks") or []) or "None"),
+        "- remaining blocking checks: "
+        + (", ".join(revision_delta.get("remaining_blocking_checks") or []) or "None"),
+        "- remaining warning checks: "
+        + (", ".join(revision_delta.get("remaining_warning_checks") or []) or "None"),
+    ]
+    write_text_atomic(report_md_path, existing + "\n\n" + "\n".join(lines) + "\n")
 
 
 def _write_promotion_or_rollback_run_state(
@@ -278,6 +309,19 @@ def _repair_report_contract(vault_path: Path, slug: str, record: dict) -> tuple[
             ["redo-read the reparsed paper"],
         )
     if stage == "redo-read":
+        changed_artifacts = [
+            "reader/reader.md",
+            "reader/editorial-summary.md",
+            "reader/technical-reading.md",
+            "reader/research-notes.md",
+            "reader/figures.md",
+            "reader/reproducibility.md",
+            "reader/implementation-ideas.md",
+        ]
+        guidance_path = raw_paper_root(vault_path, slug) / "reader" / "revision-guidance.md"
+        if guidance_path.exists():
+            changed_artifacts.append("reader/revision-guidance.md")
+        changed_artifacts.append("reader/evidence-map.json")
         return (
             {
                 "slug": slug,
@@ -287,12 +331,7 @@ def _repair_report_contract(vault_path: Path, slug: str, record: dict) -> tuple[
                 "next_action": "recritic",
                 "human_gate_required": False,
             },
-            [
-                "reader/reader.md",
-                "reader/figures.md",
-                "reader/reproducibility.md",
-                "reader/implementation-ideas.md",
-            ],
+            changed_artifacts,
             ["recritic the regenerated reader outputs"],
         )
     if stage == "recritic":
@@ -315,6 +354,45 @@ def _repair_report_contract(vault_path: Path, slug: str, record: dict) -> tuple[
                 "human_gate_required": False,
             },
             ["critic/critic-report.json"],
+            next_actions,
+        )
+    if stage == "redo-read-recritic":
+        critic_report_path = raw_paper_root(vault_path, slug) / "critic" / "critic-report.json"
+        critic_report = json.loads(critic_report_path.read_text(encoding="utf-8"))
+        next_action = critic_report.get("next_action", "stage")
+        state = "critic_passed" if next_action == "stage" else "critic_failed"
+        next_actions = (
+            ["stage the paper for promotion review"]
+            if next_action == "stage"
+            else ["revise the reader outputs before another critic pass"]
+        )
+        changed_artifacts = [
+            "reader/reader.md",
+            "reader/editorial-summary.md",
+            "reader/technical-reading.md",
+            "reader/research-notes.md",
+            "reader/figures.md",
+            "reader/reproducibility.md",
+            "reader/implementation-ideas.md",
+            "reader/revision-guidance.md",
+            "reader/evidence-map.json",
+            "critic/critic-report.json",
+            "critic/critic-quorum.json",
+            "critic/research-decision.json",
+            "critic/research-decision.md",
+            "critic/reader-revision-plan.json",
+            "critic/reader-revision-plan.md",
+        ]
+        return (
+            {
+                "slug": slug,
+                "title": _paper_title(vault_path, slug),
+                "state": state,
+                "last_action": "redo-read-recritic",
+                "next_action": next_action,
+                "human_gate_required": False,
+            },
+            changed_artifacts,
             next_actions,
         )
     raise ValueError(f"unsupported repair stage: {stage}")
@@ -400,7 +478,10 @@ def _write_repair_routed_report(
     report_payload["changed_artifacts"] = changed_artifacts
     report_payload["next_actions"] = next_actions
     report_payload["wiki_pages_written"] = []
+    if record.get("revision_delta"):
+        report_payload["revision_delta"] = record["revision_delta"]
     _write_json(report_json_path, report_payload)
+    _append_revision_delta_section(run_dir / "report.md", record.get("revision_delta"))
     _write_repair_run_state(
         run_dir,
         run_id=run_id,
@@ -426,7 +507,6 @@ def run_dry_run(
     sources: list[str] | None = None,
 ) -> Path:
     config = load_config(plugin_root=plugin_root, vault_path=vault_path, max_results=max_results)
-    initialize_paper_wiki(config.vault_path)
     run_id, run_dir = _new_run_dir(config.vault_path)
     started_at = utc_now()
 
@@ -478,7 +558,11 @@ def run_dry_run(
 
     ranked = rank_candidates(
         filtered,
-        positive_keywords=["robot", "humanoid", "embodied", "control", "navigation"],
+        positive_keywords=(
+            config.positive_keywords
+            or [*config.domains, "robot", "humanoid", "embodied", "control", "navigation"]
+        ),
+        negative_keywords=config.negative_keywords,
         venue_tiers={"icra": 1.0, "iros": 0.95, "rss": 1.0, "corl": 0.98, "neurips": 1.0, "iclr": 1.0, "icml": 1.0},
     )
     _write_json(run_dir / "rank.json", ranked)
@@ -734,7 +818,7 @@ def advance_paper_once(vault_path: Path, candidate: dict, mineru_command: str | 
                 slug=slug,
                 state="staged",
                 last_action="staging",
-                next_action="promote-to-wiki",
+                next_action="run-wiki-ingest-agent",
                 stage_record=record,
                 human_gate_required=True,
             ),
@@ -746,11 +830,68 @@ def advance_paper_once(vault_path: Path, candidate: dict, mineru_command: str | 
             paper_root=paper_root,
             slug=slug,
             state="staged",
-            last_action="awaiting-promotion",
-            next_action="promote-to-wiki",
+            last_action="awaiting-wiki-ingest",
+            next_action="run-wiki-ingest-agent",
             human_gate_required=True,
         ),
     )
+
+
+def _research_decision_from_result(result: dict, *, title: str) -> dict | None:
+    stage_record = result.get("stage_record")
+    if not isinstance(stage_record, dict):
+        return None
+    decision = stage_record.get("research_decision")
+    if not isinstance(decision, dict):
+        return None
+    payload = dict(decision)
+    payload["slug"] = result["paper_slug"]
+    payload["title"] = title
+    if stage_record.get("research_decision_path"):
+        payload["decision_path"] = stage_record["research_decision_path"]
+    return payload
+
+
+def _reader_revision_plan_from_result(result: dict, *, title: str) -> dict | None:
+    stage_record = result.get("stage_record")
+    if not isinstance(stage_record, dict):
+        return None
+    plan = stage_record.get("reader_revision_plan")
+    if not isinstance(plan, dict):
+        return None
+    payload = {
+        "slug": result["paper_slug"],
+        "title": title,
+        "recommendation": plan.get("recommendation"),
+        "next_action": plan.get("next_action"),
+        "blocking_count": len(plan.get("blocking_repairs") or []),
+        "warning_count": len(plan.get("warning_followups") or []),
+    }
+    if stage_record.get("reader_revision_plan_path"):
+        payload["plan_path"] = stage_record["reader_revision_plan_path"]
+    return payload
+
+
+def _reproduction_plan_from_result(result: dict, *, title: str) -> dict | None:
+    stage_record = result.get("stage_record")
+    if not isinstance(stage_record, dict):
+        return None
+    plan = stage_record.get("reproduction_plan")
+    if not isinstance(plan, dict):
+        return None
+    if plan.get("next_action") == "none":
+        return None
+    checklist = plan.get("checklist") or []
+    payload = {
+        "slug": result["paper_slug"],
+        "title": title,
+        "next_action": plan.get("next_action"),
+        "missing_count": len([item for item in checklist if item.get("status") == "missing"]),
+        "human_gate_required": bool(plan.get("human_gate_required")),
+    }
+    if stage_record.get("reproduction_plan_path"):
+        payload["plan_path"] = stage_record["reproduction_plan_path"]
+    return payload
 
 
 def advance_paper_batch(
@@ -761,11 +902,16 @@ def advance_paper_batch(
     source_run_id: str | None = None,
     candidate_source: Path | None = None,
     workflow_type: str = "advance-batch",
+    source_candidate_count: int | None = None,
+    skipped_ranked_candidates: list[dict] | None = None,
+    rank_decision_filter: list[str] | None = None,
 ) -> dict:
     vault_path = vault_path.resolve()
     initialize_paper_wiki(vault_path)
     if max_papers is not None and max_papers < 0:
         raise ValueError("max_papers must be greater than or equal to 0")
+    skipped_ranked_candidates = skipped_ranked_candidates or []
+    source_candidate_count = source_candidate_count if source_candidate_count is not None else len(candidates)
 
     selected_candidates = candidates[:max_papers] if max_papers is not None else candidates
     run_id, run_dir = _new_run_dir(vault_path, "batch-advance")
@@ -776,7 +922,8 @@ def advance_paper_batch(
     ]
     failed = any(result["state"].endswith("_failed") for result in results)
     awaiting_promotion = any(
-        result.get("human_gate_required") and result.get("next_action") == "promote-to-wiki"
+        result.get("human_gate_required")
+        and result.get("next_action") in {"promote-to-wiki", "run-wiki-ingest-agent"}
         for result in results
     )
     if failed:
@@ -813,6 +960,39 @@ def advance_paper_batch(
             "human_gate_required": result.get("human_gate_required", False),
         }
         for result in results
+    ]
+    research_decisions = [
+        decision
+        for result in results
+        for decision in [
+            _research_decision_from_result(
+                result,
+                title=titles_by_slug.get(result["paper_slug"], result["paper_slug"]),
+            )
+        ]
+        if decision is not None
+    ]
+    reader_revision_plans = [
+        plan
+        for result in results
+        for plan in [
+            _reader_revision_plan_from_result(
+                result,
+                title=titles_by_slug.get(result["paper_slug"], result["paper_slug"]),
+            )
+        ]
+        if plan is not None
+    ]
+    reproduction_plans = [
+        plan
+        for result in results
+        for plan in [
+            _reproduction_plan_from_result(
+                result,
+                title=titles_by_slug.get(result["paper_slug"], result["paper_slug"]),
+            )
+        ]
+        if plan is not None
     ]
     failed_papers = [
         state
@@ -851,9 +1031,9 @@ def advance_paper_batch(
         )
     )
     budget_usage = {
-        "candidate_count": len(candidates),
+        "candidate_count": source_candidate_count,
         "processed_count": len(results),
-        "skipped_count": len(candidates) - len(results),
+        "skipped_count": source_candidate_count - len(results),
         "max_papers": max_papers,
     }
 
@@ -864,20 +1044,26 @@ def advance_paper_batch(
         "state": batch_state,
         "status": status,
         "vault_path": str(vault_path),
-        "candidate_count": len(candidates),
+        "candidate_count": source_candidate_count,
         "processed_count": len(results),
-        "skipped_count": len(candidates) - len(results),
+        "skipped_count": source_candidate_count - len(results),
         "max_papers": max_papers,
+        "skipped_ranked_candidates": skipped_ranked_candidates,
         "compiled_wiki_write": False,
         "human_gate_required": awaiting_promotion,
         "started_at": started_at,
         "tool_versions": _tool_versions("orchestrator", "advance_paper_batch", "advance_paper_once"),
         "results": results,
+        "research_decisions": research_decisions,
+        "reader_revision_plans": reader_revision_plans,
+        "reproduction_plans": reproduction_plans,
     }
     if source_run_id is not None:
         batch["source_run_id"] = source_run_id
     if candidate_source is not None:
         batch["candidate_source"] = str(candidate_source)
+    if rank_decision_filter is not None:
+        batch["rank_decision_filter"] = rank_decision_filter
     batch["finished_at"] = utc_now()
     batch["exit_status"] = 1 if failed else 0
     input_hashes = {
@@ -906,15 +1092,23 @@ def advance_paper_batch(
         wiki_pages_written=[],
         zotero_results={"status": "not_run", "records": []},
         next_actions=next_actions,
+        research_decisions=research_decisions,
+        reader_revision_plans=reader_revision_plans,
+        reproduction_plans=reproduction_plans,
     )
     report_json_path = run_dir / "report.json"
     report_payload = json.loads(report_json_path.read_text(encoding="utf-8"))
     report_payload["processed_count"] = batch["processed_count"]
     report_payload["skipped_count"] = batch["skipped_count"]
+    report_payload["skipped_ranked_candidates"] = skipped_ranked_candidates
+    if rank_decision_filter is not None:
+        report_payload["rank_decision_filter"] = rank_decision_filter
     report_payload["paper_states"] = paper_states
     report_payload["failed_papers"] = failed_papers
     report_payload["next_actions"] = next_actions
     report_payload["wiki_pages_written"] = []
+    report_payload["reader_revision_plans"] = reader_revision_plans
+    report_payload["reproduction_plans"] = reproduction_plans
     if source_run_id is not None:
         report_payload["source_run_id"] = source_run_id
     _write_json(report_json_path, report_payload)
@@ -922,25 +1116,67 @@ def advance_paper_batch(
     return batch
 
 
+def _rank_decision(candidate: dict) -> str | None:
+    protocol = candidate.get("ranking_protocol")
+    if not isinstance(protocol, dict):
+        return None
+    decision = protocol.get("decision")
+    return str(decision) if decision else None
+
+
+def _select_ranked_candidates(
+    candidates: list[dict],
+    *,
+    include_review_candidates: bool,
+) -> tuple[list[dict], list[dict], list[str]]:
+    allowed = ["advance-candidate"]
+    if include_review_candidates:
+        allowed.append("review-candidate")
+    selected: list[dict] = []
+    skipped: list[dict] = []
+    for candidate in candidates:
+        decision = _rank_decision(candidate)
+        if decision in allowed:
+            selected.append(candidate)
+            continue
+        skipped.append(
+            {
+                "slug": candidate.get("slug"),
+                "title": candidate.get("title"),
+                "decision": decision,
+                "reason": "decision_not_selected",
+            }
+        )
+    return selected, skipped, allowed
+
+
 def advance_paper_batch_from_run(
     vault_path: Path,
     run_id: str,
     mineru_command: str | list[str] | None = None,
     max_papers: int | None = None,
+    include_review_candidates: bool = False,
 ) -> dict:
     vault_path = vault_path.resolve()
     rank_path = vault_path / "_runs" / run_id / "rank.json"
     if not rank_path.exists():
         raise FileNotFoundError(f"missing ranked candidates: {rank_path}")
     candidates = json.loads(rank_path.read_text(encoding="utf-8"))
+    selected_candidates, skipped_ranked_candidates, rank_decision_filter = _select_ranked_candidates(
+        candidates,
+        include_review_candidates=include_review_candidates,
+    )
     return advance_paper_batch(
         vault_path,
-        candidates,
+        selected_candidates,
         mineru_command=mineru_command,
         max_papers=max_papers,
         source_run_id=run_id,
         candidate_source=rank_path,
         workflow_type="advance-ranked",
+        source_candidate_count=len(candidates),
+        skipped_ranked_candidates=skipped_ranked_candidates,
+        rank_decision_filter=rank_decision_filter,
     )
 
 

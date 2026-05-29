@@ -133,6 +133,107 @@ def test_redo_parse_and_redo_read_refresh_outputs_and_record_events(tmp_path):
     assert not (vault / "references" / f"{slug}.md").exists()
 
 
+def test_redo_read_consumes_reader_revision_plan_as_role_guidance(tmp_path):
+    vault, slug, paper_root = _ingest_fixture(tmp_path)
+    plan_path = paper_root / "critic" / "reader-revision-plan.json"
+    plan_path.parent.mkdir(parents=True, exist_ok=True)
+    plan_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "epi-reader-revision-plan-v1",
+                "recommendation": "revise-reader",
+                "next_action": "revise-reader",
+                "hard_rule": "No critic pass, no compiled wiki write.",
+                "blocking_repairs": [
+                    {
+                        "reviewer": "peer-review-methods-critic",
+                        "lens": "peer-reviewer",
+                        "check": "benchmark_integrity",
+                        "target_artifacts": ["reader/technical-reading.md"],
+                        "instruction": "Add baseline, metric, and task context.",
+                        "evidence": "benchmark_integrity: performance claim missing baseline",
+                    }
+                ],
+                "warning_followups": [
+                    {
+                        "reviewer": "paper-quality-critic",
+                        "lens": "peer-reviewer",
+                        "check": "engineering_reproducibility",
+                        "target_artifacts": ["reader/reproducibility.md"],
+                        "instruction": "Record code/data/model/config/simulator/hardware gaps.",
+                        "evidence": "engineering_reproducibility: missing model, config",
+                    }
+                ],
+                "role_worklist": [
+                    {
+                        "lens": "nature-sci-editor",
+                        "heading": "Nature Sci Editor",
+                        "responsibility": "Tighten novelty and scope.",
+                        "target_artifacts": ["reader/editorial-summary.md"],
+                        "blocking_repairs": [],
+                        "warning_followups": [],
+                    },
+                    {
+                        "lens": "peer-reviewer",
+                        "heading": "Peer Reviewer",
+                        "responsibility": "Audit methods and reproducibility.",
+                        "target_artifacts": ["reader/technical-reading.md", "reader/reproducibility.md"],
+                        "blocking_repairs": [
+                            {
+                                "check": "benchmark_integrity",
+                                "instruction": "Add baseline, metric, and task context.",
+                                "evidence": "benchmark_integrity: performance claim missing baseline",
+                            }
+                        ],
+                        "warning_followups": [
+                            {
+                                "check": "engineering_reproducibility",
+                                "instruction": "Record code/data/model/config/simulator/hardware gaps.",
+                                "evidence": "engineering_reproducibility: missing model, config",
+                            }
+                        ],
+                    },
+                    {
+                        "lens": "senior-domain-researcher",
+                        "heading": "Senior Domain Researcher",
+                        "responsibility": "Check transfer value.",
+                        "target_artifacts": ["reader/research-notes.md"],
+                        "blocking_repairs": [],
+                        "warning_followups": [],
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    record = redo_read(vault, slug, reason="apply critic revision plan")
+    guidance_path = paper_root / "reader" / "revision-guidance.md"
+    guidance = guidance_path.read_text(encoding="utf-8")
+    technical = (paper_root / "reader" / "technical-reading.md").read_text(encoding="utf-8")
+    reproducibility = (paper_root / "reader" / "reproducibility.md").read_text(encoding="utf-8")
+    research_notes = (paper_root / "reader" / "research-notes.md").read_text(encoding="utf-8")
+
+    assert record["stage"] == "redo-read"
+    assert record["revision_plan_path"] == str(plan_path)
+    assert record["revision_guidance_path"] == str(guidance_path)
+    assert record["revision_blocking_count"] == 1
+    assert record["revision_warning_count"] == 1
+    assert "## Peer Reviewer" in guidance
+    assert "benchmark_integrity" in guidance
+    assert "engineering_reproducibility" in guidance
+    assert "reader/technical-reading.md" in guidance
+    assert "## Critic Revision Focus" in technical
+    assert "benchmark_integrity: Add baseline, metric, and task context." in technical
+    assert "engineering_reproducibility: Record code/data/model/config/simulator/hardware gaps." in technical
+    assert "Evidence: source=inference; basis=critic-revision-guidance" in technical
+    assert "## Critic Revision Focus" in reproducibility
+    assert "engineering_reproducibility" in reproducibility
+    assert "## Critic Revision Focus" in research_notes
+    assert "Check transfer value." in research_notes
+    assert _redo_events(paper_root)[-1]["revision_guidance_path"] == str(guidance_path)
+
+
 def test_recritic_refreshes_critic_report_and_records_event(tmp_path):
     vault, slug, paper_root = _ingest_fixture(tmp_path)
     (paper_root / "reader" / "reader.md").write_text(
@@ -282,9 +383,14 @@ def test_redo_read_cli_writes_routed_report_with_changed_artifacts(tmp_path, mon
     ]
     assert report_json["changed_artifacts"] == [
         "reader/reader.md",
+        "reader/editorial-summary.md",
+        "reader/technical-reading.md",
+        "reader/research-notes.md",
         "reader/figures.md",
         "reader/reproducibility.md",
         "reader/implementation-ideas.md",
+        "reader/revision-guidance.md",
+        "reader/evidence-map.json",
     ]
     assert report_json["next_actions"] == ["recritic the regenerated reader outputs"]
     assert report_json["wiki_pages_written"] == []
@@ -298,13 +404,127 @@ def test_redo_read_cli_writes_routed_report_with_changed_artifacts(tmp_path, mon
         required_input_hash_keys=["mineru/paper.md"],
         required_output_hash_keys=[
             "reader/reader.md",
+            "reader/editorial-summary.md",
+            "reader/technical-reading.md",
+            "reader/research-notes.md",
             "reader/figures.md",
             "reader/reproducibility.md",
             "reader/implementation-ideas.md",
+            "reader/revision-guidance.md",
+            "reader/evidence-map.json",
             "redo-records.jsonl",
         ],
     )
     assert _redo_events(paper_root)[-1]["stage"] == "redo-read"
+
+
+def test_redo_read_cli_can_apply_revision_plan_and_recritic_in_one_routed_run(tmp_path, monkeypatch):
+    vault, slug, paper_root = _ingest_fixture(tmp_path)
+    plan_path = paper_root / "critic" / "reader-revision-plan.json"
+    plan_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "epi-reader-revision-plan-v1",
+                "recommendation": "revise-reader",
+                "next_action": "revise-reader",
+                "hard_rule": "No critic pass, no compiled wiki write.",
+                "blocking_repairs": [
+                    {
+                        "reviewer": "peer-review-methods-critic",
+                        "lens": "peer-reviewer",
+                        "check": "benchmark_integrity",
+                        "target_artifacts": ["reader/technical-reading.md"],
+                        "instruction": "Add baseline, metric, and task context.",
+                        "evidence": "benchmark_integrity: performance claim missing baseline",
+                    }
+                ],
+                "warning_followups": [
+                    {
+                        "reviewer": "paper-quality-critic",
+                        "lens": "peer-reviewer",
+                        "check": "engineering_reproducibility",
+                        "target_artifacts": ["reader/reproducibility.md"],
+                        "instruction": "Record reproducibility gaps.",
+                        "evidence": "engineering_reproducibility: missing code, model",
+                    }
+                ],
+                "role_worklist": [
+                    {
+                        "lens": "peer-reviewer",
+                        "heading": "Peer Reviewer",
+                        "responsibility": "Audit methods and reproducibility.",
+                        "target_artifacts": ["reader/technical-reading.md", "reader/reproducibility.md"],
+                        "blocking_repairs": [
+                            {
+                                "check": "benchmark_integrity",
+                                "instruction": "Add baseline, metric, and task context.",
+                                "evidence": "benchmark_integrity: performance claim missing baseline",
+                            }
+                        ],
+                        "warning_followups": [
+                            {
+                                "check": "engineering_reproducibility",
+                                "instruction": "Record reproducibility gaps.",
+                                "evidence": "engineering_reproducibility: missing code, model",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = _run_orchestrator_cli(
+        monkeypatch,
+        "redo-read",
+        "--vault",
+        str(vault),
+        "--slug",
+        slug,
+        "--from-revision-plan",
+        "--recritic",
+        "--reason",
+        "apply critic plan and re-review",
+    )
+
+    assert exit_code == 0
+    run_dir = _single_run_dir(vault)
+    report_json = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
+    report_md = (run_dir / "report.md").read_text(encoding="utf-8")
+    events = _redo_events(paper_root)
+
+    assert report_json["workflow_type"] == "redo-read-recritic"
+    assert report_json["paper_states"] == [
+        {"paper_slug": slug, "state": "critic_passed", "next_action": "stage"}
+    ]
+    assert "reader/revision-guidance.md" in report_json["changed_artifacts"]
+    assert "critic/critic-report.json" in report_json["changed_artifacts"]
+    assert "critic/reader-revision-plan.json" in report_json["changed_artifacts"]
+    assert report_json["next_actions"] == ["stage the paper for promotion review"]
+    assert report_json["revision_delta"]["before"]["blocking_count"] == 1
+    assert report_json["revision_delta"]["before"]["warning_count"] == 1
+    assert report_json["revision_delta"]["after"]["blocking_count"] == 0
+    assert report_json["revision_delta"]["resolved_blocking_checks"] == ["benchmark_integrity"]
+    assert report_json["revision_delta"]["remaining_warning_checks"]
+    assert "## Revision Delta" in report_md
+    assert "resolved blocking checks: benchmark_integrity" in report_md
+    assert [event["stage"] for event in events[-2:]] == ["redo-read", "redo-read-recritic"]
+    assert events[-1]["critic_outcome"] == "pass"
+    _assert_repair_run_state_contract(
+        run_dir,
+        workflow_type="redo-read-recritic",
+        expected_state="critic_passed",
+        slug=slug,
+        vault=vault,
+        required_input_hash_keys=["mineru/paper.md", "critic/reader-revision-plan.json"],
+        required_output_hash_keys=[
+            "reader/revision-guidance.md",
+            "critic/critic-report.json",
+            "critic/reader-revision-plan.json",
+            "redo-records.jsonl",
+        ],
+    )
 
 
 def test_recritic_cli_writes_routed_report_with_changed_artifacts(tmp_path, monkeypatch):

@@ -2,9 +2,23 @@ import json
 from pathlib import Path
 from collections import Counter
 
+from epi.paper_gate import build_paper_gate
 
-_SUCCESS_STATUSES = {"success", "succeeded"}
+
+_SUCCESS_STATUSES = {"success", "succeeded", "waiting_for_human_gate"}
 _HUMAN_GATE_PENDING = {"pending", "required"}
+_RESEARCH_QUEUE_BUCKETS = [
+    "ready_to_promote",
+    "needs_reader_repair",
+    "warning_only",
+    "reproducibility_caveats",
+]
+RESEARCH_QUEUE_BUCKETS = tuple(_RESEARCH_QUEUE_BUCKETS)
+_ROLE_DISPLAY_NAMES = {
+    "nature-sci-editor": "Nature/Sci Editor",
+    "peer-reviewer": "Peer Reviewer",
+    "senior-domain-researcher": "Senior Domain Researcher",
+}
 
 
 def _runs_root(vault_path):
@@ -27,7 +41,7 @@ def _normalize_run_entry(run_dir):
     if not isinstance(report, dict):
         report = {}
 
-    return {
+    entry = {
         "run_id": run_state.get("run_id", run_dir.name),
         "workflow_type": run_state.get("workflow_type", "unknown"),
         "state": run_state.get("state", "unknown"),
@@ -38,6 +52,19 @@ def _normalize_run_entry(run_dir):
         "next_actions": report.get("next_actions", []),
         "human_gate": report.get("human_gate"),
     }
+    research_decisions = report.get("research_decisions") or []
+    if research_decisions:
+        entry["research_decisions"] = research_decisions
+    reader_revision_plans = report.get("reader_revision_plans") or []
+    if reader_revision_plans:
+        entry["reader_revision_plans"] = reader_revision_plans
+    reproduction_plans = report.get("reproduction_plans") or []
+    if reproduction_plans:
+        entry["reproduction_plans"] = reproduction_plans
+    revision_delta = report.get("revision_delta")
+    if isinstance(revision_delta, dict):
+        entry["revision_delta"] = revision_delta
+    return entry
 
 
 def _sort_key(entry):
@@ -115,6 +142,199 @@ def _build_grouped_summaries(entries):
     }
 
 
+def _queue_item(entry, *, paper_slug=None, title=None, reason=None, checks=None, source=None):
+    item = {
+        "paper_slug": paper_slug or entry.get("paper_slug") or "-",
+        "run_id": entry.get("run_id", "-"),
+        "workflow_type": entry.get("workflow_type", "unknown"),
+        "state": entry.get("state", "unknown"),
+        "status": entry.get("status", "unknown"),
+    }
+    if title:
+        item["title"] = title
+    if reason:
+        item["reason"] = reason
+    if checks:
+        item["checks"] = list(checks)
+    if source:
+        item["source"] = source
+    return item
+
+
+def _paper_gate_summary(vault_path, slug):
+    if not slug or slug == "-":
+        return None
+    try:
+        gate = build_paper_gate(Path(vault_path), slug)
+    except Exception as exc:
+        return {
+            "status": "unknown",
+            "conclusion": "unknown",
+            "next_action": "inspect-paper-gate",
+            "action_required_checks": [],
+            "failure_checks": [],
+            "error": str(exc),
+        }
+    check_suite = gate.get("check_suite")
+    if not isinstance(check_suite, dict):
+        return {
+            "status": gate.get("status") or "unknown",
+            "conclusion": "unknown",
+            "next_action": gate.get("next_action") or "inspect-paper-gate",
+            "action_required_checks": [],
+            "failure_checks": [],
+        }
+    check_runs = check_suite.get("check_runs")
+    if not isinstance(check_runs, list):
+        return {
+            "status": gate.get("status") or "unknown",
+            "conclusion": check_suite.get("conclusion") or "unknown",
+            "next_action": gate.get("next_action") or "inspect-paper-gate",
+            "action_required_checks": [],
+            "failure_checks": [],
+        }
+    return {
+        "status": gate.get("status"),
+        "conclusion": check_suite.get("conclusion"),
+        "next_action": gate.get("next_action"),
+        "action_required_checks": [
+            run.get("name")
+            for run in check_runs
+            if run.get("conclusion") == "action_required" and run.get("name")
+        ],
+        "failure_checks": [
+            run.get("name")
+            for run in check_runs
+            if run.get("conclusion") == "failure" and run.get("name")
+        ],
+    }
+
+
+def _ready_to_promote_reason(gate_summary):
+    if not gate_summary:
+        return "paper gate status unknown"
+    if gate_summary.get("failure_checks") or gate_summary.get("conclusion") == "failure":
+        return "paper gate blocked by failed checks"
+    if gate_summary.get("conclusion") == "action_required":
+        if gate_summary.get("next_action") == "run-wiki-ingest-agent":
+            return "wiki ingest handoff is ready"
+        return "promotion gate is ready"
+    return "paper gate status unknown"
+
+
+def _next_actions(entry):
+    return [
+        str(action).strip().lower()
+        for action in (entry.get("next_actions") or [])
+        if str(action).strip()
+    ]
+
+
+def _is_ready_to_promote(entry):
+    if entry.get("status") not in _SUCCESS_STATUSES:
+        return False
+    revision_delta = entry.get("revision_delta") or {}
+    after = revision_delta.get("after") if isinstance(revision_delta, dict) else None
+    if isinstance(after, dict) and after.get("warning_count", 0):
+        return False
+    return any(
+        action in {"promote-to-wiki", "promote-after-approval", "run-wiki-ingest-agent"}
+        for action in _next_actions(entry)
+    )
+
+
+def _build_research_queue(entries, vault_path):
+    queue = {bucket: [] for bucket in _RESEARCH_QUEUE_BUCKETS}
+
+    for entry in entries:
+        if _is_ready_to_promote(entry):
+            item = _queue_item(entry, source="run")
+            gate_summary = _paper_gate_summary(vault_path, item.get("paper_slug"))
+            item["reason"] = _ready_to_promote_reason(gate_summary)
+            if gate_summary:
+                item["paper_gate"] = gate_summary
+            queue["ready_to_promote"].append(item)
+
+        for plan in entry.get("reader_revision_plans") or []:
+            blocking_count = plan.get("blocking_count", 0) or 0
+            next_action = str(plan.get("next_action") or "").lower()
+            if blocking_count > 0 or next_action == "revise-reader":
+                queue["needs_reader_repair"].append(
+                    _queue_item(
+                        entry,
+                        paper_slug=plan.get("slug"),
+                        title=plan.get("title"),
+                        reason=f"reader revision plan has {blocking_count} blocking repairs",
+                        source=plan.get("plan_path") or "reader_revision_plan",
+                    )
+                )
+
+        for decision in entry.get("research_decisions") or []:
+            recommendation = str(decision.get("recommendation") or "").lower()
+            next_action = str(decision.get("next_action") or "").lower()
+            if recommendation == "revise-reader" or next_action == "revise-reader":
+                slug = decision.get("slug") or entry.get("paper_slug")
+                already_queued = any(item.get("paper_slug") == slug for item in queue["needs_reader_repair"])
+                if not already_queued:
+                    queue["needs_reader_repair"].append(
+                        _queue_item(
+                            entry,
+                            paper_slug=slug,
+                            title=decision.get("title"),
+                            reason="research decision requests reader revision",
+                            source="research_decision",
+                        )
+                    )
+
+        for plan in entry.get("reproduction_plans") or []:
+            next_action = str(plan.get("next_action") or "").lower()
+            missing_count = plan.get("missing_count", 0) or 0
+            if next_action == "prepare-reproduction-plan" or missing_count > 0:
+                queue["reproducibility_caveats"].append(
+                    _queue_item(
+                        entry,
+                        paper_slug=plan.get("slug"),
+                        title=plan.get("title"),
+                        reason="reproducibility caveats need evidence review",
+                        checks=["engineering_reproducibility"],
+                        source=plan.get("plan_path") or "reproduction_plan",
+                    )
+                )
+
+        revision_delta = entry.get("revision_delta") or {}
+        after = revision_delta.get("after") if isinstance(revision_delta, dict) else None
+        if not isinstance(after, dict):
+            continue
+
+        blocking_count = after.get("blocking_count", 0) or 0
+        warning_count = after.get("warning_count", 0) or 0
+        warning_checks = (
+            revision_delta.get("remaining_warning_checks")
+            or after.get("warning_checks")
+            or []
+        )
+        if blocking_count == 0 and warning_count > 0:
+            queue["warning_only"].append(
+                _queue_item(
+                    entry,
+                    reason="critic has warnings but no blocking checks",
+                    checks=warning_checks,
+                    source="revision_delta",
+                )
+            )
+        if "engineering_reproducibility" in warning_checks:
+            queue["reproducibility_caveats"].append(
+                _queue_item(
+                    entry,
+                    reason="engineering reproducibility evidence is incomplete",
+                    checks=warning_checks,
+                    source="revision_delta",
+                )
+            )
+
+    return queue
+
+
 def _render_run_line(entry):
     paper_slug = entry.get("paper_slug") or "-"
     return "- {run_id} | {workflow_type} | {status} / {state} | {paper_slug}".format(
@@ -133,11 +353,250 @@ def _render_next_line(entry):
     return f"  next: {next_actions[0]}"
 
 
+def _render_decision_lines(entry):
+    lines = []
+    for decision in entry.get("research_decisions") or []:
+        slug = decision.get("slug") or entry.get("paper_slug") or "-"
+        recommendation = decision.get("recommendation") or "-"
+        next_action = decision.get("next_action") or "-"
+        lines.append(f"  decision: {slug} -> {recommendation} / {next_action}")
+    return lines
+
+
+def _render_revision_plan_lines(entry):
+    lines = []
+    for plan in entry.get("reader_revision_plans") or []:
+        slug = plan.get("slug") or entry.get("paper_slug") or "-"
+        next_action = plan.get("next_action") or "-"
+        blocking_count = plan.get("blocking_count", 0)
+        warning_count = plan.get("warning_count", 0)
+        lines.append(
+            f"  revision-plan: {slug} -> {next_action} "
+            f"(blocking={blocking_count}, warnings={warning_count})"
+        )
+    return lines
+
+
+def _render_research_queue(queue):
+    lines = ["# EPI Research Queue", ""]
+    for bucket in _RESEARCH_QUEUE_BUCKETS:
+        title = bucket.replace("_", " ").title()
+        lines.extend([f"## {title}", ""])
+        items = queue.get(bucket) or []
+        if not items:
+            lines.extend(["No papers in this bucket.", ""])
+            continue
+        for item in items:
+            lines.append(
+                "- {paper_slug} | {status} / {state} | {run_id}".format(
+                    paper_slug=item.get("paper_slug", "-"),
+                    status=item.get("status", "unknown"),
+                    state=item.get("state", "unknown"),
+                    run_id=item.get("run_id", "-"),
+                )
+            )
+            if item.get("title"):
+                lines.append(f"  title: {item['title']}")
+            if item.get("reason"):
+                lines.append(f"  reason: {item['reason']}")
+            if item.get("checks"):
+                lines.append(f"  checks: {', '.join(item['checks'])}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _render_research_queue_item(item):
+    lines = [
+        "- {paper_slug} | {status} / {state} | {run_id}".format(
+            paper_slug=item.get("paper_slug", "-"),
+            status=item.get("status", "unknown"),
+            state=item.get("state", "unknown"),
+            run_id=item.get("run_id", "-"),
+        )
+    ]
+    if item.get("title"):
+        lines.append(f"  title: {item['title']}")
+    if item.get("reason"):
+        lines.append(f"  reason: {item['reason']}")
+    if item.get("checks"):
+        lines.append(f"  checks: {', '.join(item['checks'])}")
+    for action in item.get("recommended_actions") or []:
+        lines.append(f"  action: {action.get('action', '-')}")
+        if action.get("command"):
+            lines.append(f"  command: {action['command']}")
+        if action.get("checklist"):
+            lines.append(f"  checklist: {', '.join(action['checklist'])}")
+        if action.get("human_gate_required"):
+            lines.append("  human_gate_required: true")
+    return lines
+
+
+def _action_command(vault_path, *parts):
+    subcommand = parts[0]
+    args = ["python", r"scripts\orchestrator.py", subcommand, "--vault", str(Path(vault_path).resolve()), *parts[1:]]
+    return " ".join(args)
+
+
+def _paper_gate_action_command(vault_path, slug):
+    args = [
+        "python",
+        r"scripts\orchestrator.py",
+        "paper-gate",
+        "--slug",
+        slug,
+        "--vault",
+        str(Path(vault_path).resolve()),
+    ]
+    return " ".join(args)
+
+
+def _wiki_ingest_handoff_action_command(vault_path, slug):
+    args = [
+        "python",
+        r"scripts\orchestrator.py",
+        "wiki-ingest-handoff",
+        "--slug",
+        slug,
+        "--vault",
+        str(Path(vault_path).resolve()),
+    ]
+    return " ".join(args)
+
+
+def _promote_action_command(vault_path, slug):
+    args = [
+        "python",
+        r"scripts\orchestrator.py",
+        "promote-to-wiki",
+        "--slug",
+        slug,
+        "--approved-by",
+        "<name>",
+        "--vault",
+        str(Path(vault_path).resolve()),
+    ]
+    return " ".join(args)
+
+
+def _paper_gate_allows_promotion(item):
+    gate_summary = item.get("paper_gate")
+    if not isinstance(gate_summary, dict):
+        return False
+    action_required_checks = set(gate_summary.get("action_required_checks") or [])
+    return (
+        gate_summary.get("conclusion") == "action_required"
+        and gate_summary.get("next_action") == "promote-to-wiki"
+        and not gate_summary.get("failure_checks")
+        and action_required_checks == {"human-approval"}
+    )
+
+
+def _paper_gate_allows_wiki_ingest(item):
+    gate_summary = item.get("paper_gate")
+    if not isinstance(gate_summary, dict):
+        return False
+    action_required_checks = set(gate_summary.get("action_required_checks") or [])
+    return (
+        gate_summary.get("conclusion") == "action_required"
+        and gate_summary.get("next_action") == "run-wiki-ingest-agent"
+        and not gate_summary.get("failure_checks")
+        and action_required_checks == {"human-approval"}
+    )
+
+
+def _recommended_actions(bucket, item, vault_path):
+    slug = item.get("paper_slug")
+    if not slug or slug == "-":
+        return []
+    if bucket == "needs_reader_repair":
+        return [
+            {
+                "action": "redo-read-recritic",
+                "command": _action_command(
+                    vault_path,
+                    "redo-read",
+                    "--slug",
+                    slug,
+                    "--from-revision-plan",
+                    "--recritic",
+                ),
+                "human_gate_required": False,
+                "uses": item.get("source"),
+            }
+        ]
+    if bucket == "reproducibility_caveats":
+        return [
+            {
+                "action": "review-reproducibility-caveats",
+                "checklist": ["code", "data", "model", "config", "simulator", "hardware"],
+                "human_gate_required": True,
+                "reason": "keep this as a short evidence-review cue unless the user asks for a reproduction run",
+            }
+        ]
+    if bucket == "ready_to_promote":
+        actions = [
+            {
+                "action": "inspect-paper-gate",
+                "command": _paper_gate_action_command(vault_path, slug),
+                "human_gate_required": True,
+            }
+        ]
+        if _paper_gate_allows_promotion(item):
+            actions.append(
+                {
+                    "action": "promote-to-wiki",
+                    "command": _promote_action_command(vault_path, slug),
+                    "human_gate_required": True,
+                }
+            )
+        if _paper_gate_allows_wiki_ingest(item):
+            actions.append(
+                {
+                    "action": "run-wiki-ingest-agent",
+                    "command": _wiki_ingest_handoff_action_command(vault_path, slug),
+                    "human_gate_required": True,
+                    "uses": "wiki-ingest-brief.json",
+                    "checklist": [
+                        "read target vault AGENTS.md and _meta/*",
+                        "merge existing pages before creating new ones",
+                        "respect vault frontmatter, tags, links, and staged writes",
+                    ],
+                }
+            )
+        return actions
+    if bucket == "warning_only":
+        return [
+            {
+                "action": "inspect-warning",
+                "checklist": item.get("checks") or [],
+                "human_gate_required": True,
+            }
+        ]
+    return []
+
+
+def _with_recommended_actions(bucket, items, vault_path):
+    enriched = []
+    for item in items:
+        payload = dict(item)
+        if bucket == "ready_to_promote":
+            gate_summary = _paper_gate_summary(vault_path, payload.get("paper_slug"))
+            payload["reason"] = _ready_to_promote_reason(gate_summary)
+            if gate_summary:
+                payload["paper_gate"] = gate_summary
+            else:
+                payload.pop("paper_gate", None)
+        payload["recommended_actions"] = _recommended_actions(bucket, payload, vault_path)
+        enriched.append(payload)
+    return enriched
+
+
 def _write_json(path, payload):
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
-def _render_dashboard(entries, summary):
+def _render_dashboard(entries, summary, research_queue=None):
+    research_queue = research_queue or {bucket: [] for bucket in _RESEARCH_QUEUE_BUCKETS}
     lines = ["# EPI Run Dashboard", ""]
     if not entries:
         lines.extend(
@@ -151,6 +610,10 @@ def _render_dashboard(entries, summary):
                 "## Needs Attention",
                 "",
                 "No runs need attention.",
+                "",
+                "## Research Queue",
+                "",
+                *[f"- {bucket}: 0" for bucket in _RESEARCH_QUEUE_BUCKETS],
                 "",
                 "## Recent Failures",
                 "",
@@ -197,8 +660,14 @@ def _render_dashboard(entries, summary):
             next_line = _render_next_line(entry)
             if next_line:
                 lines.append(next_line)
+            lines.extend(_render_decision_lines(entry))
+            lines.extend(_render_revision_plan_lines(entry))
     else:
         lines.append("No runs need attention.")
+
+    lines.extend(["", "## Research Queue", ""])
+    for bucket in _RESEARCH_QUEUE_BUCKETS:
+        lines.append(f"- {bucket}: {len(research_queue.get(bucket) or [])}")
 
     lines.extend(["", "## Recent Failures", ""])
     if grouped["latest_failures"]:
@@ -207,6 +676,8 @@ def _render_dashboard(entries, summary):
             next_line = _render_next_line(entry)
             if next_line:
                 lines.append(next_line)
+            lines.extend(_render_decision_lines(entry))
+            lines.extend(_render_revision_plan_lines(entry))
     else:
         lines.append("No failed runs.")
 
@@ -217,6 +688,8 @@ def _render_dashboard(entries, summary):
             next_line = _render_next_line(entry)
             if next_line:
                 lines.append(next_line)
+            lines.extend(_render_decision_lines(entry))
+            lines.extend(_render_revision_plan_lines(entry))
     else:
         lines.append("No runs waiting on a human gate.")
 
@@ -228,6 +701,8 @@ def _render_dashboard(entries, summary):
             next_line = _render_next_line(entry)
             if next_line:
                 lines.append(next_line)
+            lines.extend(_render_decision_lines(entry))
+            lines.extend(_render_revision_plan_lines(entry))
     else:
         lines.append("No successful runs yet.")
 
@@ -241,6 +716,8 @@ def _render_dashboard(entries, summary):
         next_line = _render_next_line(entry)
         if next_line:
             lines.append(next_line)
+        lines.extend(_render_decision_lines(entry))
+        lines.extend(_render_revision_plan_lines(entry))
     lines.append("")
     return "\n".join(lines)
 
@@ -256,6 +733,8 @@ def _render_filtered_dashboard(title, entries, empty_text):
         next_line = _render_next_line(entry)
         if next_line:
             lines.append(next_line)
+        lines.extend(_render_decision_lines(entry))
+        lines.extend(_render_revision_plan_lines(entry))
     lines.append("")
     return "\n".join(lines)
 
@@ -277,15 +756,25 @@ def refresh_run_index(vault_path):
 
     summary = _build_summary(entries)
     grouped = _build_grouped_summaries(entries)
+    research_queue = _build_research_queue(entries, vault_path)
     index_payload = {
         "summary": summary,
+        "research_queue": research_queue,
         "latest_failures": grouped["latest_failures"],
         "latest_human_gate_pending": grouped["latest_human_gate_pending"],
         "latest_success_by_workflow": grouped["latest_success_by_workflow"],
         "runs": entries,
     }
     _write_json(runs_root / "index.json", index_payload)
-    (runs_root / "dashboard.md").write_text(_render_dashboard(entries, summary), encoding="utf-8")
+    _write_json(runs_root / "research-queue.json", research_queue)
+    for stale_path in [runs_root / "research-agenda.json", runs_root / "research-agenda.md"]:
+        if stale_path.exists():
+            stale_path.unlink()
+    (runs_root / "research-queue.md").write_text(_render_research_queue(research_queue), encoding="utf-8")
+    (runs_root / "dashboard.md").write_text(
+        _render_dashboard(entries, summary, research_queue),
+        encoding="utf-8",
+    )
     failures = [entry for entry in entries if entry.get("status") not in _SUCCESS_STATUSES]
     human_gate_pending = [entry for entry in entries if _human_gate_status(entry) in _HUMAN_GATE_PENDING]
     recent_success = [entry for entry in entries if entry.get("status") in _SUCCESS_STATUSES]
@@ -311,6 +800,65 @@ def load_run_index(vault_path):
     if isinstance(payload, dict):
         return payload
     return refresh_run_index(vault_path)
+
+
+def query_research_queue(vault_path, *, bucket=None, limit=10, include_actions=False):
+    index_payload = load_run_index(vault_path)
+    if not isinstance(index_payload.get("research_queue"), dict):
+        index_payload = refresh_run_index(vault_path)
+    queue = {
+        queue_bucket: list(index_payload.get("research_queue", {}).get(queue_bucket) or [])
+        for queue_bucket in _RESEARCH_QUEUE_BUCKETS
+    }
+
+    if bucket:
+        items = queue.get(bucket, [])[:limit]
+        if include_actions:
+            items = _with_recommended_actions(bucket, items, vault_path)
+        return {
+            "title": f"EPI Research Queue - {bucket}",
+            "bucket": bucket,
+            "items": items,
+        }
+
+    return {
+        "title": "EPI Research Queue",
+        "bucket": None,
+        "queue": {
+            queue_bucket: (
+                _with_recommended_actions(queue_bucket, items[:limit], vault_path)
+                if include_actions
+                else items[:limit]
+            )
+            for queue_bucket, items in queue.items()
+        },
+    }
+
+
+def render_research_queue_query(query_result):
+    lines = [query_result["title"], ""]
+
+    if query_result.get("bucket"):
+        items = query_result.get("items") or []
+        if not items:
+            lines.extend(["No papers in this bucket.", ""])
+            return "\n".join(lines)
+        for item in items:
+            lines.extend(_render_research_queue_item(item))
+        lines.append("")
+        return "\n".join(lines)
+
+    queue = query_result.get("queue") or {}
+    for bucket in _RESEARCH_QUEUE_BUCKETS:
+        lines.extend([f"## {bucket}", ""])
+        items = queue.get(bucket) or []
+        if not items:
+            lines.extend(["No papers in this bucket.", ""])
+            continue
+        for item in items:
+            lines.extend(_render_research_queue_item(item))
+        lines.append("")
+    return "\n".join(lines)
 
 
 def query_runs(
@@ -363,5 +911,6 @@ def render_runs_query(query_result):
         next_line = _render_next_line(entry)
         if next_line:
             lines.append(next_line)
+        lines.extend(_render_decision_lines(entry))
     lines.append("")
     return "\n".join(lines)

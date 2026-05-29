@@ -3,9 +3,13 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
+from pathlib import PurePosixPath
 
 from epi.artifacts import utc_now, write_json_atomic, write_text_atomic
 from epi.run_critic import HARD_RULE
+
+
+_ALLOWED_COMPILED_TARGET_ROOTS = {"references", "concepts", "synthesis", "reports"}
 
 
 def _read_json(path: Path) -> dict:
@@ -37,7 +41,53 @@ def _hot_path(vault_path: Path) -> Path:
 
 
 def _compiled_target_path(vault_path: Path, target: str) -> Path:
-    return vault_path.resolve() / Path(target)
+    normalized = str(target or "").replace("\\", "/").strip()
+    target_path = PurePosixPath(normalized)
+    if (
+        not normalized
+        or Path(str(target)).is_absolute()
+        or target_path.is_absolute()
+        or ".." in target_path.parts
+        or not target_path.parts
+        or target_path.parts[0] not in _ALLOWED_COMPILED_TARGET_ROOTS
+    ):
+        raise ValueError(
+            "compiled target must be a relative path under references/, concepts/, synthesis/, or reports/"
+        )
+    compiled_path = (vault_path.resolve() / Path(*target_path.parts)).resolve()
+    try:
+        compiled_path.relative_to(vault_path.resolve())
+    except ValueError as exc:
+        raise ValueError("compiled target must stay inside the vault") from exc
+    return compiled_path
+
+
+def _promotion_record_compiled_path(vault_path: Path, raw_path: str) -> Path:
+    vault_path = vault_path.resolve()
+    candidate = Path(raw_path)
+    if not candidate.is_absolute():
+        candidate = vault_path / candidate
+    compiled_path = candidate.resolve()
+    try:
+        relative_path = compiled_path.relative_to(vault_path)
+    except ValueError as exc:
+        raise ValueError("promotion record compiled path must stay inside the vault") from exc
+    if not relative_path.parts or relative_path.parts[0] not in _ALLOWED_COMPILED_TARGET_ROOTS:
+        raise ValueError("promotion record compiled path must be under an allowed wiki page root")
+    return compiled_path
+
+
+def _promotion_record_snapshot_path(paper_root: Path, raw_path: str) -> Path:
+    backup_root = (paper_root / "promotion-backups").resolve()
+    candidate = Path(raw_path)
+    if not candidate.is_absolute():
+        candidate = paper_root / candidate
+    snapshot_path = candidate.resolve()
+    try:
+        snapshot_path.relative_to(backup_root)
+    except ValueError as exc:
+        raise ValueError("promotion record snapshot path must stay under paper promotion-backups") from exc
+    return snapshot_path
 
 
 def _backup_path_for_target(
@@ -55,9 +105,21 @@ def _page_transactions(vault_path: Path, staging_root: Path, slug: str) -> list[
     staged_paths = [Path(plan.get("staged_reference") or (staging_root / "references" / f"{slug}.md"))]
     staged_paths.extend(Path(path) for path in plan.get("staged_concepts", []))
     staged_paths.extend(Path(path) for path in plan.get("staged_synthesis", []))
-    compiled_targets = plan.get("compiled_targets") or [f"references/{slug}.md"]
+    staged_paths.extend(Path(path) for path in plan.get("staged_reports", []))
+    staged_paths.extend(Path(path) for path in plan.get("staged_reproduction", []))
+    compiled_targets = plan.get("compiled_targets")
+    if not isinstance(compiled_targets, list) or not compiled_targets:
+        if (
+            plan.get("handoff_type") == "agent-mediated-wiki-ingest"
+            or plan.get("wiki_write_model") == "agent-mediated-vault-contract"
+        ):
+            raise ValueError(
+                "agent-mediated wiki ingest plans do not provide compiled_targets; "
+                "run the wiki ingest agent from wiki-ingest-brief.json"
+            )
+        raise ValueError("promotion-plan compiled_targets must be present and non-empty")
     if len(staged_paths) != len(compiled_targets):
-        raise ValueError("promotion-plan staged paths and compiled targets are out of sync")
+        raise ValueError("promotion-plan staged paths and compiled_targets are out of sync")
     return [
         {
             "staged_path": str(staged_path),
@@ -65,6 +127,93 @@ def _page_transactions(vault_path: Path, staging_root: Path, slug: str) -> list[
         }
         for staged_path, compiled_target in zip(staged_paths, compiled_targets)
     ]
+
+
+def _load_promotion_plan(staging_root: Path) -> dict:
+    return _read_json(staging_root / "promotion-plan.json")
+
+
+def _load_research_decision_summary(paper_root: Path, staging_root: Path) -> tuple[dict | None, list[dict]]:
+    plan = _load_promotion_plan(staging_root)
+    if plan.get("panel_summary") or plan.get("role_verdicts"):
+        panel = plan.get("panel_summary") or {}
+        return (
+            {
+                "recommendation": plan.get("recommendation"),
+                "next_action": plan.get("next_action"),
+                "panel_consensus": panel.get("consensus"),
+                "blocking_lenses": panel.get("blocking_lenses") or [],
+                "warning_reviewers": panel.get("warning_reviewers") or [],
+                "role_verdicts": plan.get("role_verdicts") or {},
+            },
+            list(plan.get("role_assessments") or []),
+        )
+
+    critic_report = _read_json(paper_root / "critic" / "critic-report.json")
+    decision = critic_report.get("research_decision") if isinstance(critic_report.get("research_decision"), dict) else {}
+    decision_path = critic_report.get("research_decision_path")
+    if not decision and decision_path and Path(decision_path).exists():
+        decision = _read_json(Path(decision_path))
+    if not decision:
+        fallback_path = paper_root / "critic" / "research-decision.json"
+        if fallback_path.exists():
+            decision = _read_json(fallback_path)
+    if not decision:
+        return None, []
+
+    panel = decision.get("panel_summary") or {}
+    return (
+        {
+            "recommendation": decision.get("recommendation"),
+            "next_action": decision.get("next_action"),
+            "panel_consensus": panel.get("consensus"),
+            "blocking_lenses": panel.get("blocking_lenses") or [],
+            "warning_reviewers": panel.get("warning_reviewers") or [],
+            "role_verdicts": decision.get("role_verdicts") or {},
+        },
+        list(decision.get("role_assessments") or []),
+    )
+
+
+def _role_verdict_key(lens: str) -> str:
+    return "epi_" + lens.replace("-", "_") + "_verdict"
+
+
+def _frontmatter_value(value: object) -> str:
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _research_decision_frontmatter_lines(summary: dict) -> list[str]:
+    lines = [
+        f"epi_recommendation: {_frontmatter_value(summary.get('recommendation', ''))}",
+        f"epi_next_action: {_frontmatter_value(summary.get('next_action', ''))}",
+        f"epi_panel_consensus: {_frontmatter_value(summary.get('panel_consensus', ''))}",
+        f"epi_blocking_lenses: {_frontmatter_value(summary.get('blocking_lenses') or [])}",
+        f"epi_warning_reviewers: {_frontmatter_value(summary.get('warning_reviewers') or [])}",
+    ]
+    for lens, verdict in (summary.get("role_verdicts") or {}).items():
+        lines.append(f"{_role_verdict_key(str(lens))}: {_frontmatter_value(verdict)}")
+    return lines
+
+
+def _ensure_reference_frontmatter(path: Path, summary: dict | None) -> None:
+    if summary is None or not path.exists():
+        return
+    text = path.read_text(encoding="utf-8")
+    if "epi_panel_consensus:" in text:
+        return
+    lines = text.splitlines()
+    frontmatter_lines = _research_decision_frontmatter_lines(summary)
+    if lines and lines[0] == "---":
+        try:
+            closing_index = lines.index("---", 1)
+        except ValueError:
+            closing_index = -1
+        if closing_index > 0:
+            updated = lines[:closing_index] + frontmatter_lines + lines[closing_index:]
+            write_text_atomic(path, "\n".join(updated) + ("\n" if text.endswith("\n") else ""))
+            return
+    write_text_atomic(path, "---\n" + "\n".join(frontmatter_lines) + "\n---\n\n" + text)
 
 
 def _load_manifest(vault_path: Path) -> dict:
@@ -112,6 +261,31 @@ def _paper_link(paper: dict) -> str:
     return f"[[references/{slug}|{title}]]"
 
 
+def _decision_summary_suffix(paper: dict) -> str:
+    decision = paper.get("research_decision")
+    if not isinstance(decision, dict):
+        return ""
+    role_verdicts = decision.get("role_verdicts") or {}
+    role_summary = ", ".join(
+        [
+            f"editor={role_verdicts.get('nature-sci-editor', '-')}",
+            f"reviewer={role_verdicts.get('peer-reviewer', '-')}",
+            f"domain={role_verdicts.get('senior-domain-researcher', '-')}",
+        ]
+    )
+    parts = [
+        f"decision: {decision.get('panel_consensus') or decision.get('recommendation') or '-'}",
+        f"roles: {role_summary}",
+    ]
+    blocking_lenses = decision.get("blocking_lenses") or []
+    warning_reviewers = decision.get("warning_reviewers") or []
+    if blocking_lenses:
+        parts.append("blocking: " + ", ".join(str(item) for item in blocking_lenses))
+    if warning_reviewers:
+        parts.append("warnings: " + ", ".join(str(item) for item in warning_reviewers))
+    return " - " + "; ".join(parts)
+
+
 def _render_index_section(manifest: dict) -> str:
     papers = [
         paper
@@ -123,7 +297,7 @@ def _render_index_section(manifest: dict) -> str:
     lines = ["## Promoted Papers", ""]
     for paper in sorted(papers, key=lambda item: (item.get("title") or item["slug"]).lower()):
         suffix = f" (DOI: {paper['doi']})" if paper.get("doi") else ""
-        lines.append(f"- {_paper_link(paper)}{suffix}")
+        lines.append(f"- {_paper_link(paper)}{suffix}{_decision_summary_suffix(paper)}")
     return "\n".join(lines)
 
 
@@ -138,7 +312,7 @@ def _render_hot_section(manifest: dict) -> str:
     lines = ["## Hot Papers", ""]
     for paper in sorted(papers, key=lambda item: item.get("promoted_at") or "", reverse=True)[:10]:
         promoted_at = f" - promoted at {paper['promoted_at']}" if paper.get("promoted_at") else ""
-        lines.append(f"- {_paper_link(paper)}{promoted_at}")
+        lines.append(f"- {_paper_link(paper)}{promoted_at}{_decision_summary_suffix(paper)}")
     return "\n".join(lines)
 
 
@@ -248,22 +422,28 @@ def promote_paper(vault_path: Path, slug: str, approved_by: str | None = None) -
     metadata = _read_json(paper_root / "metadata.json")
     manifest = _load_manifest(vault_path)
     promoted_at = utc_now()
+    research_decision_summary, role_assessments = _load_research_decision_summary(paper_root, staging_root)
+    _ensure_reference_frontmatter(compiled_reference, research_decision_summary)
     human_gate_decision = {
         "status": "approved",
         "approved_by": approved_by,
         "approved_at": promoted_at,
     }
+    manifest_entry = {
+        "slug": slug,
+        "title": metadata.get("title", ""),
+        "doi": metadata.get("doi"),
+        "promotion_status": "promoted",
+        "promoted_at": promoted_at,
+        "compiled_reference": str(compiled_reference),
+        "critic_report": str(paper_root / "critic" / "critic-report.json"),
+    }
+    if research_decision_summary is not None:
+        manifest_entry["research_decision"] = research_decision_summary
+        manifest_entry["role_assessments"] = role_assessments
     _upsert_paper(
         manifest,
-        {
-            "slug": slug,
-            "title": metadata.get("title", ""),
-            "doi": metadata.get("doi"),
-            "promotion_status": "promoted",
-            "promoted_at": promoted_at,
-            "compiled_reference": str(compiled_reference),
-            "critic_report": str(paper_root / "critic" / "critic-report.json"),
-        },
+        manifest_entry,
     )
     write_json_atomic(_manifest_path(vault_path), manifest)
     _refresh_index_and_hot(vault_path, manifest)
@@ -293,6 +473,9 @@ def promote_paper(vault_path: Path, slug: str, approved_by: str | None = None) -
         "hard_rule": HARD_RULE,
         "human_gate_decision": human_gate_decision,
     }
+    if research_decision_summary is not None:
+        record["research_decision"] = research_decision_summary
+        record["role_assessments"] = role_assessments
     write_json_atomic(paper_root / "promotion-record.json", record)
     return record
 
@@ -320,10 +503,11 @@ def rollback_promotion(vault_path: Path, slug: str) -> dict:
     restored_state_paths: dict[str, str] = {}
 
     for page in page_transactions:
-        compiled_path = Path(page["compiled_path"])
+        compiled_path = _promotion_record_compiled_path(vault_path, page["compiled_path"])
         snapshot_path = page.get("previous_snapshot_path")
         if snapshot_path:
-            backup_path = Path(snapshot_path)
+            backup_path = _promotion_record_snapshot_path(paper_root, snapshot_path)
+            compiled_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(backup_path, compiled_path)
             restored_paths.append(str(compiled_path))
         elif compiled_path.exists():
@@ -333,7 +517,7 @@ def rollback_promotion(vault_path: Path, slug: str) -> dict:
     rolled_back_at = utc_now()
     manifest_snapshot = state_snapshot_paths.get("manifest")
     if manifest_snapshot:
-        shutil.copyfile(manifest_snapshot, _manifest_path(vault_path))
+        shutil.copyfile(_promotion_record_snapshot_path(paper_root, manifest_snapshot), _manifest_path(vault_path))
         restored_state_paths["manifest"] = str(_manifest_path(vault_path))
     else:
         manifest = _load_manifest(vault_path)
@@ -349,15 +533,15 @@ def rollback_promotion(vault_path: Path, slug: str) -> dict:
         restored_state_paths["manifest"] = str(_manifest_path(vault_path))
     log_snapshot = state_snapshot_paths.get("log")
     if log_snapshot:
-        shutil.copyfile(log_snapshot, _log_path(vault_path))
+        shutil.copyfile(_promotion_record_snapshot_path(paper_root, log_snapshot), _log_path(vault_path))
         restored_state_paths["log"] = str(_log_path(vault_path))
     index_snapshot = state_snapshot_paths.get("index")
     if index_snapshot:
-        shutil.copyfile(index_snapshot, _index_path(vault_path))
+        shutil.copyfile(_promotion_record_snapshot_path(paper_root, index_snapshot), _index_path(vault_path))
         restored_state_paths["index"] = str(_index_path(vault_path))
     hot_snapshot = state_snapshot_paths.get("hot")
     if hot_snapshot:
-        shutil.copyfile(hot_snapshot, _hot_path(vault_path))
+        shutil.copyfile(_promotion_record_snapshot_path(paper_root, hot_snapshot), _hot_path(vault_path))
         restored_state_paths["hot"] = str(_hot_path(vault_path))
     _append_log(vault_path, f"- Rolled back {slug} at {rolled_back_at}.")
 

@@ -10,7 +10,8 @@ post_phase_1_stage_names:
   - read
   - critic
   - staging
-  - promote-to-wiki
+  - run-wiki-ingest-agent
+  - promote-to-wiki # legacy compiled-draft compatibility only
   - zotero
   - feedback
   - skill-aware-evolve

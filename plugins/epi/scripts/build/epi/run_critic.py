@@ -4,6 +4,13 @@ import json
 from pathlib import Path
 
 from epi.artifacts import file_sha256, utc_now, write_json_atomic, write_text_atomic
+from epi.critic_contracts import critic_protocol
+from epi.paper_quality import review_paper_quality
+from epi.reader_evidence import validate_evidence_map, validate_reader_evidence
+from epi.reader_revision_plan import write_reader_revision_plan
+from epi.reproduction_plan import write_reproduction_plan
+from epi.research_decision import write_research_decision
+from epi.role_critics import role_check_key, role_reviewer_paths, review_role_artifacts
 
 
 HARD_RULE = "No critic pass, no compiled wiki write."
@@ -12,94 +19,25 @@ TOOL_VERSIONS = {
 }
 
 
-def _mineru_headings(mineru_text: str) -> set[str]:
-    headings: set[str] = set()
-    for line in mineru_text.splitlines():
-        stripped = line.strip()
-        if not stripped.startswith("#"):
-            continue
-        heading = stripped.lstrip("#").strip()
-        if heading:
-            headings.add(heading)
-    return headings
-
-
-def _evidence_addresses(text: str) -> list[str]:
-    addresses: list[str] = []
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("Evidence:"):
-            addresses.append(stripped.removeprefix("Evidence:").strip())
-    return addresses
-
-
-def _parse_evidence_address(address: str) -> dict[str, str] | None:
-    fields: dict[str, str] = {}
-    for segment in address.split(";"):
-        part = segment.strip()
-        if not part or "=" not in part:
-            return None
-        key, value = part.split("=", 1)
-        key = key.strip()
-        value = value.strip()
-        if not key or not value:
-            return None
-        fields[key] = value
-    return fields if "source" in fields else None
-
-
-def _validate_reader_evidence(paper_root: Path, evidence_docs: dict[str, str]) -> tuple[bool, list[str]]:
-    addresses: list[tuple[str, str]] = []
-    for doc_name, text in evidence_docs.items():
-        addresses.extend((doc_name, address) for address in _evidence_addresses(text))
-    if not addresses:
-        return False, ["reader outputs missing structured Evidence lines"]
-
-    metadata = json.loads((paper_root / "metadata.json").read_text(encoding="utf-8"))
-    mineru_text = (paper_root / "mineru" / "paper.md").read_text(encoding="utf-8")
-    headings = _mineru_headings(mineru_text)
-    failures: list[str] = []
-
-    for doc_name, address in addresses:
-        parsed = _parse_evidence_address(address)
-        if not parsed:
-            failures.append(f"{doc_name}: unsupported evidence address: {address}")
-            continue
-
-        source = parsed["source"]
-        if source == "mineru/paper.md":
-            heading = parsed.get("heading")
-            if not heading or heading not in headings:
-                failures.append(f"{doc_name}: missing mineru heading for Evidence: {address}")
-        elif source == "metadata.json":
-            field = parsed.get("field")
-            if not field or field not in metadata:
-                failures.append(f"{doc_name}: missing metadata field for Evidence: {address}")
-        elif source == "mineru/images":
-            image = parsed.get("image")
-            image_path = paper_root / "mineru" / "images" / image if image else None
-            if not image or image_path is None or not image_path.exists():
-                failures.append(f"{doc_name}: missing mineru image for Evidence: {address}")
-        elif source == "inference":
-            basis = parsed.get("basis")
-            if not basis:
-                failures.append(f"{doc_name}: missing inference basis for Evidence: {address}")
-        else:
-            failures.append(f"{doc_name}: unsupported evidence source for Evidence: {address}")
-
-    if failures:
-        return False, failures
-    return True, [f"Validated {len(addresses)} structured reader evidence address(es)"]
-
-
-def _reviewer_record(name: str, scope: str, passed: bool, evidence: list[str]) -> dict:
-    return {
+def _reviewer_record(
+    name: str,
+    scope: str,
+    passed: bool,
+    evidence: list[str],
+    warnings: list[str] | None = None,
+    review_protocol: dict | None = None,
+) -> dict:
+    record = {
         "name": name,
         "mode": "local",
         "scope": scope,
         "verdict": "pass" if passed else "fail",
         "evidence": evidence,
+        "warnings": warnings or [],
     }
+    if review_protocol:
+        record["review_protocol"] = review_protocol
+    return record
 
 
 def _artifact_hashes(artifacts: dict[str, Path]) -> dict[str, str]:
@@ -110,53 +48,130 @@ def _artifact_hashes(artifacts: dict[str, Path]) -> dict[str, str]:
     }
 
 
+def _write_reviewer_markdown(path: Path, reviewer: dict) -> None:
+    lines = [
+        f"# {reviewer['name']}",
+        "",
+        f"Outcome: {reviewer['verdict']}",
+        "",
+        "## Scope",
+        reviewer["scope"],
+        "",
+        "## Evidence",
+    ]
+    lines.extend(f"- {item}" for item in reviewer["evidence"])
+    if reviewer["warnings"]:
+        lines.extend(["", "## Warnings"])
+        lines.extend(f"- {item}" for item in reviewer["warnings"])
+    if reviewer.get("review_protocol"):
+        lines.extend(["", "## Review Protocol"])
+        protocol = reviewer["review_protocol"]
+        lines.append(f"- Lens: {protocol['lens']}")
+        lines.append(f"- Consumes: {protocol['consumes']}")
+        if protocol.get("required_sections"):
+            lines.append(f"- Required sections: {', '.join(protocol['required_sections'])}")
+        if protocol.get("hard_fail_checks"):
+            lines.append(f"- Hard fail checks: {', '.join(protocol['hard_fail_checks'])}")
+        if protocol.get("warning_checks"):
+            lines.append(f"- Warning checks: {', '.join(protocol['warning_checks'])}")
+        if protocol.get("decision_boundary"):
+            lines.append(f"- Decision boundary: {protocol['decision_boundary']}")
+    lines.extend(["", f"Hard rule: {HARD_RULE}", ""])
+    write_text_atomic(path, "\n".join(lines))
+
+
 def run_critics(paper_root: Path) -> dict:
     started_at = utc_now()
     critic_dir = paper_root / "critic"
     critic_dir.mkdir(parents=True, exist_ok=True)
     reader_path = paper_root / "reader" / "reader.md"
+    editorial_summary_path = paper_root / "reader" / "editorial-summary.md"
+    technical_reading_path = paper_root / "reader" / "technical-reading.md"
+    research_notes_path = paper_root / "reader" / "research-notes.md"
     figures_path = paper_root / "reader" / "figures.md"
     reproducibility_path = paper_root / "reader" / "reproducibility.md"
+    implementation_ideas_path = paper_root / "reader" / "implementation-ideas.md"
+    evidence_map_path = paper_root / "reader" / "evidence-map.json"
+    metadata_path = paper_root / "metadata.json"
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        metadata = {}
     reader_text = reader_path.read_text(encoding="utf-8") if reader_path.exists() else ""
+    editorial_summary_text = (
+        editorial_summary_path.read_text(encoding="utf-8") if editorial_summary_path.exists() else ""
+    )
+    technical_reading_text = technical_reading_path.read_text(encoding="utf-8") if technical_reading_path.exists() else ""
+    research_notes_text = research_notes_path.read_text(encoding="utf-8") if research_notes_path.exists() else ""
+    figures_text = figures_path.read_text(encoding="utf-8") if figures_path.exists() else ""
+    reproducibility_text = reproducibility_path.read_text(encoding="utf-8") if reproducibility_path.exists() else ""
+    implementation_ideas_text = (
+        implementation_ideas_path.read_text(encoding="utf-8") if implementation_ideas_path.exists() else ""
+    )
+    paper_quality_review = review_paper_quality(
+        paper_root,
+        reader_text=reader_text,
+        additional_reader_texts=[
+            editorial_summary_text,
+            technical_reading_text,
+            research_notes_text,
+            implementation_ideas_text,
+        ],
+        figures_text=figures_text,
+        reproducibility_text=reproducibility_text,
+    )
     reader_quality = False
     if reader_path.exists():
-        reader_quality, reader_evidence = _validate_reader_evidence(
+        text_reader_quality, text_reader_evidence = validate_reader_evidence(
             paper_root,
             {
                 "reader/reader.md": reader_text,
-                "reader/figures.md": figures_path.read_text(encoding="utf-8") if figures_path.exists() else "",
-                "reader/reproducibility.md": (
-                    reproducibility_path.read_text(encoding="utf-8") if reproducibility_path.exists() else ""
-                ),
+                "reader/editorial-summary.md": editorial_summary_text,
+                "reader/technical-reading.md": technical_reading_text,
+                "reader/research-notes.md": research_notes_text,
+                "reader/figures.md": figures_text,
+                "reader/reproducibility.md": reproducibility_text,
+                "reader/implementation-ideas.md": implementation_ideas_text,
             },
         )
+        map_reader_quality, map_reader_evidence = validate_evidence_map(paper_root)
+        reader_quality = text_reader_quality and map_reader_quality
+        reader_evidence = text_reader_evidence + map_reader_evidence
     else:
         reader_evidence = ["reader/reader.md missing"]
+    role_reviewers = review_role_artifacts(paper_root)
+    role_checks = {role_check_key(reviewer["name"]): reviewer["verdict"] == "pass" for reviewer in role_reviewers}
     checks = {
-        "paper_quality": (paper_root / "paper.pdf").exists() and (paper_root / "metadata.json").exists(),
+        "paper_quality": paper_quality_review["passed"],
         "parse_quality": (paper_root / "mineru" / "paper.md").exists(),
         "reader_quality": reader_quality,
+        **role_checks,
     }
     outcome = "pass" if all(checks.values()) else "revise-reader"
     reviewers = [
         _reviewer_record(
             "paper-quality-critic",
-            "raw paper acquisition and metadata",
+            "engineering paper reliability: identity, supported claims, benchmark context, scope, reproducibility, and parse limitations",
             checks["paper_quality"],
-            ["paper.pdf exists", "metadata.json exists"],
+            paper_quality_review["evidence"],
+            paper_quality_review["warnings"],
+            critic_protocol("paper-quality-critic"),
         ),
         _reviewer_record(
             "parse-quality-critic",
             "MinerU parse materialization",
             checks["parse_quality"],
             ["mineru/paper.md exists"],
+            review_protocol=critic_protocol("parse-quality-critic"),
         ),
         _reviewer_record(
             "reader-quality-critic",
             "reader output source grounding",
             checks["reader_quality"],
             reader_evidence,
+            review_protocol=critic_protocol("reader-quality-critic"),
         ),
+        *role_reviewers,
     ]
     disagreement = len({reviewer["verdict"] for reviewer in reviewers}) > 1
     exit_status = 0 if outcome == "pass" else 1
@@ -164,7 +179,23 @@ def run_critics(paper_root: Path) -> dict:
         "paper-quality-critic.md": critic_dir / "paper-quality-critic.md",
         "parse-quality-critic.md": critic_dir / "parse-quality-critic.md",
         "reader-quality-critic.md": critic_dir / "reader-quality-critic.md",
+        **role_reviewer_paths(critic_dir),
+        "research-decision.json": critic_dir / "research-decision.json",
+        "research-decision.md": critic_dir / "research-decision.md",
+        "reader-revision-plan.json": critic_dir / "reader-revision-plan.json",
+        "reader-revision-plan.md": critic_dir / "reader-revision-plan.md",
+        "reproduction-plan.json": critic_dir / "reproduction-plan.json",
+        "reproduction-plan.md": critic_dir / "reproduction-plan.md",
     }
+    research_decision = write_research_decision(critic_dir, outcome, reviewers, hard_rule=HARD_RULE)
+    reader_revision_plan = write_reader_revision_plan(critic_dir, outcome, reviewers, hard_rule=HARD_RULE)
+    reproduction_plan = write_reproduction_plan(
+        critic_dir,
+        outcome,
+        reviewers,
+        metadata=metadata,
+        hard_rule=HARD_RULE,
+    )
     quorum = {
         "stage": "critic-quorum",
         "critic_at": utc_now(),
@@ -175,25 +206,35 @@ def run_critics(paper_root: Path) -> dict:
         "disagreement": disagreement,
         "final_outcome": outcome,
         "hard_rule": HARD_RULE,
+        "paper_quality_checks": paper_quality_review["checks"],
+        "research_decision_path": str(critic_dir / "research-decision.json"),
+        "research_decision": research_decision,
+        "reader_revision_plan_path": str(critic_dir / "reader-revision-plan.json"),
+        "reader_revision_plan": reader_revision_plan,
+        "reproduction_plan_path": str(critic_dir / "reproduction-plan.json"),
+        "reproduction_plan": reproduction_plan,
     }
     quorum_path = critic_dir / "critic-quorum.json"
-    for filename, passed in {
-        "paper-quality-critic.md": checks["paper_quality"],
-        "parse-quality-critic.md": checks["parse_quality"],
-        "reader-quality-critic.md": checks["reader_quality"],
-    }.items():
-        write_text_atomic(
-            critic_dir / filename,
-            f"# {filename.removesuffix('.md')}\n\nOutcome: {'pass' if passed else 'fail'}\n\nHard rule: {HARD_RULE}\n",
-        )
+    reviewer_markdown_paths = {
+        key: path
+        for key, path in reviewer_paths.items()
+        if key.endswith("-critic.md")
+    }
+    for filename, reviewer in zip(reviewer_markdown_paths, reviewers):
+        _write_reviewer_markdown(critic_dir / filename, reviewer)
     input_hashes = _artifact_hashes(
         {
             "paper.pdf": paper_root / "paper.pdf",
             "metadata.json": paper_root / "metadata.json",
             "mineru/paper.md": paper_root / "mineru" / "paper.md",
             "reader/reader.md": reader_path,
+            "reader/editorial-summary.md": editorial_summary_path,
+            "reader/technical-reading.md": technical_reading_path,
+            "reader/research-notes.md": research_notes_path,
             "reader/figures.md": figures_path,
             "reader/reproducibility.md": reproducibility_path,
+            "reader/implementation-ideas.md": implementation_ideas_path,
+            "reader/evidence-map.json": evidence_map_path,
         }
     )
     finished_at = utc_now()
@@ -208,6 +249,7 @@ def run_critics(paper_root: Path) -> dict:
         "critic_at": finished_at,
         "outcome": outcome,
         "checks": checks,
+        "paper_quality_checks": paper_quality_review["checks"],
         "hard_rule": HARD_RULE,
         "tool_versions": TOOL_VERSIONS,
         "reviewer_quorum_path": str(quorum_path),
@@ -222,6 +264,12 @@ def run_critics(paper_root: Path) -> dict:
             **_artifact_hashes(reviewer_paths),
             "critic-quorum.json": file_sha256(quorum_path),
         },
+        "research_decision_path": str(critic_dir / "research-decision.json"),
+        "research_decision": research_decision,
+        "reader_revision_plan_path": str(critic_dir / "reader-revision-plan.json"),
+        "reader_revision_plan": reader_revision_plan,
+        "reproduction_plan_path": str(critic_dir / "reproduction-plan.json"),
+        "reproduction_plan": reproduction_plan,
     }
     write_json_atomic(critic_dir / "critic-report.json", report)
     return report

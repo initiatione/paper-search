@@ -11,6 +11,11 @@ def test_load_config_uses_relative_defaults(tmp_path):
         "profile: robotics_ai_control\n"
         "domains:\n"
         "  - robotics\n"
+        "positive_keywords:\n"
+        "  - humanoid\n"
+        "  - sim2real\n"
+        "negative_keywords:\n"
+        "  - biomedical trial\n"
         "budget:\n"
         "  max_results: 12\n",
         encoding="utf-8",
@@ -23,3 +28,5 @@ def test_load_config_uses_relative_defaults(tmp_path):
     assert config.runs_dir == tmp_path / "vault" / "_runs"
     assert config.max_results == 12
     assert config.profile == "robotics_ai_control"
+    assert config.positive_keywords == ["humanoid", "sim2real"]
+    assert config.negative_keywords == ["biomedical trial"]

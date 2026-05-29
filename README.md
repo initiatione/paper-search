@@ -65,3 +65,16 @@ python -m pytest tests\epi -q
 python -m coverage run -m pytest tests\epi
 python -m coverage xml -o plugins\epi\coverage\coverage.xml
 ```
+
+EPI's source-of-truth chain document is `plugins\epi\docs\epi-linkage.md`. Every plugin change or optimization must check and update that document so the implementation stays aligned with the intended chain: high-quality paper collection -> Obsidian/LLM Wiki knowledge deposition -> low-burden reading report.
+
+For an installed or source checkout, the current handoff flow is:
+
+```powershell
+python plugins\epi\scripts\orchestrator.py paper-gate --slug <paper-slug> --vault D:\paper-research-wiki
+python plugins\epi\scripts\orchestrator.py wiki-ingest-handoff --slug <paper-slug> --vault D:\paper-research-wiki
+```
+
+`wiki-ingest-handoff` is read-only. It renders the paper gate, target-vault contract files, wiki rule source priority, suggested routes, and agent checklist before the final Obsidian/LLM Wiki ingest.
+
+EPI critic development treats `paper-quality-critic` as an engineering paper reliability gate, not a file-existence check. It now verifies stable paper identity, reader claim support, benchmark context for outperform/SOTA claims, and scope overclaim risk while preserving reproducibility gaps and MinerU parse limitations as warnings. Reader development also emits `reader/evidence-map.json` so editor, reviewer, and senior-researcher claims can be checked as structured evidence before promotion. The critic quorum includes role reviewers for editorial significance, peer-review methods, and domain fit. Every reviewer now writes a machine-readable `review_protocol` with its lens, consumed artifacts, hard-fail checks, warning checks, and decision boundary so reader and critic responsibilities stay explicit in the run artifact. Critic runs also write `critic/reader-revision-plan.json` and `.md`, translating blocking failures and warnings into role-specific reader repair worklists for the Nature/Sci editor, peer reviewer, and senior domain researcher.

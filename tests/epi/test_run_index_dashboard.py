@@ -18,6 +18,138 @@ def _seed_run(runs_root, run_id, run_state=None, report=None):
     return run_dir
 
 
+def _seed_ready_paper_gate(vault_path, slug):
+    paper_root = vault_path / "_raw" / "papers" / slug
+    staging_root = vault_path / "_staging" / "papers" / slug
+    critic_root = paper_root / "critic"
+    critic_root.mkdir(parents=True, exist_ok=True)
+    _write_json(paper_root / "metadata.json", {"slug": slug, "title": "Ready Paper"})
+    _write_json(
+        critic_root / "critic-quorum.json",
+        {
+            "stage": "critic-quorum",
+            "final_outcome": "pass",
+            "reviewers": [
+                {"name": "paper-quality-critic", "verdict": "pass"},
+                {"name": "peer-review-methods-critic", "verdict": "pass"},
+            ],
+        },
+    )
+    _write_json(
+        critic_root / "critic-report.json",
+        {
+            "outcome": "pass",
+            "next_action": "stage",
+            "hard_rule": "No critic pass, no compiled wiki write.",
+            "reviewer_quorum_path": str(critic_root / "critic-quorum.json"),
+        },
+    )
+    staged_reference = staging_root / "references" / f"{slug}.md"
+    staged_concept = staging_root / "concepts" / f"{slug}-concept.md"
+    staged_synthesis = staging_root / "synthesis" / f"{slug}-synthesis.md"
+    staged_report = staging_root / "reports" / f"{slug}-reading-report.md"
+    for staged_path in [staged_reference, staged_concept, staged_synthesis, staged_report]:
+        staged_path.parent.mkdir(parents=True, exist_ok=True)
+        staged_path.write_text(f"# {staged_path.stem}\n", encoding="utf-8")
+    _write_json(
+        staging_root / "promotion-plan.json",
+        {
+            "paper_slug": slug,
+            "critic_outcome": "pass",
+            "staged_reference": str(staged_reference),
+            "staged_concepts": [str(staged_concept)],
+            "staged_synthesis": [str(staged_synthesis)],
+            "staged_reports": [str(staged_report)],
+            "compiled_targets": [
+                f"references/{slug}.md",
+                f"concepts/{slug}-concept.md",
+                f"synthesis/{slug}-synthesis.md",
+                f"reports/{slug}-reading-report.md",
+            ],
+        },
+    )
+
+
+def _seed_failed_paper_gate(vault_path, slug):
+    _seed_ready_paper_gate(vault_path, slug)
+    staging_root = vault_path / "_staging" / "papers" / slug
+    plan_path = staging_root / "promotion-plan.json"
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    plan["compiled_targets"] = [
+        f"references/{slug}.md",
+        "../unsafe.md",
+    ]
+    _write_json(plan_path, plan)
+
+
+def test_refresh_run_index_enriches_ready_queue_with_paper_gate(tmp_path):
+    vault_path = tmp_path / "vault"
+    runs_root = vault_path / "_runs"
+    runs_root.mkdir(parents=True, exist_ok=True)
+    slug = "ready-paper"
+    _seed_ready_paper_gate(vault_path, slug)
+    _seed_run(
+        runs_root,
+        "20260529T100000Z-ready",
+        run_state={
+            "run_id": "20260529T100000Z-ready",
+            "workflow_type": "advance-batch",
+            "state": "staging_ready",
+            "status": "waiting_for_human_gate",
+            "paper_slug": slug,
+            "started_at": "2026-05-29T10:00:00Z",
+            "finished_at": "2026-05-29T10:05:00Z",
+        },
+        report={
+            "next_actions": ["promote-to-wiki"],
+            "human_gate": {"status": "required"},
+        },
+    )
+
+    index_payload = refresh_run_index(vault_path)
+
+    item = index_payload["research_queue"]["ready_to_promote"][0]
+    assert item["paper_gate"] == {
+        "status": "waiting_for_human_gate",
+        "conclusion": "action_required",
+        "next_action": "promote-to-wiki",
+        "action_required_checks": ["human-approval"],
+        "failure_checks": [],
+    }
+
+
+def test_refresh_run_index_marks_ready_queue_reason_blocked_when_current_paper_gate_fails(tmp_path):
+    vault_path = tmp_path / "vault"
+    runs_root = vault_path / "_runs"
+    runs_root.mkdir(parents=True, exist_ok=True)
+    slug = "unsafe-ready-paper"
+    _seed_failed_paper_gate(vault_path, slug)
+    _seed_run(
+        runs_root,
+        "20260529T101000Z-stale-ready",
+        run_state={
+            "run_id": "20260529T101000Z-stale-ready",
+            "workflow_type": "advance-batch",
+            "state": "staging_ready",
+            "status": "waiting_for_human_gate",
+            "paper_slug": slug,
+            "started_at": "2026-05-29T10:10:00Z",
+            "finished_at": "2026-05-29T10:15:00Z",
+        },
+        report={
+            "next_actions": ["promote-to-wiki"],
+            "human_gate": {"status": "required"},
+        },
+    )
+
+    index_payload = refresh_run_index(vault_path)
+
+    item = index_payload["research_queue"]["ready_to_promote"][0]
+    assert item["reason"] == "paper gate blocked by failed checks"
+    assert item["paper_gate"]["conclusion"] == "failure"
+    assert item["paper_gate"]["failure_checks"] == ["compiled-targets"]
+
+
 def test_refresh_run_index_writes_sorted_index_entries(tmp_path):
     vault_path = tmp_path / "vault"
     runs_root = vault_path / "_runs"
@@ -293,6 +425,350 @@ def test_refresh_run_index_writes_dashboard_and_skips_broken_runs(tmp_path):
     assert success_text.startswith("# EPI Recent Successful Runs")
     assert success_text.index("20260528T120000Z-ranked") < success_text.index("20260528T113000Z-promote")
     assert "20260528T115000Z-recritic" not in success_text
+
+
+def test_refresh_run_index_surfaces_research_decisions(tmp_path):
+    vault_path = tmp_path / "vault"
+    runs_root = vault_path / "_runs"
+    runs_root.mkdir(parents=True, exist_ok=True)
+
+    _seed_run(
+        runs_root,
+        "20260528T121500Z-recritic",
+        run_state={
+            "run_id": "20260528T121500Z-recritic",
+            "workflow_type": "recritic",
+            "state": "critic_failed",
+            "status": "failed",
+            "paper_slug": "embodied-control",
+            "started_at": "2026-05-28T12:15:00Z",
+            "finished_at": "2026-05-28T12:18:00Z",
+        },
+        report={
+            "next_actions": ["revise-reader"],
+            "human_gate": None,
+            "research_decisions": [
+                {
+                    "slug": "embodied-control",
+                    "title": "Embodied Control for Mobile Robots",
+                    "recommendation": "revise-reader",
+                    "next_action": "revise-reader",
+                    "role_verdicts": {
+                        "nature-sci-editor": "pass",
+                        "peer-reviewer": "fail",
+                        "senior-domain-researcher": "pass",
+                    },
+                }
+            ],
+        },
+    )
+
+    index_payload = refresh_run_index(vault_path)
+    dashboard_text = (runs_root / "dashboard.md").read_text(encoding="utf-8")
+
+    entry = index_payload["runs"][0]
+    assert entry["research_decisions"][0]["recommendation"] == "revise-reader"
+    assert entry["research_decisions"][0]["role_verdicts"]["peer-reviewer"] == "fail"
+    assert "decision: embodied-control -> revise-reader / revise-reader" in dashboard_text
+
+
+def test_refresh_run_index_writes_research_queue_from_decisions_revision_plans_and_delta(tmp_path):
+    vault_path = tmp_path / "vault"
+    runs_root = vault_path / "_runs"
+    runs_root.mkdir(parents=True, exist_ok=True)
+
+    _seed_run(
+        runs_root,
+        "20260528T140000Z-promote-ready",
+        run_state={
+            "run_id": "20260528T140000Z-promote-ready",
+            "workflow_type": "advance-batch",
+            "state": "staged",
+            "status": "succeeded",
+            "paper_slug": "ready-paper",
+            "started_at": "2026-05-28T14:00:00Z",
+            "finished_at": "2026-05-28T14:05:00Z",
+        },
+        report={
+            "next_actions": ["promote-to-wiki"],
+            "human_gate": {"status": "required"},
+        },
+    )
+    _seed_run(
+        runs_root,
+        "20260528T141000Z-repair",
+        run_state={
+            "run_id": "20260528T141000Z-repair",
+            "workflow_type": "advance-batch",
+            "state": "critic_failed",
+            "status": "failed",
+            "paper_slug": None,
+            "started_at": "2026-05-28T14:10:00Z",
+            "finished_at": "2026-05-28T14:12:00Z",
+        },
+        report={
+            "next_actions": ["revise-reader"],
+            "reader_revision_plans": [
+                {
+                    "slug": "repair-paper",
+                    "title": "Repair Paper",
+                    "next_action": "revise-reader",
+                    "blocking_count": 2,
+                    "warning_count": 1,
+                    "plan_path": "D:\\vault\\_raw\\papers\\repair-paper\\critic\\reader-revision-plan.json",
+                }
+            ],
+            "research_decisions": [
+                {
+                    "slug": "repair-paper",
+                    "title": "Repair Paper",
+                    "recommendation": "revise-reader",
+                    "next_action": "revise-reader",
+                    "role_verdicts": {"peer-reviewer": "fail"},
+                }
+            ],
+        },
+    )
+    _seed_run(
+        runs_root,
+        "20260528T142000Z-recritic",
+        run_state={
+            "run_id": "20260528T142000Z-recritic",
+            "workflow_type": "redo-read-recritic",
+            "state": "critic_passed",
+            "status": "succeeded",
+            "paper_slug": "warning-paper",
+            "started_at": "2026-05-28T14:20:00Z",
+            "finished_at": "2026-05-28T14:22:00Z",
+        },
+        report={
+            "next_actions": ["stage the paper for promotion review"],
+            "revision_delta": {
+                "before": {
+                    "blocking_count": 1,
+                    "warning_count": 1,
+                    "blocking_checks": ["benchmark_integrity"],
+                    "warning_checks": ["engineering_reproducibility"],
+                },
+                "after": {
+                    "blocking_count": 0,
+                    "warning_count": 1,
+                    "blocking_checks": [],
+                    "warning_checks": ["engineering_reproducibility"],
+                },
+                "resolved_blocking_checks": ["benchmark_integrity"],
+                "remaining_blocking_checks": [],
+                "remaining_warning_checks": ["engineering_reproducibility"],
+            },
+        },
+    )
+
+    index_payload = refresh_run_index(vault_path)
+
+    queue_json = json.loads((runs_root / "research-queue.json").read_text(encoding="utf-8"))
+    queue_md = (runs_root / "research-queue.md").read_text(encoding="utf-8")
+    dashboard_text = (runs_root / "dashboard.md").read_text(encoding="utf-8")
+
+    assert index_payload["research_queue"]["ready_to_promote"][0]["paper_slug"] == "ready-paper"
+    assert index_payload["research_queue"]["needs_reader_repair"][0]["paper_slug"] == "repair-paper"
+    assert index_payload["research_queue"]["warning_only"][0]["paper_slug"] == "warning-paper"
+    assert index_payload["research_queue"]["reproducibility_caveats"][0]["paper_slug"] == "warning-paper"
+    assert queue_json == index_payload["research_queue"]
+    assert "# EPI Research Queue" in queue_md
+    assert "## Ready To Promote" in queue_md
+    assert "ready-paper" in queue_md
+    assert "repair-paper" in queue_md
+    assert "engineering_reproducibility" in queue_md
+    assert "## Research Queue" in dashboard_text
+    assert "ready_to_promote: 1" in dashboard_text
+    assert "needs_reader_repair: 1" in dashboard_text
+    assert "reproducibility_caveats: 1" in dashboard_text
+
+
+def test_refresh_run_index_treats_waiting_human_gate_as_ready_not_failed(tmp_path):
+    vault_path = tmp_path / "vault"
+    runs_root = vault_path / "_runs"
+    runs_root.mkdir(parents=True, exist_ok=True)
+
+    _seed_run(
+        runs_root,
+        "20260528T144000Z-waiting-promote",
+        run_state={
+            "run_id": "20260528T144000Z-waiting-promote",
+            "workflow_type": "advance-ranked",
+            "state": "staging_ready",
+            "status": "waiting_for_human_gate",
+            "paper_slug": "waiting-paper",
+            "started_at": "2026-05-28T14:40:00Z",
+            "finished_at": "2026-05-28T14:45:00Z",
+        },
+        report={
+            "next_actions": ["promote-to-wiki"],
+            "human_gate": {"status": "required"},
+        },
+    )
+
+    index_payload = refresh_run_index(vault_path)
+
+    assert index_payload["summary"]["failed_run_count"] == 0
+    assert index_payload["latest_failures"] == []
+    assert index_payload["latest_human_gate_pending"][0]["paper_slug"] == "waiting-paper"
+    assert index_payload["research_queue"]["ready_to_promote"][0]["paper_slug"] == "waiting-paper"
+
+
+def test_refresh_run_index_adds_reproducibility_caveat_items_to_research_queue(tmp_path):
+    vault_path = tmp_path / "vault"
+    runs_root = vault_path / "_runs"
+    runs_root.mkdir(parents=True, exist_ok=True)
+
+    _seed_run(
+        runs_root,
+        "20260528T143000Z-reproduction",
+        run_state={
+            "run_id": "20260528T143000Z-reproduction",
+            "workflow_type": "advance-batch",
+            "state": "critic_passed",
+            "status": "succeeded",
+            "paper_slug": "repro-paper",
+            "started_at": "2026-05-28T14:30:00Z",
+            "finished_at": "2026-05-28T14:35:00Z",
+        },
+        report={
+            "next_actions": ["stage"],
+            "reproduction_plans": [
+                {
+                    "slug": "repro-paper",
+                    "title": "Repro Paper",
+                    "plan_path": "D:\\vault\\_raw\\papers\\repro-paper\\critic\\reproduction-plan.json",
+                    "next_action": "prepare-reproduction-plan",
+                    "missing_count": 2,
+                    "human_gate_required": True,
+                }
+            ],
+        },
+    )
+
+    index_payload = refresh_run_index(vault_path)
+
+    item = index_payload["research_queue"]["reproducibility_caveats"][0]
+    assert item["paper_slug"] == "repro-paper"
+    assert item["title"] == "Repro Paper"
+    assert item["source"].endswith("reproduction-plan.json")
+    assert item["reason"] == "reproducibility caveats need evidence review"
+
+
+def test_refresh_run_index_does_not_write_research_agenda_outputs(tmp_path):
+    vault_path = tmp_path / "vault"
+    runs_root = vault_path / "_runs"
+    runs_root.mkdir(parents=True, exist_ok=True)
+
+    _seed_run(
+        runs_root,
+        "20260528T150000Z-ready",
+        run_state={
+            "run_id": "20260528T150000Z-ready",
+            "workflow_type": "advance-batch",
+            "state": "staged",
+            "status": "succeeded",
+            "paper_slug": "ready-paper",
+            "started_at": "2026-05-28T15:00:00Z",
+            "finished_at": "2026-05-28T15:05:00Z",
+        },
+        report={
+            "next_actions": ["promote-to-wiki"],
+            "human_gate": {"status": "required"},
+            "research_decisions": [
+                {
+                    "slug": "ready-paper",
+                    "title": "Ready Paper",
+                    "recommendation": "stage-for-promotion-review",
+                    "next_action": "stage",
+                    "role_verdicts": {
+                        "nature-sci-editor": "pass",
+                        "peer-reviewer": "pass",
+                        "senior-domain-researcher": "pass",
+                    },
+                }
+            ],
+        },
+    )
+    _seed_run(
+        runs_root,
+        "20260528T151000Z-repair",
+        run_state={
+            "run_id": "20260528T151000Z-repair",
+            "workflow_type": "recritic",
+            "state": "critic_failed",
+            "status": "failed",
+            "paper_slug": "repair-paper",
+            "started_at": "2026-05-28T15:10:00Z",
+            "finished_at": "2026-05-28T15:12:00Z",
+        },
+        report={
+            "next_actions": ["revise-reader"],
+            "reader_revision_plans": [
+                {
+                    "slug": "repair-paper",
+                    "title": "Repair Paper",
+                    "next_action": "revise-reader",
+                    "blocking_count": 1,
+                    "warning_count": 0,
+                    "plan_path": "D:\\vault\\_raw\\papers\\repair-paper\\critic\\reader-revision-plan.json",
+                }
+            ],
+            "research_decisions": [
+                {
+                    "slug": "repair-paper",
+                    "title": "Repair Paper",
+                    "recommendation": "revise-reader",
+                    "next_action": "revise-reader",
+                    "role_verdicts": {
+                        "nature-sci-editor": "pass",
+                        "peer-reviewer": "fail",
+                        "senior-domain-researcher": "pass",
+                    },
+                }
+            ],
+        },
+    )
+    _seed_run(
+        runs_root,
+        "20260528T152000Z-repro",
+        run_state={
+            "run_id": "20260528T152000Z-repro",
+            "workflow_type": "advance-batch",
+            "state": "critic_passed",
+            "status": "succeeded",
+            "paper_slug": "repro-paper",
+            "started_at": "2026-05-28T15:20:00Z",
+            "finished_at": "2026-05-28T15:25:00Z",
+        },
+        report={
+            "next_actions": ["stage"],
+            "reproduction_plans": [
+                {
+                    "slug": "repro-paper",
+                    "title": "Repro Paper",
+                    "plan_path": "D:\\vault\\_raw\\papers\\repro-paper\\critic\\reproduction-plan.json",
+                    "next_action": "prepare-reproduction-plan",
+                    "missing_count": 2,
+                    "human_gate_required": True,
+                }
+            ],
+        },
+    )
+
+    index_payload = refresh_run_index(vault_path)
+
+    dashboard_text = (runs_root / "dashboard.md").read_text(encoding="utf-8")
+
+    assert "research_agenda" not in index_payload
+    assert not (runs_root / "research-agenda.json").exists()
+    assert not (runs_root / "research-agenda.md").exists()
+    assert "## Research Agenda" not in dashboard_text
+    assert index_payload["research_queue"]["ready_to_promote"][0]["paper_slug"] == "ready-paper"
+    assert index_payload["research_queue"]["needs_reader_repair"][0]["paper_slug"] == "repair-paper"
+    assert index_payload["research_queue"]["reproducibility_caveats"][0]["paper_slug"] == "repro-paper"
 
 
 def test_refresh_run_index_writes_empty_filtered_views_when_no_matches(tmp_path):

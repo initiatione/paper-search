@@ -10,8 +10,10 @@ REQUIRED_DIRS = [
     "_quarantine/papers",
     "_runs",
     "_evolution/proposals",
+    "_evolution/pending",
     "_evolution/active",
     "_evolution/archive",
+    "_evolution/rejected",
     "_meta",
     "references",
     "concepts",
@@ -40,8 +42,10 @@ def initialize_paper_wiki(vault_path: Path) -> list[str]:
         ".manifest.json": json.dumps(
             {
                 "vault_type": "engineering-paper-research",
-                "schema": "raw source -> compiled wiki -> schema",
-                "compiled_dirs": ["references", "concepts", "synthesis", "entities", "skills", "projects", "journal"],
+                "schema": "raw source -> evidence handoff -> agent-mediated wiki -> vault schema",
+                "wiki_write_model": "agent-mediated-vault-contract",
+                "suggested_draft_dirs": ["references", "concepts", "synthesis", "reports"],
+                "wiki_dirs": ["references", "concepts", "synthesis", "entities", "skills", "projects", "journal"],
                 "operational_dirs": ["_raw", "_staging", "_quarantine", "_runs", "_evolution", "_meta"],
                 "papers": [],
             },

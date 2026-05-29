@@ -9,6 +9,7 @@ from epi import orchestrator as workflows
 from epi.artifacts import file_sha256, raw_paper_root, utc_now
 from epi.config import apply_config_update, config_status as get_config_status, init_config, propose_config_update
 from epi.doctor import collect_doctor_report, open_setup_links, render_doctor_report
+from epi.run_index import RESEARCH_QUEUE_BUCKETS
 
 
 Handler = Callable[[argparse.Namespace], int]
@@ -97,6 +98,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_vault(advance_ranked)
     advance_ranked.add_argument("--max-papers", type=int, default=None)
     advance_ranked.add_argument("--mineru-command", default=None)
+    advance_ranked.add_argument("--include-review-candidates", action="store_true")
 
     parse_paper = subparsers.add_parser("parse-paper")
     _add_common_vault(parse_paper)
@@ -130,6 +132,8 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_vault(redo_read)
     redo_read.add_argument("--slug", required=True)
     redo_read.add_argument("--reason", default="")
+    redo_read.add_argument("--from-revision-plan", action="store_true")
+    redo_read.add_argument("--recritic", action="store_true")
 
     recritic = subparsers.add_parser("recritic")
     _add_common_vault(recritic)
@@ -156,11 +160,22 @@ def build_parser() -> argparse.ArgumentParser:
     propose.add_argument("--rationale", required=True)
     propose.add_argument("--proposed-change-json", required=True)
     propose.add_argument("--evidence", action="append", default=[])
+    propose.add_argument("--evidence-type", default=None)
+    propose.add_argument("--before-metrics-json", default=None)
+    propose.add_argument("--acceptance-gates-json", default=None)
+    propose.add_argument("--risk-level", default=None)
 
     activate = subparsers.add_parser("activate-evolution")
     _add_common_vault(activate)
     activate.add_argument("--proposal-id", required=True)
     activate.add_argument("--approved", action="store_true")
+    activate.add_argument("--validation-result-json", default=None)
+
+    evolution_query = subparsers.add_parser("evolution-query")
+    _add_common_vault(evolution_query)
+    evolution_query.add_argument("--status", default=None)
+    evolution_query.add_argument("--limit", type=int, default=20)
+    evolution_query.add_argument("--json", action="store_true")
 
     runs_query = subparsers.add_parser("runs-query")
     _add_common_vault(runs_query)
@@ -170,6 +185,33 @@ def build_parser() -> argparse.ArgumentParser:
     runs_query_group.add_argument("--latest-success")
     runs_query.add_argument("--workflow", default=None)
     runs_query.add_argument("--limit", type=int, default=10)
+
+    research_queue = subparsers.add_parser("research-queue")
+    _add_common_vault(research_queue)
+    research_queue.add_argument("--bucket", choices=RESEARCH_QUEUE_BUCKETS, default=None)
+    research_queue.add_argument("--limit", type=int, default=10)
+    research_queue.add_argument("--actions", action="store_true")
+    research_queue.add_argument("--json", action="store_true")
+
+    wiki_query = subparsers.add_parser("wiki-query")
+    _add_common_vault(wiki_query)
+    wiki_query.add_argument("--consensus", default=None)
+    wiki_query.add_argument("--role", default=None)
+    wiki_query.add_argument("--verdict", default=None)
+    wiki_query.add_argument("--warning-reviewer", default=None)
+    wiki_query.add_argument("--blocking-lens", default=None)
+    wiki_query.add_argument("--limit", type=int, default=20)
+    wiki_query.add_argument("--json", action="store_true")
+
+    wiki_ingest_handoff = subparsers.add_parser("wiki-ingest-handoff")
+    _add_common_vault(wiki_ingest_handoff)
+    wiki_ingest_handoff.add_argument("--slug", required=True)
+    wiki_ingest_handoff.add_argument("--json", action="store_true")
+
+    paper_gate = subparsers.add_parser("paper-gate")
+    _add_common_vault(paper_gate)
+    paper_gate.add_argument("--slug", required=True)
+    paper_gate.add_argument("--json", action="store_true")
 
     return parser
 
@@ -312,6 +354,7 @@ def _handle_advance_ranked(args: argparse.Namespace) -> int:
         args.run_id,
         mineru_command=args.mineru_command,
         max_papers=args.max_papers,
+        include_review_candidates=args.include_review_candidates,
     )
     print(f"run_dir={args.vault.resolve() / '_runs' / batch['run_id']}")
     print(f"batch_state={batch['state']}")
@@ -444,15 +487,33 @@ def _handle_redo_parse(args: argparse.Namespace) -> int:
 
 def _handle_redo_read(args: argparse.Namespace) -> int:
     started_at = utc_now()
-    record = workflows.redo_read(args.vault, args.slug, reason=args.reason)
+    paper_root = raw_paper_root(args.vault.resolve(), args.slug)
+    input_hashes = {
+        "mineru/paper.md": file_sha256(paper_root / "mineru" / "paper.md"),
+    }
+    revision_plan_path = paper_root / "critic" / "reader-revision-plan.json"
+    if args.from_revision_plan and revision_plan_path.exists():
+        input_hashes["critic/reader-revision-plan.json"] = file_sha256(revision_plan_path)
+    if args.recritic:
+        record = workflows.redo_read_recritic(
+            args.vault,
+            args.slug,
+            reason=args.reason,
+            require_revision_plan=args.from_revision_plan,
+        )
+    else:
+        record = workflows.redo_read(
+            args.vault,
+            args.slug,
+            reason=args.reason,
+            require_revision_plan=args.from_revision_plan,
+        )
     workflows._write_repair_routed_report(
         args.vault.resolve(),
         args.slug,
         record,
         started_at=started_at,
-        input_artifact_hashes={
-            "mineru/paper.md": file_sha256(raw_paper_root(args.vault.resolve(), args.slug) / "mineru" / "paper.md"),
-        },
+        input_artifact_hashes=input_hashes,
     )
     print(f"redo_status={record['status']}")
     return 0
@@ -498,6 +559,8 @@ def _handle_record_feedback(args: argparse.Namespace) -> int:
 
 
 def _handle_propose_evolution(args: argparse.Namespace) -> int:
+    before_metrics = json.loads(args.before_metrics_json) if args.before_metrics_json else None
+    acceptance_gates = json.loads(args.acceptance_gates_json) if args.acceptance_gates_json else None
     proposal = workflows.propose_evolution(
         args.vault,
         reflection_type=args.reflection_type,
@@ -505,14 +568,37 @@ def _handle_propose_evolution(args: argparse.Namespace) -> int:
         rationale=args.rationale,
         proposed_change=json.loads(args.proposed_change_json),
         evidence=args.evidence,
+        evidence_type=args.evidence_type,
+        before_metrics=before_metrics,
+        acceptance_gates=acceptance_gates,
+        risk_level=args.risk_level,
     )
     print(f"proposal_id={proposal['id']}")
     return 0
 
 
 def _handle_activate_evolution(args: argparse.Namespace) -> int:
-    activated = workflows.activate_evolution(args.vault, args.proposal_id, approved=args.approved)
+    validation_result = json.loads(args.validation_result_json) if args.validation_result_json else None
+    activated = workflows.activate_evolution(
+        args.vault,
+        args.proposal_id,
+        approved=args.approved,
+        validation_result=validation_result,
+    )
     print(f"evolution_status={activated['status']}")
+    return 0
+
+
+def _handle_evolution_query(args: argparse.Namespace) -> int:
+    result = workflows.query_evolution(
+        args.vault.resolve(),
+        status=args.status,
+        limit=args.limit,
+    )
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(workflows.render_evolution_query(result))
     return 0
 
 
@@ -526,6 +612,55 @@ def _handle_runs_query(args: argparse.Namespace) -> int:
         limit=args.limit,
     )
     print(workflows.render_runs_query(result))
+    return 0
+
+
+def _handle_research_queue(args: argparse.Namespace) -> int:
+    result = workflows.query_research_queue(
+        args.vault.resolve(),
+        bucket=args.bucket,
+        limit=args.limit,
+        include_actions=args.actions,
+    )
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(workflows.render_research_queue_query(result))
+    return 0
+
+
+def _handle_wiki_query(args: argparse.Namespace) -> int:
+    result = workflows.query_wiki(
+        args.vault.resolve(),
+        consensus=args.consensus,
+        role=args.role,
+        verdict=args.verdict,
+        warning_reviewer=args.warning_reviewer,
+        blocking_lens=args.blocking_lens,
+        limit=args.limit,
+    )
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(workflows.render_wiki_query(result))
+    return 0
+
+
+def _handle_wiki_ingest_handoff(args: argparse.Namespace) -> int:
+    result = workflows.build_wiki_ingest_handoff(args.vault.resolve(), args.slug)
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(workflows.render_wiki_ingest_handoff(result))
+    return 0
+
+
+def _handle_paper_gate(args: argparse.Namespace) -> int:
+    result = workflows.build_paper_gate(args.vault.resolve(), args.slug)
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(workflows.render_paper_gate(result))
     return 0
 
 
@@ -552,7 +687,12 @@ HANDLERS: dict[str, Handler] = {
     "record-feedback": _handle_record_feedback,
     "propose-evolution": _handle_propose_evolution,
     "activate-evolution": _handle_activate_evolution,
+    "evolution-query": _handle_evolution_query,
     "runs-query": _handle_runs_query,
+    "research-queue": _handle_research_queue,
+    "wiki-query": _handle_wiki_query,
+    "wiki-ingest-handoff": _handle_wiki_ingest_handoff,
+    "paper-gate": _handle_paper_gate,
 }
 
 
