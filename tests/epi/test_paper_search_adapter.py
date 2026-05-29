@@ -123,6 +123,29 @@ def test_live_cli_discovery_fails_closed_when_command_is_missing(tmp_path):
     assert result["error"] == COMMAND_UNAVAILABLE
 
 
+def test_live_cli_discovery_treats_empty_stdout_with_stderr_as_upstream_failure(tmp_path):
+    script = tmp_path / "paper-search-empty.ps1"
+    script.write_text(
+        "if ($args -contains '--version') { Write-Output 'paper-search 0.1.4'; exit 0 }\n"
+        "Write-Error 'Failed to resolve --with requirement: Git operation failed'\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+
+    result = discover(
+        query="robotics",
+        max_results=2,
+        command=str(script),
+        sources=["arxiv"],
+        raw_response_path=tmp_path / "raw-search.json",
+    )
+
+    assert result["records"] == []
+    assert result["error"] == "paper-search search failed"
+    assert result["upstream"]["returncode"] == 0
+    assert "Git operation failed" in result["upstream"]["stderr"]
+
+
 def test_probe_paper_search_fails_closed_on_timeout(monkeypatch):
     monkeypatch.setattr("epi.paper_search_adapter._resolve_command", lambda command: command)
 

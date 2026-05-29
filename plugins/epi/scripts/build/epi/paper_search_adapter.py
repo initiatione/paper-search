@@ -190,7 +190,7 @@ def discover(
     resolved_command = probe["command"]
     args = ["search", query, "-n", str(max_results), "-s", ",".join(selected_sources)]
     result = _run_command(resolved_command, args, timeout_seconds=timeout_seconds)
-    if result.returncode != 0:
+    if result.returncode != 0 or not result.stdout.strip():
         raw_path = _write_raw_response(
             raw_response_path,
             {
