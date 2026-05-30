@@ -1,4 +1,9 @@
-from epi.filter_candidates import exclusion_terms_from_query, filter_candidates, filter_candidates_with_report
+from epi.filter_candidates import (
+    default_discovery_exclusion_terms,
+    exclusion_terms_from_query,
+    filter_candidates,
+    filter_candidates_with_report,
+)
 from epi.normalize_candidates import normalize_candidates
 from epi.rank_papers import rank_candidates
 
@@ -71,3 +76,13 @@ def test_exclusion_terms_from_query_accepts_chinese_review_request():
 
     assert "review" in terms
     assert "systematic review" in terms
+
+
+def test_default_discovery_exclusion_terms_skip_reviews_unless_requested():
+    default_terms = default_discovery_exclusion_terms("latest high quality AUV reinforcement learning control papers")
+    review_terms = default_discovery_exclusion_terms("latest survey papers about AUV reinforcement learning control")
+
+    assert "review" in default_terms
+    assert "survey" in default_terms
+    assert "meta-analysis" in default_terms
+    assert review_terms == []

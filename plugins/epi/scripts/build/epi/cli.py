@@ -112,6 +112,13 @@ def build_parser() -> argparse.ArgumentParser:
     dry_run.add_argument("--fixture", type=Path, default=None)
     dry_run.add_argument("--paper-search-command", default=None)
     dry_run.add_argument("--sources", default=None, help="Comma-separated paper-search sources for live discovery.")
+    dry_run.add_argument("--no-query-plan", action="store_true")
+    dry_run.add_argument(
+        "--query-plan-domain",
+        default="auto",
+        choices=["auto", "auv-control", "embodied-ai", "general-robotics"],
+    )
+    dry_run.add_argument("--query-plan-max-queries", type=int, default=6)
 
     ingest_one = subparsers.add_parser("ingest-one")
     ingest_one.add_argument("--candidate", type=Path, required=True)
@@ -362,6 +369,9 @@ def _handle_dry_run(args: argparse.Namespace) -> int:
         fixture_path=args.fixture,
         paper_search_command=args.paper_search_command,
         sources=sources,
+        use_query_plan=not args.no_query_plan,
+        query_plan_domain=args.query_plan_domain,
+        query_plan_max_queries=args.query_plan_max_queries,
     )
     print(f"run_dir={run_dir}")
     return 0

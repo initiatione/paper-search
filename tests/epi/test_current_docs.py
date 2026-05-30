@@ -80,6 +80,8 @@ def test_linkage_doc_records_paper_discovery_bundle_and_venue_prior():
     assert "query_plan" in text
     assert "5-8 条 query variants" in text
     assert "two-stage retrieval" in text
+    assert "--no-query-plan" in text
+    assert "search-record.json.query_records" in text
     assert "venue_prior" in text
     assert "verified_metrics" in text
     assert "RoboWiki" in text

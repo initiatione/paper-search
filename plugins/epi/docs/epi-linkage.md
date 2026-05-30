@@ -72,9 +72,9 @@ ranking 必须同时给机器信号和低阅读负担解释：
 
 期刊/会议分层可用于提高高质量论文筛选能力，但只能作为 `venue_prior`。RoboWiki 这类机器人会议/期刊整理页可作为 curated robotics venue prior 和 recall gap 检查来源；知乎、论坛或博客排名只能作为弱召回线索和社区主观背景，不能直接当作影响因子、JCR 分区、引用数、录用率或最终质量标签。推荐结果必须把 `venue_prior` 和 `verified_metrics` 分开展示；若影响因子、分区、CiteScore、引用数没有在本轮核实，就写 `未核实`。AUV/RL/control 这类任务还要把 Ocean Engineering、IEEE Journal of Oceanic Engineering、Applied Ocean Research、Control Engineering Practice、OCEANS 等海洋/控制场所纳入召回检查，避免只搜通用机器人和 AI 场所。
 
-当用户给出紧凑主题或要求“最新/高质量/非综述”时，`paper-discovery` 应先形成 `query_plan`：概念块、5-8 条 query variants、source route、recall gap checks 和 quality signals。`scripts/query-planner.py` 是离线辅助工具，只生成计划不访问网络；执行搜索时仍以 `dry-run` 和上游 MCP/CLI 为准。检索应采用 two-stage retrieval：第一阶段扩大 raw candidate pool，第二阶段按 DOI/arXiv/title/library 去重、过滤综述、核验 DOI/venue/year/PDF/citation/metric，再排序输出。对强 seed paper，允许用 citation graph 查 journal version、recent cited-by、references 和 related papers，并在 `EPI 实测证据` 记录扩展证据。
+当用户给出紧凑主题或要求“最新/高质量/非综述”时，`paper-discovery` 应先形成 `query_plan`：概念块、5-8 条 query variants、source route、recall gap checks 和 quality signals。`scripts/query-planner.py` 是离线辅助工具，只生成计划不访问网络；默认 `dry-run` 会写 `_runs/<run-id>/query-plan.json`，按 query variants 多次调用上游 MCP/CLI 搜索，并在 `search-record.json.query_records` 留下每条 query 的证据；只有调试单条原始检索时才使用 `--no-query-plan`。检索应采用 two-stage retrieval：第一阶段扩大 raw candidate pool，第二阶段按 DOI/arXiv/title/library 去重、过滤综述、核验 DOI/venue/year/PDF/citation/metric，再排序输出。对强 seed paper，允许用 citation graph 查 journal version、recent cited-by、references 和 related papers，并在 `EPI 实测证据` 记录扩展证据。
 
-当用户明确说“不要综述/非综述/not review/research papers only”时，查询应带上 `-review -survey`，并且 filter 阶段把 review、survey、systematic review、literature review、meta-analysis 等文档类型作为 hard exclusion 写入 `filter_reasons`，例如 `excluded_terms:review,survey`。默认偏综述沉淀的画像不受影响；只有本次查询显式要求排除综述时才硬过滤。
+默认论文发现面向方法/系统/实验论文，不默认找综述。除非用户明确要求 review/survey/综述类论文，查询应带上 `-review -survey`，并且 filter 阶段把 review、survey、systematic review、literature review、meta-analysis 等文档类型作为 hard exclusion 写入 `filter_reasons`，例如 `excluded_terms:review,survey`。若用户明确找综述或 survey，才放开该 hard exclusion。
 
 ### 3. 采集、解析与 raw 留痕
 

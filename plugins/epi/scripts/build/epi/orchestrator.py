@@ -9,13 +9,14 @@ from epi.acquire_papers import acquire_paper, acquire_paper_from_url
 from epi.artifacts import file_sha256, json_sha256, raw_paper_root, utc_now, write_json_atomic, write_text_atomic
 from epi.config import load_config
 from epi.feedback import record_feedback
-from epi.filter_candidates import exclusion_terms_from_query, filter_candidates, filter_candidates_with_report
+from epi.filter_candidates import default_discovery_exclusion_terms, filter_candidates, filter_candidates_with_report
 from epi.generate_reader import generate_reader_outputs
 from epi.normalize_candidates import normalize_candidates
 from epi.paper_gate import build_paper_gate, render_paper_gate
 from epi.paper_library import load_existing_paper_index
 from epi.paper_search_adapter import discover
 from epi.promote_to_wiki import promote_paper, rollback_promotion
+from epi.query_planner import build_query_plan
 from epi.rank_papers import rank_candidates
 from epi.redo import redo_acquire, redo_parse, redo_read, redo_read_recritic, recritic
 from epi.report_run import write_report
@@ -68,6 +69,120 @@ def _new_run_dir(vault_path: Path, prefix: str | None = None) -> tuple[str, Path
     run_dir = runs_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
     return run_id, run_dir
+
+
+def _build_dry_run_query_plan(query: str, *, domain: str, max_queries: int) -> dict:
+    return build_query_plan(
+        topic=query,
+        domain=domain,
+        max_queries=max(1, max_queries),
+    )
+
+
+def _annotate_query_records(records: list[dict], *, query_variant: str, query_variant_index: int) -> list[dict]:
+    annotated: list[dict] = []
+    for record in records:
+        enriched = dict(record)
+        enriched["query_variant"] = query_variant
+        enriched["query_variant_index"] = query_variant_index
+        annotated.append(enriched)
+    return annotated
+
+
+def _merged_source_mode(query_records: list[dict]) -> str:
+    modes = sorted({str(record.get("source_mode") or "unknown") for record in query_records})
+    if not modes:
+        return "query_plan_multi_query"
+    if len(modes) == 1:
+        return modes[0]
+    return "query_plan_mixed"
+
+
+def _run_query_plan_discovery(
+    *,
+    query: str,
+    query_plan: dict | None,
+    max_results: int,
+    fixture_path: Path | None,
+    command: str | None,
+    sources: list[str],
+    run_dir: Path,
+) -> dict:
+    if fixture_path is not None or not query_plan:
+        search_record = discover(
+            query=query,
+            max_results=max_results,
+            fixture_path=fixture_path,
+            command=command,
+            sources=sources,
+            raw_response_path=run_dir / "paper-search-raw.json",
+        )
+        if query_plan:
+            search_record["query_plan"] = query_plan
+            search_record["query_strategy"] = "fixture_single_query" if fixture_path is not None else "single_query"
+        return search_record
+
+    query_variants = query_plan.get("query_variants") or [query]
+    query_records: list[dict] = []
+    combined_records: list[dict] = []
+    query_errors: list[str] = []
+    for index, query_variant in enumerate(query_variants, start=1):
+        raw_path = run_dir / f"paper-search-raw-{index:02d}.json"
+        search_record = discover(
+            query=query_variant,
+            max_results=max_results,
+            fixture_path=None,
+            command=command,
+            sources=sources,
+            raw_response_path=raw_path,
+        )
+        if search_record.get("error"):
+            query_errors.append(f"{query_variant}: {search_record['error']}")
+        query_records.append(
+            {
+                "index": index,
+                "query": query_variant,
+                "source_mode": search_record.get("source_mode"),
+                "record_count": len(search_record.get("records") or []),
+                "raw_response_path": search_record.get("raw_response_path"),
+                "error": search_record.get("error"),
+                "upstream": search_record.get("upstream", {}),
+            }
+        )
+        combined_records.extend(
+            _annotate_query_records(
+                search_record.get("records") or [],
+                query_variant=query_variant,
+                query_variant_index=index,
+            )
+        )
+
+    aggregate_raw_path = run_dir / "paper-search-raw.json"
+    _write_json(
+        aggregate_raw_path,
+        {
+            "query": query,
+            "query_strategy": "query_plan_multi_query",
+            "query_plan": query_plan,
+            "query_records": query_records,
+            "raw_candidate_count": len(combined_records),
+        },
+    )
+    combined = {
+        "query": query,
+        "max_results": max_results,
+        "source_mode": _merged_source_mode(query_records),
+        "query_strategy": "query_plan_multi_query",
+        "query_plan": query_plan,
+        "query_records": query_records,
+        "raw_response_path": str(aggregate_raw_path),
+        "records": combined_records,
+    }
+    if query_errors and not combined_records:
+        combined["error"] = "; ".join(query_errors)
+    elif query_errors:
+        combined["warnings"] = query_errors
+    return combined
 
 
 def _append_report_sections(
@@ -525,6 +640,9 @@ def run_dry_run(
     fixture_path: Path | None = None,
     paper_search_command: str | None = None,
     sources: list[str] | None = None,
+    use_query_plan: bool = True,
+    query_plan_domain: str = "auto",
+    query_plan_max_queries: int = 6,
 ) -> Path:
     config = load_config(plugin_root=plugin_root, vault_path=vault_path, max_results=max_results)
     configured_paper_search_command = (
@@ -534,6 +652,13 @@ def run_dry_run(
     effective_sources = sources or config.paper_search_sources
     run_id, run_dir = _new_run_dir(config.vault_path)
     started_at = utc_now()
+    query_plan = (
+        _build_dry_run_query_plan(query, domain=query_plan_domain, max_queries=query_plan_max_queries)
+        if use_query_plan
+        else None
+    )
+    if query_plan:
+        _write_json(run_dir / "query-plan.json", query_plan)
 
     state = {
         "stage": "paper-discovery-dry-run",
@@ -543,6 +668,7 @@ def run_dry_run(
         "status": "running",
         "dry_run": True,
         "query": query,
+        "query_strategy": "query_plan_multi_query" if query_plan and fixture_path is None else "single_query",
         "profile": config.profile,
         "vault_path": str(config.vault_path),
         "started_at": started_at,
@@ -555,15 +681,22 @@ def run_dry_run(
             "report_run",
         ),
     }
+    if query_plan:
+        state["query_plan"] = {
+            "domain": query_plan.get("domain"),
+            "query_variant_count": len(query_plan.get("query_variants") or []),
+            "path": str(run_dir / "query-plan.json"),
+        }
     _write_json(run_dir / "run-state.json", state)
 
-    search_record = discover(
+    search_record = _run_query_plan_discovery(
         query=query,
+        query_plan=query_plan,
         max_results=config.max_results,
         fixture_path=fixture_path,
         command=effective_paper_search_command,
         sources=effective_sources,
-        raw_response_path=run_dir / "paper-search-raw.json",
+        run_dir=run_dir,
     )
     _write_json(run_dir / "search-record.json", search_record)
     state["state"] = "discovered"
@@ -574,7 +707,7 @@ def run_dry_run(
     state["state"] = "normalized"
     _write_json(run_dir / "run-state.json", state)
 
-    query_exclude_terms = exclusion_terms_from_query(query)
+    query_exclude_terms = default_discovery_exclusion_terms(query)
     existing_library_index = load_existing_paper_index(config.vault_path)
     filter_report = filter_candidates_with_report(
         normalized,
@@ -593,7 +726,7 @@ def run_dry_run(
     state["state"] = "filtered"
     _write_json(run_dir / "run-state.json", state)
 
-    ranked = rank_candidates(
+    ranked_pool = rank_candidates(
         filtered,
         positive_keywords=(
             config.positive_keywords
@@ -602,6 +735,7 @@ def run_dry_run(
         negative_keywords=config.negative_keywords,
         venue_tiers={"icra": 1.0, "iros": 0.95, "rss": 1.0, "corl": 0.98, "neurips": 1.0, "iclr": 1.0, "icml": 1.0},
     )
+    ranked = ranked_pool[: config.max_results]
     _write_json(run_dir / "rank.json", ranked)
     state["state"] = "ranked"
     _write_json(run_dir / "run-state.json", state)
@@ -609,9 +743,28 @@ def run_dry_run(
     errors = [search_record["error"]] if search_record.get("error") else []
     budget_usage = {
         "max_results": config.max_results,
+        "raw_candidate_pool_count": len(search_record.get("records", [])),
         "discovered_count": len(normalized),
+        "filtered_candidate_pool_count": len(filtered),
+        "ranked_candidate_pool_count": len(ranked_pool),
         "accepted_count": len(ranked),
         "rejected_count": len(rejected),
+    }
+    if query_plan:
+        budget_usage["query_variant_count"] = len(query_plan.get("query_variants") or [])
+    discovery_context = {
+        "query_strategy": search_record.get("query_strategy", state.get("query_strategy")),
+        "query_plan": query_plan or {},
+        "candidate_pool": {
+            "raw": len(search_record.get("records", [])),
+            "normalized": len(normalized),
+            "filtered": len(filtered),
+            "ranked": len(ranked_pool),
+            "accepted": len(ranked),
+            "rejected": len(rejected),
+        },
+        "query_records": search_record.get("query_records", []),
+        "warnings": search_record.get("warnings", []),
     }
     next_actions = ["Review accepted dry-run candidates before advancing ranked papers."]
     if rejected:
@@ -631,6 +784,7 @@ def run_dry_run(
         wiki_pages_written=[],
         zotero_results={"status": "not_run", "records": []},
         next_actions=next_actions,
+        discovery_context=discovery_context,
     )
     state["state"] = "reported"
     state["status"] = "failed" if errors else "success"
@@ -643,6 +797,7 @@ def run_dry_run(
                 "max_results": config.max_results,
                 "sources": effective_sources,
                 "profile": config.profile,
+                "query_plan": query_plan,
             }
         )
     }
@@ -657,6 +812,7 @@ def run_dry_run(
             "rank.json": run_dir / "rank.json",
             "report.md": run_dir / "report.md",
             "paper-search-raw.json": run_dir / "paper-search-raw.json",
+            "query-plan.json": run_dir / "query-plan.json",
         }
     )
     _write_json(run_dir / "run-state.json", state)

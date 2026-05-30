@@ -11,6 +11,21 @@ DOCUMENT_TYPE_EXCLUSION_TERMS = {
     "meta": ("meta-analysis", "meta analysis"),
 }
 
+REVIEW_REQUEST_PHRASES = (
+    "review paper",
+    "review papers",
+    "survey paper",
+    "survey papers",
+    "systematic review",
+    "literature review",
+    "meta-analysis",
+    "meta analysis",
+    "state-of-the-art review",
+    "综述",
+    "文献综述",
+    "调研论文",
+)
+
 
 def exclusion_terms_from_query(query: str) -> list[str]:
     query_lower = query.lower()
@@ -32,6 +47,21 @@ def exclusion_terms_from_query(query: str) -> list[str]:
     for key in ("review", "survey", "meta"):
         if key in requested:
             terms.extend(DOCUMENT_TYPE_EXCLUSION_TERMS[key])
+    return terms
+
+
+def default_discovery_exclusion_terms(query: str) -> list[str]:
+    requested_terms = exclusion_terms_from_query(query)
+    if requested_terms:
+        return requested_terms
+
+    query_lower = query.lower()
+    if any(phrase in query_lower for phrase in REVIEW_REQUEST_PHRASES):
+        return []
+
+    terms: list[str] = []
+    for key in ("review", "survey", "meta"):
+        terms.extend(DOCUMENT_TYPE_EXCLUSION_TERMS[key])
     return terms
 
 

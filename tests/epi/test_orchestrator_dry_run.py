@@ -90,12 +90,14 @@ def test_dry_run_writes_phase_1_artifacts(tmp_path):
     )
 
     assert (run_dir / "run-state.json").is_file()
+    assert (run_dir / "query-plan.json").is_file()
     assert (run_dir / "search-record.json").is_file()
     assert (run_dir / "normalized.json").is_file()
     assert (run_dir / "filter-report.json").is_file()
     assert (run_dir / "rank.json").is_file()
     assert (run_dir / "report.md").is_file()
     state = json.loads((run_dir / "run-state.json").read_text(encoding="utf-8"))
+    query_plan = json.loads((run_dir / "query-plan.json").read_text(encoding="utf-8"))
     ranked = json.loads((run_dir / "rank.json").read_text(encoding="utf-8"))
     report = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
     report_md = (run_dir / "report.md").read_text(encoding="utf-8")
@@ -106,6 +108,13 @@ def test_dry_run_writes_phase_1_artifacts(tmp_path):
     assert state["state"] == "reported"
     assert state["status"] == "success"
     assert state["dry_run"] is True
+    assert state["query_strategy"] == "single_query"
+    assert state["query_plan"]["domain"] == "general-robotics"
+    assert query_plan["workflow"] == "epi-query-plan"
+    assert query_plan["domain"] == "general-robotics"
+    assert all("-review -survey" in query for query in query_plan["query_variants"])
+    assert report["discovery_context"]["query_plan"]["domain"] == "general-robotics"
+    assert report["discovery_context"]["candidate_pool"]["raw"] == 2
     assert state["started_at"]
     assert state["finished_at"]
     assert state["exit_status"] == 0
@@ -141,7 +150,9 @@ def test_dry_run_writes_phase_1_artifacts(tmp_path):
     assert report["quarantined"] == []
     assert report["critic_failures"] == []
     assert report["budget_usage"]["max_results"] == 5
+    assert report["budget_usage"]["raw_candidate_pool_count"] == 2
     assert report["budget_usage"]["discovered_count"] == 2
+    assert report["budget_usage"]["query_variant_count"] == len(query_plan["query_variants"])
     assert report["wiki_pages_written"] == []
     assert report["zotero_results"]["status"] == "not_run"
     assert report["next_actions"] == [
@@ -156,6 +167,173 @@ def test_dry_run_writes_phase_1_artifacts(tmp_path):
     assert index_payload["runs"][0]["workflow_type"] == "paper-discovery-dry-run"
     assert run_dir.name in dashboard_text
     assert sorted(path.name for path in (tmp_path / "vault").iterdir()) == ["_runs"]
+
+
+def test_dry_run_query_plan_searches_variants_and_merges_candidate_pool(tmp_path):
+    plugin_root = tmp_path / "plugin"
+    _write_minimal_plugin_template(plugin_root)
+    fake_command = tmp_path / "planned-paper-search.ps1"
+    args_path = tmp_path / "planned-args.jsonl"
+    fake_command.write_text(
+        "$args_json = $args | ConvertTo-Json -Compress\n"
+        "Add-Content -Encoding UTF8 -LiteralPath "
+        f"{json.dumps(str(args_path))} "
+        "-Value $args_json\n"
+        "if ($args -contains '--version') { Write-Output 'paper-search 0.1.4'; exit 0 }\n"
+        "$query = $args[1]\n"
+        "$safe = ($query -replace '\"','')\n"
+        "$payload = [ordered]@{\n"
+        "  query = $query\n"
+        "  sources_used = @('arxiv')\n"
+        "  source_results = @{ arxiv = 1 }\n"
+        "  errors = @{}\n"
+        "  total = 1\n"
+        "  papers = @(@{\n"
+        "    paper_id = [Math]::Abs($safe.GetHashCode()).ToString()\n"
+        "    title = \"AUV RL Control $([Math]::Abs($safe.GetHashCode()).ToString())\"\n"
+        "    authors = 'A. Researcher'\n"
+        "    abstract = 'AUV reinforcement learning control with ocean current and real AUV evidence.'\n"
+        "    doi = ''\n"
+        "    published_date = '2025-01-02T00:00:00'\n"
+        "    pdf_url = 'https://example.org/paper.pdf'\n"
+        "    url = 'https://example.org/paper'\n"
+        "    source = 'arxiv'\n"
+        "    citations = 3\n"
+        "    extra = @{}\n"
+        "  })\n"
+        "}\n"
+        "$payload | ConvertTo-Json -Depth 8 | Write-Output\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+
+    run_dir = run_dry_run(
+        plugin_root=plugin_root,
+        vault_path=tmp_path / "vault",
+        query="latest high quality AUV reinforcement learning control papers not review",
+        max_results=3,
+        paper_search_command=str(fake_command),
+        sources=["arxiv"],
+        query_plan_domain="auv-control",
+        query_plan_max_queries=4,
+    )
+
+    search_record = json.loads((run_dir / "search-record.json").read_text(encoding="utf-8"))
+    query_plan = json.loads((run_dir / "query-plan.json").read_text(encoding="utf-8"))
+    normalized = json.loads((run_dir / "normalized.json").read_text(encoding="utf-8"))
+    ranked = json.loads((run_dir / "rank.json").read_text(encoding="utf-8"))
+    report = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
+    invoked = [
+        json.loads(line)
+        for line in args_path.read_text(encoding="utf-8-sig").splitlines()
+        if line.strip()
+    ]
+
+    search_invocations = [args for args in invoked if args and args[0] == "search"]
+    assert search_record["query_strategy"] == "query_plan_multi_query"
+    assert search_record["query_plan"]["domain"] == "auv-control"
+    assert len(search_record["query_records"]) == 4
+    assert len(search_invocations) == 4
+    assert all("-review -survey" in args[1] for args in search_invocations)
+    assert query_plan["query_variants"][0] == search_invocations[0][1]
+    assert len(search_record["records"]) == 4
+    assert all("query_variant" in record for record in search_record["records"])
+    assert len(normalized) == 4
+    assert len(ranked) == 3
+    assert report["budget_usage"]["raw_candidate_pool_count"] == 4
+    assert report["budget_usage"]["ranked_candidate_pool_count"] == 4
+    assert report["budget_usage"]["accepted_count"] == 3
+    assert report["discovery_context"]["query_strategy"] == "query_plan_multi_query"
+    assert report["discovery_context"]["candidate_pool"]["accepted"] == 3
+    assert (run_dir / "paper-search-raw-01.json").is_file()
+    assert (run_dir / "paper-search-raw.json").is_file()
+
+
+def test_dry_run_keeps_review_query_when_user_explicitly_requests_reviews(tmp_path):
+    plugin_root = tmp_path / "plugin"
+    _write_minimal_plugin_template(plugin_root)
+    fixture = tmp_path / "fixture.json"
+    fixture.write_text(
+        json.dumps(
+            [
+                {
+                    "source": "fixture",
+                    "title": "AUV Reinforcement Learning Control: A Systematic Review",
+                    "authors": ["B. Engineer"],
+                    "year": 2025,
+                    "venue": "Ocean Engineering",
+                    "abstract": "This systematic review surveys AUV reinforcement learning control.",
+                    "pdf_url": "https://example.org/review.pdf",
+                    "citation_count": 9,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    run_dir = run_dry_run(
+        plugin_root=plugin_root,
+        vault_path=tmp_path / "vault",
+        query="latest survey papers about AUV reinforcement learning control",
+        max_results=5,
+        fixture_path=fixture,
+    )
+
+    query_plan = json.loads((run_dir / "query-plan.json").read_text(encoding="utf-8"))
+    filter_report = json.loads((run_dir / "filter-report.json").read_text(encoding="utf-8"))
+
+    assert all("-review -survey" not in query for query in query_plan["query_variants"])
+    assert filter_report["kept"][0]["title"] == "AUV Reinforcement Learning Control: A Systematic Review"
+    assert filter_report["rejected"] == []
+
+
+def test_dry_run_can_disable_query_plan_for_single_search(tmp_path):
+    plugin_root = tmp_path / "plugin"
+    _write_minimal_plugin_template(plugin_root)
+    fake_command = _write_fake_paper_search(
+        tmp_path,
+        {
+            "query": "robotics control",
+            "sources_used": ["arxiv"],
+            "source_results": {"arxiv": 1},
+            "errors": {},
+            "total": 1,
+            "papers": [
+                {
+                    "paper_id": "2401.12345",
+                    "title": "Embodied Control for Robots",
+                    "authors": "A. Researcher",
+                    "abstract": "Robotics control.",
+                    "published_date": "2025-01-02T00:00:00",
+                    "pdf_url": "https://arxiv.org/pdf/2401.12345",
+                    "url": "https://arxiv.org/abs/2401.12345",
+                    "source": "arxiv",
+                    "citations": 3,
+                    "extra": {},
+                }
+            ],
+        },
+    )
+
+    run_dir = run_dry_run(
+        plugin_root=plugin_root,
+        vault_path=tmp_path / "vault",
+        query="robotics control",
+        max_results=2,
+        paper_search_command=fake_command,
+        sources=["arxiv"],
+        use_query_plan=False,
+    )
+
+    search_record = json.loads((run_dir / "search-record.json").read_text(encoding="utf-8"))
+    state = json.loads((run_dir / "run-state.json").read_text(encoding="utf-8"))
+    report = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
+
+    assert not (run_dir / "query-plan.json").exists()
+    assert search_record["source_mode"] == "paper_search_cli"
+    assert "query_plan" not in search_record
+    assert state["query_strategy"] == "single_query"
+    assert report["discovery_context"]["query_plan"] == {}
 
 
 def test_dry_run_live_search_preserves_raw_upstream_response(tmp_path):
@@ -194,6 +372,7 @@ def test_dry_run_live_search_preserves_raw_upstream_response(tmp_path):
         max_results=2,
         paper_search_command=fake_command,
         sources=["arxiv"],
+        use_query_plan=False,
     )
 
     raw_response = run_dir / "paper-search-raw.json"
@@ -268,6 +447,7 @@ def test_dry_run_uses_configured_paper_search_command_and_sources(tmp_path):
         max_results=None,
         paper_search_command=None,
         sources=None,
+        use_query_plan=False,
     )
 
     search_record = json.loads((run_dir / "search-record.json").read_text(encoding="utf-8"))
@@ -337,6 +517,7 @@ def test_dry_run_keeps_environment_command_override_for_default_config_command(t
         max_results=None,
         paper_search_command=None,
         sources=None,
+        use_query_plan=False,
     )
 
     search_record = json.loads((run_dir / "search-record.json").read_text(encoding="utf-8"))

@@ -1,6 +1,39 @@
 from epi.cli import build_parser
 
 
+def test_dry_run_parser_defaults_to_query_plan_and_accepts_overrides():
+    args = build_parser().parse_args(
+        [
+            "dry-run",
+            "--query",
+            "AUV reinforcement learning control",
+            "--query-plan-domain",
+            "auv-control",
+            "--query-plan-max-queries",
+            "8",
+        ]
+    )
+
+    assert args.command == "dry-run"
+    assert args.no_query_plan is False
+    assert args.query_plan_domain == "auv-control"
+    assert args.query_plan_max_queries == 8
+
+
+def test_dry_run_parser_accepts_no_query_plan_fallback():
+    args = build_parser().parse_args(
+        [
+            "dry-run",
+            "--query",
+            "robotics control",
+            "--no-query-plan",
+        ]
+    )
+
+    assert args.command == "dry-run"
+    assert args.no_query_plan is True
+
+
 def test_advance_ranked_parser_accepts_include_review_candidates():
     args = build_parser().parse_args(
         [

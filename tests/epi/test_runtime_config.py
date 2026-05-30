@@ -186,6 +186,7 @@ def test_dry_run_uses_runtime_configured_cli_fallback(tmp_path, monkeypatch):
         max_results=None,
         paper_search_command=None,
         sources=["arxiv"],
+        use_query_plan=False,
     )
 
     search_record = json.loads((run_dir / "search-record.json").read_text(encoding="utf-8"))

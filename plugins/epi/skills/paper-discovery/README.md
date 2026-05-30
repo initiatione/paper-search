@@ -50,12 +50,14 @@ paper-discovery/
 ## 常用命令
 
 ```powershell
-python skills\paper-discovery\scripts\query-planner.py --topic "<topic>" --domain auto --non-review --max-queries 8
+python skills\paper-discovery\scripts\query-planner.py --topic "<topic>" --domain auto --max-queries 8
+python skills\paper-discovery\scripts\query-planner.py --topic "<review topic>" --domain auto --include-reviews --max-queries 8
 python scripts\orchestrator.py dry-run --query "<topic>" --max-results 10 --sources arxiv,semantic,openalex --plugin-root <plugin-root> --vault <vault>
+python scripts\orchestrator.py dry-run --query "<topic>" --no-query-plan --max-results 10 --plugin-root <plugin-root> --vault <vault>
 python scripts\orchestrator.py prepare-ranked --run-id <run-id> --max-papers 1 --vault <vault>
 ```
 
-`query-planner.py` 不访问网络，只把用户主题转换成可审计的检索计划。`dry-run` 只写 `_runs`。`prepare-ranked` 只写 `_raw/papers/<slug>`，完成 PDF 下载和 MinerU 解析后停止。
+`query-planner.py` 不访问网络，只把用户主题转换成可审计的检索计划。默认 `dry-run` 会生成 `_runs/<run-id>/query-plan.json`，并按 query variants 多次搜索形成 candidate pool；默认排除 review/survey/meta 类综述候选，用户明确找综述时才放开；`--no-query-plan` 才退回单 query 搜索。`dry-run` 只写 `_runs`。`prepare-ranked` 只写 `_raw/papers/<slug>`，完成 PDF 下载和 MinerU 解析后停止。
 
 ## 参考来源
 

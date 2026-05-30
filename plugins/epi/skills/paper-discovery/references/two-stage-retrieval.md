@@ -17,6 +17,8 @@ Suggested pool size:
 - High-quality/latest search: 80-150 raw candidates if source limits allow.
 - User asks for 10 papers: still build a larger pool, then rank down to kept papers.
 
+EPI `dry-run` now performs this by default: it writes `query-plan.json`, searches each query variant, stores per-variant evidence in `search-record.json.query_records`, and then sends the merged raw candidate pool through normalization, filtering, and ranking. Discovery excludes review/survey/meta candidates by default; keep reviews only when the user explicitly asks for review or survey papers. Use `--no-query-plan` only when debugging one raw search query.
+
 ## Stage 2: Precision Filtering And Ranking
 
 Filter and rank after the pool exists:

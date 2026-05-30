@@ -127,6 +127,7 @@ def write_report(
     research_decisions: list[dict] | None = None,
     reader_revision_plans: list[dict] | None = None,
     reproduction_plans: list[dict] | None = None,
+    discovery_context: dict | None = None,
 ) -> None:
     rejected = rejected or []
     quarantined = quarantined or []
@@ -143,6 +144,7 @@ def write_report(
     research_decisions = research_decisions or []
     reader_revision_plans = reader_revision_plans or []
     reproduction_plans = reproduction_plans or []
+    discovery_context = discovery_context or {}
     research_queue = _research_queue(ranked)
 
     if workflow_type in {"dry-run", "paper-discovery-dry-run"}:
@@ -158,6 +160,23 @@ def write_report(
             report.append("## Budget Usage")
             for key, value in budget_usage.items():
                 report.append(f"- {key}: {value}")
+        if discovery_context:
+            report.append("")
+            report.append("## Discovery Context")
+            query_plan = discovery_context.get("query_plan") or {}
+            if query_plan:
+                report.append(f"- query_strategy: {discovery_context.get('query_strategy')}")
+                report.append(f"- query_plan.domain: {query_plan.get('domain')}")
+                report.append(f"- query_plan.variants: {len(query_plan.get('query_variants') or [])}")
+            candidate_pool = discovery_context.get("candidate_pool") or {}
+            if candidate_pool:
+                report.append(
+                    "- candidate_pool: "
+                    + ", ".join(f"{key}={value}" for key, value in candidate_pool.items())
+                )
+            query_records = discovery_context.get("query_records") or []
+            if query_records:
+                report.append(f"- query_records: {len(query_records)}")
         report.append("")
         report.append("## Next Actions")
         if next_actions:
@@ -286,6 +305,7 @@ def write_report(
             "research_decisions": research_decisions,
             "reader_revision_plans": reader_revision_plans,
             "reproduction_plans": reproduction_plans,
+            "discovery_context": discovery_context,
             "research_queue": research_queue,
             "accepted_count": len(ranked),
             "errors": errors,

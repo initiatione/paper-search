@@ -152,6 +152,7 @@ def test_paper_discovery_skill_defines_stronger_high_quality_search_protocol():
     discovery = _read(SKILL_DIR / "paper-discovery" / "SKILL.md")
 
     assert "query-planner.py" in discovery
+    assert "--no-query-plan" in discovery
     assert "references/query-planner.md" in discovery
     assert "references/domain-ontology.md" in discovery
     assert "references/search-protocol.md" in discovery
@@ -207,6 +208,7 @@ def test_paper_discovery_reference_files_exist_and_hold_split_protocol():
     assert "Zhihu" in venue_prior
     assert "Ocean Engineering" in venue_prior
     assert "High Recall Candidate Pool" in two_stage
+    assert "query-plan.json" in two_stage
     assert "precision_at_10" in evaluation_set
     assert "recent cited-by" in citation_graph
     assert "query_plan" in workflow
@@ -216,6 +218,7 @@ def test_paper_discovery_reference_files_exist_and_hold_split_protocol():
     assert "venue-prior.md" in quality_gate
     assert "recall gap" in quality_gate
     assert "推荐优先看" in output_format
+    assert "query_plan_multi_query" in output_format
     assert "venue prior" in output_format
     assert "citation graph expansion" in output_format
     assert "EPI 实测证据" in output_format

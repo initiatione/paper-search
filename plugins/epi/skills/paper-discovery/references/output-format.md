@@ -19,6 +19,7 @@ Then add `EPI 实测证据` with:
 
 - run path
 - `source_mode`
+- query strategy: `query_plan_multi_query`, `single_query`, or fixture mode
 - query plan summary: domain, concept blocks, query variants
 - candidate pool size before/after dedup/filter when available
 - accepted/rejected counts

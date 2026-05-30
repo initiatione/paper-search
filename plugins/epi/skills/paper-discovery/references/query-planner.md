@@ -18,7 +18,8 @@ Use the query planner before the first search whenever the user asks for high-qu
 The bundled helper is deterministic and network-free:
 
 ```powershell
-python skills\paper-discovery\scripts\query-planner.py --topic "<topic>" --domain auto --non-review --max-queries 8
+python skills\paper-discovery\scripts\query-planner.py --topic "<topic>" --domain auto --max-queries 8
+python skills\paper-discovery\scripts\query-planner.py --topic "<review topic>" --domain auto --include-reviews --max-queries 8
 ```
 
 Use it when the user gives a compact request such as `最新 AUV RL control 论文，不要综述`. The helper output is a starting point; agent judgment still decides whether to add task-specific terms.
@@ -28,7 +29,7 @@ Use it when the user gives a compact request such as `最新 AUV RL control 论�
 1. Prefer domain-specific synonyms over generic AI terms.
 2. Generate both broad and narrow queries: broad queries catch recall, narrow queries catch precision.
 3. Include evidence terms such as `field trial`, `sea trial`, `real robot`, `sim-to-real`, `safety`, `benchmark`, or `code` when the user asks for high quality.
-4. For non-review requests, append `-review -survey` to every query and still enforce review exclusion in filtering.
+4. Default discovery is non-review: append `-review -survey` to every query and still enforce review exclusion in filtering. Skip this only when the user explicitly asks for review or survey papers.
 5. If the plan produces fewer than 5 strong variants, broaden platform or method terms before broadening the whole topic.
 
 ## AUV Example

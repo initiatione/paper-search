@@ -25,10 +25,14 @@ The full EPI chain stays documented in `docs\epi-linkage.md`. If setup is unclea
 
 ```powershell
 python scripts\orchestrator.py doctor --plugin-root <plugin-root> --vault <vault> --json
-python skills\paper-discovery\scripts\query-planner.py --topic "<topic>" --domain auto --non-review --max-queries 8
+python skills\paper-discovery\scripts\query-planner.py --topic "<topic>" --domain auto --max-queries 8
+python skills\paper-discovery\scripts\query-planner.py --topic "<review topic>" --domain auto --include-reviews --max-queries 8
 python scripts\orchestrator.py dry-run --query "<topic>" --max-results 10 --sources arxiv,semantic,openalex --plugin-root <plugin-root> --vault <vault>
+python scripts\orchestrator.py dry-run --query "<topic>" --no-query-plan --max-results 10 --plugin-root <plugin-root> --vault <vault>
 python scripts\orchestrator.py prepare-ranked --run-id <run-id> --max-papers 1 --vault <vault>
 ```
+
+Default `dry-run` writes `query-plan.json`, searches query variants, and excludes review/survey/meta candidates before dedup/filter/rank. If the user explicitly asks for reviews or surveys, keep that intent and do not force non-review exclusions. Use `--no-query-plan` only for debugging a single raw search query.
 
 `prepare-ranked` downloads selected ranked papers and parses them with MinerU, then stops after `_raw\papers\<slug>\mineru\...`. It must not generate reader, critic, staging, Zotero, or final wiki outputs. Verify evidence with `search-record.json`, `acquire-record.json`, `parse-record.json`, `paper.pdf`, `mineru\paper.md`, `mineru\paper.tex`, `mineru\images`, and `mineru\mineru-manifest.json`.
 
