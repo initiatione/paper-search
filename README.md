@@ -45,7 +45,7 @@ If `doctor` reports `epi_config: warning`, run `config-status` and complete the 
 ## Plugins
 
 - `epi`: Engineering Paper Intelligence. Searches, ranks, preserves, parses, reviews, and promotes engineering papers into a dedicated paper research wiki.
-- `mineru-paper-parser`: Local MinerU precise-batch paper parser used as a lower-level parsing capability.
+- `mineru-paper-parser`: Local MinerU precise-batch parser used internally by EPI as a helper capability, not as a separate marketplace plugin.
 
 ## Local Development
 
@@ -67,6 +67,8 @@ python -m coverage xml -o plugins\epi\coverage\coverage.xml
 ```
 
 EPI's source-of-truth chain document is `plugins\epi\docs\epi-linkage.md`. Every plugin change or optimization must check and update that document so the implementation stays aligned with the intended chain: high-quality paper collection -> Obsidian/LLM Wiki knowledge deposition -> low-burden reading report.
+
+MinerU parsing is part of the EPI pipeline, but the marketplace now exposes it only through the EPI plugin path rather than as a separate installable plugin.
 
 For an installed or source checkout, the current handoff flow is:
 
