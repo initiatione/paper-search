@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 
+from epi.paper_library import existing_library_match
+
 
 DOCUMENT_TYPE_EXCLUSION_TERMS = {
     "review": ("review", "review paper", "systematic review", "literature review"),
@@ -38,6 +40,7 @@ def filter_candidates_with_report(
     domains: list[str],
     require_pdf: bool,
     exclude_terms: list[str] | None = None,
+    existing_library_index: dict | None = None,
 ) -> dict[str, list[dict]]:
     kept: list[dict] = []
     rejected: list[dict] = []
@@ -57,11 +60,16 @@ def filter_candidates_with_report(
         matched_excluded_terms = [term for term in excluded if term in haystack]
         if matched_excluded_terms:
             reasons.append("excluded_terms:" + ",".join(matched_excluded_terms))
+        library_match = existing_library_match(candidate, existing_library_index)
+        if library_match:
+            reasons.append(f"already_in_library:{library_match.get('slug')}")
         if domain_terms and not any(term in haystack for term in domain_terms):
             robotics_terms = ["robot", "humanoid", "control", "navigation", "embodied"]
             if not any(term in haystack for term in robotics_terms):
                 reasons.append("outside_domain")
         filtered = dict(candidate)
+        if library_match:
+            filtered["existing_library_match"] = library_match
         filtered["filter_reasons"] = reasons
         filtered["filter_status"] = "rejected" if reasons else "kept"
         if reasons:
@@ -76,10 +84,12 @@ def filter_candidates(
     domains: list[str],
     require_pdf: bool,
     exclude_terms: list[str] | None = None,
+    existing_library_index: dict | None = None,
 ) -> list[dict]:
     return filter_candidates_with_report(
         candidates,
         domains=domains,
         require_pdf=require_pdf,
         exclude_terms=exclude_terms,
+        existing_library_index=existing_library_index,
     )["kept"]

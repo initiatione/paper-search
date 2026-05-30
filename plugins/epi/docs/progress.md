@@ -27,6 +27,7 @@ EPI 当前聚焦“高质量论文收集和整理 -> Obsidian/LLM Wiki 知识沉
 - Legacy promotion：`promote-to-wiki` 和 `rollback-promotion` 只保留旧 compiled-draft 路径，带路径安全限制和人工确认。
 - Self-evolution：`propose-evolution`、`activate-evolution`、`evolution-query` 已采用 proposal-based、human approval、validation gate 和 metric comparison。
 - 查询与维护：`runs-query`、`research-queue`、`wiki-query` 支持状态查询；redo/recritic 支持阶段性修复但不绕过 critic gate。
+- 过渡态生命周期：`run-lifecycle` 支持 `_runs` 单次 run 目录 dry-run/apply 清理，保留面板文件并写 `_meta/run-lifecycle` manifest；发现阶段会和 `_raw/papers` 已下载论文按 DOI/arXiv/title 去重，避免重复推荐。
 
 ## 本轮相关变更范围
 

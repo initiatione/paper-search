@@ -1,11 +1,15 @@
 import json
+import shutil
 from pathlib import Path
 from collections import Counter
+from datetime import datetime, timedelta, timezone
 
 from epi.paper_gate import build_paper_gate
 
 
 _SUCCESS_STATUSES = {"success", "succeeded", "waiting_for_human_gate"}
+_TERMINAL_CLEANUP_STATUSES = {"success", "succeeded", "skipped", "neutral"}
+_PROTECTED_CLEANUP_STATUSES = {"running", "waiting_for_human_gate"}
 _HUMAN_GATE_PENDING = {"pending", "required"}
 _RESEARCH_QUEUE_BUCKETS = [
     "ready_to_promote",
@@ -23,6 +27,10 @@ _ROLE_DISPLAY_NAMES = {
 
 def _runs_root(vault_path):
     return Path(vault_path) / "_runs"
+
+
+def _lifecycle_root(vault_path):
+    return Path(vault_path) / "_meta" / "run-lifecycle"
 
 
 def _load_json(path):
@@ -241,6 +249,24 @@ def _is_ready_to_promote(entry):
         action in {"promote-to-wiki", "promote-after-approval", "run-wiki-ingest-agent"}
         for action in _next_actions(entry)
     )
+
+
+def _parse_dt(value):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _entry_time(entry):
+    parsed = _parse_dt(entry.get("finished_at")) or _parse_dt(entry.get("started_at"))
+    if parsed is None:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def _build_research_queue(entries, vault_path):
@@ -791,6 +817,146 @@ def refresh_run_index(vault_path):
         encoding="utf-8",
     )
     return index_payload
+
+
+def _write_lifecycle_manifest(vault_path, manifest):
+    lifecycle_root = _lifecycle_root(vault_path)
+    lifecycle_root.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    path = lifecycle_root / f"{timestamp}-run-lifecycle.json"
+    _write_json(path, manifest)
+    return path
+
+
+def prune_run_lifecycle(
+    vault_path,
+    *,
+    keep_latest=30,
+    keep_per_workflow=2,
+    max_age_days=None,
+    apply=False,
+):
+    runs_root = _runs_root(vault_path)
+    runs_root.mkdir(parents=True, exist_ok=True)
+
+    entries = []
+    skipped = []
+    for child in runs_root.iterdir():
+        if not child.is_dir():
+            continue
+        entry = _normalize_run_entry(child)
+        if entry is None:
+            skipped.append({"run_id": child.name, "reason": "missing_or_invalid_run_state"})
+            continue
+        entry = dict(entry)
+        entry["path"] = str(child)
+        entries.append(entry)
+
+    entries.sort(key=_sort_key, reverse=True)
+    cleanup_eligible_entries = [
+        entry
+        for entry in entries
+        if entry.get("status", "unknown") in _TERMINAL_CLEANUP_STATUSES
+        and _human_gate_status(entry) not in _HUMAN_GATE_PENDING
+    ]
+    protected_ids = {entry["run_id"] for entry in cleanup_eligible_entries[: max(0, keep_latest)]}
+    by_workflow = {}
+    for entry in cleanup_eligible_entries:
+        by_workflow.setdefault(entry.get("workflow_type", "unknown"), []).append(entry)
+    for workflow_entries in by_workflow.values():
+        protected_ids.update(entry["run_id"] for entry in workflow_entries[: max(0, keep_per_workflow)])
+
+    cutoff = None
+    if max_age_days is not None:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+
+    candidates = []
+    protected = []
+    for entry in entries:
+        run_id = entry["run_id"]
+        status = entry.get("status", "unknown")
+        if status in _PROTECTED_CLEANUP_STATUSES or _human_gate_status(entry) in _HUMAN_GATE_PENDING:
+            protected.append({"run_id": run_id, "reason": "active_or_human_gate_pending"})
+            continue
+        if status not in _TERMINAL_CLEANUP_STATUSES:
+            protected.append({"run_id": run_id, "reason": f"non_cleanup_status:{status}"})
+            continue
+        if run_id in protected_ids:
+            protected.append({"run_id": run_id, "reason": "retention_floor"})
+            continue
+        if cutoff is not None and _entry_time(entry) >= cutoff:
+            protected.append({"run_id": run_id, "reason": "younger_than_max_age"})
+            continue
+        candidates.append(
+            {
+                "run_id": run_id,
+                "workflow_type": entry.get("workflow_type"),
+                "status": status,
+                "started_at": entry.get("started_at"),
+                "finished_at": entry.get("finished_at"),
+                "path": entry["path"],
+            }
+        )
+
+    deleted = []
+    if apply:
+        for candidate in candidates:
+            path = Path(candidate["path"])
+            if path.parent.resolve() != runs_root.resolve():
+                skipped.append({"run_id": candidate["run_id"], "reason": "path_outside_runs_root"})
+                continue
+            shutil.rmtree(path)
+            deleted.append(candidate)
+        refresh_run_index(vault_path)
+
+    manifest = {
+        "dry_run": not apply,
+        "vault_path": str(Path(vault_path)),
+        "runs_root": str(runs_root),
+        "policy": {
+            "keep_latest": keep_latest,
+            "keep_per_workflow": keep_per_workflow,
+            "max_age_days": max_age_days,
+            "eligible_statuses": sorted(_TERMINAL_CLEANUP_STATUSES),
+            "protected_statuses": sorted(_PROTECTED_CLEANUP_STATUSES),
+        },
+        "total_run_dirs": len(entries),
+        "candidate_count": len(candidates),
+        "deleted_count": len(deleted),
+        "candidates": candidates,
+        "deleted": deleted,
+        "protected": protected,
+        "skipped": skipped,
+    }
+    if apply or candidates:
+        manifest_path = _write_lifecycle_manifest(vault_path, manifest)
+        manifest["manifest_path"] = str(manifest_path)
+    return manifest
+
+
+def render_run_lifecycle(result):
+    action = "Dry run" if result.get("dry_run") else "Applied"
+    lines = [
+        f"EPI Run Lifecycle - {action}",
+        "",
+        f"- runs_root: {result.get('runs_root')}",
+        f"- total_run_dirs: {result.get('total_run_dirs')}",
+        f"- candidates: {result.get('candidate_count')}",
+        f"- deleted: {result.get('deleted_count')}",
+    ]
+    if result.get("manifest_path"):
+        lines.append(f"- manifest: {result['manifest_path']}")
+    candidates = result.get("candidates") or []
+    if candidates:
+        lines.extend(["", "## Candidates"])
+        for candidate in candidates[:20]:
+            lines.append(
+                f"- {candidate['run_id']} ({candidate.get('workflow_type')}, {candidate.get('status')})"
+            )
+        if len(candidates) > 20:
+            lines.append(f"- ... {len(candidates) - 20} more")
+    lines.append("")
+    return "\n".join(lines)
 
 
 def load_run_index(vault_path):

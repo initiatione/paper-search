@@ -9,5 +9,6 @@ Before running the first query:
 3. For non-review requests, every query variant should carry `-review -survey` and the filter stage should still enforce the exclusion.
 4. Route sources by intent: use `paper_search_mcp` first with `arxiv,semantic,openalex` for robotics/AI/control; use live academic/web search to verify recent journal papers, DOI pages, citation counts, JCR/CiteScore-style metrics, code/PDF availability, and gaps that MCP missed.
 5. Deduplicate across variants by DOI first, then normalized title.
+6. Deduplicate against the downloaded wiki library under `_raw\papers`. A paper already present in `_raw\papers\<slug>\metadata.json` must be rejected with `already_in_library:<slug>` and should not be recommended again unless the user explicitly asks to repair or reprocess that existing paper.
 
 If the first result set is generic, stale, or too review-heavy, run a sharper rerun rather than stopping early.

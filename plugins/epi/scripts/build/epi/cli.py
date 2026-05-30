@@ -203,6 +203,14 @@ def build_parser() -> argparse.ArgumentParser:
     runs_query.add_argument("--workflow", default=None)
     runs_query.add_argument("--limit", type=int, default=10)
 
+    run_lifecycle = subparsers.add_parser("run-lifecycle")
+    _add_common_vault(run_lifecycle)
+    run_lifecycle.add_argument("--keep-latest", type=int, default=30)
+    run_lifecycle.add_argument("--keep-per-workflow", type=int, default=2)
+    run_lifecycle.add_argument("--max-age-days", type=int, default=None)
+    run_lifecycle.add_argument("--apply", action="store_true")
+    run_lifecycle.add_argument("--json", action="store_true")
+
     research_queue = subparsers.add_parser("research-queue")
     _add_common_vault(research_queue)
     research_queue.add_argument("--bucket", choices=RESEARCH_QUEUE_BUCKETS, default=None)
@@ -656,6 +664,21 @@ def _handle_runs_query(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_run_lifecycle(args: argparse.Namespace) -> int:
+    result = workflows.prune_run_lifecycle(
+        args.vault.resolve(),
+        keep_latest=args.keep_latest,
+        keep_per_workflow=args.keep_per_workflow,
+        max_age_days=args.max_age_days,
+        apply=args.apply,
+    )
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(workflows.render_run_lifecycle(result))
+    return 0
+
+
 def _handle_research_queue(args: argparse.Namespace) -> int:
     result = workflows.query_research_queue(
         args.vault.resolve(),
@@ -731,6 +754,7 @@ HANDLERS: dict[str, Handler] = {
     "activate-evolution": _handle_activate_evolution,
     "evolution-query": _handle_evolution_query,
     "runs-query": _handle_runs_query,
+    "run-lifecycle": _handle_run_lifecycle,
     "research-queue": _handle_research_queue,
     "wiki-query": _handle_wiki_query,
     "wiki-ingest-handoff": _handle_wiki_ingest_handoff,

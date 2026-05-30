@@ -119,6 +119,25 @@ def test_research_queue_parser_accepts_actions_flag():
     assert args.actions is True
 
 
+def test_run_lifecycle_parser_defaults_to_dry_run():
+    args = build_parser().parse_args(
+        [
+            "run-lifecycle",
+            "--keep-latest",
+            "20",
+            "--keep-per-workflow",
+            "3",
+            "--json",
+        ]
+    )
+
+    assert args.command == "run-lifecycle"
+    assert args.keep_latest == 20
+    assert args.keep_per_workflow == 3
+    assert args.apply is False
+    assert args.json is True
+
+
 def test_research_agenda_command_is_not_registered():
     parser = build_parser()
 

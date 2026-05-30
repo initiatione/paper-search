@@ -19,7 +19,7 @@ Then add `EPI 实测证据` with:
 - run path
 - `source_mode`
 - accepted/rejected counts
-- review exclusion evidence
+- review exclusion evidence and already-downloaded exclusions such as `already_in_library:<slug>`
 - query variants and whether a sharper rerun was needed
 - recall gaps if any
 - `MINERU_TOKEN` set/missing only if setup was checked

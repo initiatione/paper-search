@@ -13,16 +13,19 @@ from epi.filter_candidates import exclusion_terms_from_query, filter_candidates,
 from epi.generate_reader import generate_reader_outputs
 from epi.normalize_candidates import normalize_candidates
 from epi.paper_gate import build_paper_gate, render_paper_gate
+from epi.paper_library import load_existing_paper_index
 from epi.paper_search_adapter import discover
 from epi.promote_to_wiki import promote_paper, rollback_promotion
 from epi.rank_papers import rank_candidates
 from epi.redo import redo_acquire, redo_parse, redo_read, redo_read_recritic, recritic
 from epi.report_run import write_report
 from epi.run_index import (
+    prune_run_lifecycle,
     query_research_queue,
     query_runs,
     refresh_run_index,
     render_research_queue_query,
+    render_run_lifecycle,
     render_runs_query,
 )
 from epi.run_critic import run_critics
@@ -572,12 +575,18 @@ def run_dry_run(
     _write_json(run_dir / "run-state.json", state)
 
     query_exclude_terms = exclusion_terms_from_query(query)
+    existing_library_index = load_existing_paper_index(config.vault_path)
     filter_report = filter_candidates_with_report(
         normalized,
         domains=config.domains,
         require_pdf=True,
         exclude_terms=query_exclude_terms,
+        existing_library_index=existing_library_index,
     )
+    filter_report["existing_library"] = {
+        "papers_root": existing_library_index.get("papers_root"),
+        "count": existing_library_index.get("count", 0),
+    }
     filtered = filter_report["kept"]
     rejected = filter_report["rejected"]
     _write_json(run_dir / "filter-report.json", filter_report)
