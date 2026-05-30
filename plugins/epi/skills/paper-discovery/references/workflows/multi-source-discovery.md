@@ -11,14 +11,17 @@ Use this workflow when the user asks for high-quality papers, latest papers, non
    - environment or disturbance, such as ocean current, turbulence, contact, sim-to-real
    - validation mode, such as field trial, real robot, simulator, benchmark, proof
    - exclusions, especially review/survey when requested
-2. Build 3-5 query variants. Include exact phrases and acronym expansions.
-3. Route sources by `source-tiers.md`.
-4. Search T1 sources first through `paper_search_mcp` or configured source adapters.
-5. Deduplicate by `dedup-engine.md`.
-6. Apply venue prior using `venue-prior.md`, then verify venue/citation/DOI/PDF/code and record unverified metrics explicitly.
-7. Apply `quality-gate.md` to label Tier A/B/C/Reject.
-8. If venue priors indicate missing obvious venues or papers, run a sharper rerun and record the recall gap.
-9. Present all kept papers using `output-format.md`.
+2. Build a query plan by `query-planner.md`; use `domain-ontology.md` for synonyms, exclusions, and evidence terms.
+3. Build 5-8 query variants. Include exact phrases and acronym expansions.
+4. Route sources by `source-tiers.md`.
+5. Search T1 sources first through `paper_search_mcp` or configured source adapters.
+6. Use `two-stage-retrieval.md`: collect a high-recall candidate pool before precision filtering.
+7. Deduplicate by `dedup-engine.md`.
+8. Apply venue prior using `venue-prior.md`, then verify venue/citation/DOI/PDF/code and record unverified metrics explicitly.
+9. Expand strong seed papers with `citation-graph.md` when latest/high-quality recall matters.
+10. Apply `quality-gate.md` to label Tier A/B/C/Reject.
+11. If venue priors indicate missing obvious venues or papers, run a sharper rerun and record the recall gap.
+12. Present all kept papers using `output-format.md`.
 
 ## Venue Prior Step
 
@@ -35,6 +38,8 @@ Do not promote a paper only because a venue is highly ranked. A strong venue wit
 
 The final answer should distinguish:
 
+- `query_plan`: concept blocks and query variants used.
+- `candidate_pool`: rough size before and after dedup/filter.
 - `venue_prior`: community or curated venue tier, if used.
 - `verified_metrics`: DOI, citation count, IF/JCR/CiteScore, official venue page, PDF/code.
 - `verification_warnings`: fields that are plausible but not confirmed.

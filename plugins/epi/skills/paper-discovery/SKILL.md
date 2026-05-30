@@ -8,10 +8,15 @@ description: "Use when running EPI paper search/ranking dry-runs, finding high-q
 Use this skill for search/rank dry-runs and the narrow steps 1-3 path. Keep the main file thin and load the references below for the actual policy:
 
 - `README.md`
+- `references/query-planner.md`
+- `references/domain-ontology.md`
 - `references/search-protocol.md`
 - `references/source-tiers.md`
 - `references/dedup-engine.md`
 - `references/venue-prior.md`
+- `references/two-stage-retrieval.md`
+- `references/citation-graph.md`
+- `references/evaluation-set.md`
 - `references/workflows/multi-source-discovery.md`
 - `references/quality-gate.md`
 - `references/output-format.md`
@@ -20,6 +25,7 @@ The full EPI chain stays documented in `docs\epi-linkage.md`. If setup is unclea
 
 ```powershell
 python scripts\orchestrator.py doctor --plugin-root <plugin-root> --vault <vault> --json
+python skills\paper-discovery\scripts\query-planner.py --topic "<topic>" --domain auto --non-review --max-queries 8
 python scripts\orchestrator.py dry-run --query "<topic>" --max-results 10 --sources arxiv,semantic,openalex --plugin-root <plugin-root> --vault <vault>
 python scripts\orchestrator.py prepare-ranked --run-id <run-id> --max-papers 1 --vault <vault>
 ```

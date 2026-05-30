@@ -19,10 +19,13 @@ Then add `EPI 实测证据` with:
 
 - run path
 - `source_mode`
+- query plan summary: domain, concept blocks, query variants
+- candidate pool size before/after dedup/filter when available
 - accepted/rejected counts
 - review exclusion evidence and already-downloaded exclusions such as `already_in_library:<slug>`
 - query variants and whether a sharper rerun was needed
 - venue prior sources used, such as RoboWiki, and weak community hints such as Zhihu when applicable
+- citation graph expansion evidence when used
 - recall gaps if any
 - `MINERU_TOKEN` set/missing only if setup was checked
 

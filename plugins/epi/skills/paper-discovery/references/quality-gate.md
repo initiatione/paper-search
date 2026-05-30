@@ -4,6 +4,8 @@ Apply a quality gate before recommendation: a paper should usually have strong t
 
 Venue prior from `venue-prior.md` can raise or lower reading priority, but it cannot pass the quality gate by itself. A paper with weak topic fit, unclear identity, no PDF, or unverifiable claims should not become Tier A only because the venue is famous.
 
+Two-stage retrieval changes when the gate runs: do not reject too early during the high-recall pool stage unless the item is clearly off-topic, duplicated, or explicitly excluded. Apply strict Tier A/B/C/Reject labels only after deduplication, source verification, and citation/venue checks.
+
 Separate quality tiers:
 
 - Tier A: journal/top robotics venue, DOI, PDF, high topic fit, strong validation such as sea trial, real AUV, sim-to-real, safety proof, or convincing benchmark.

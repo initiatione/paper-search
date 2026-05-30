@@ -133,11 +133,16 @@ def test_paper_discovery_skill_documents_quality_first_chat_recommendations():
     discovery = _read(SKILL_DIR / "paper-discovery" / "SKILL.md")
 
     assert "README.md" in discovery
+    assert "references/query-planner.md" in discovery
+    assert "references/domain-ontology.md" in discovery
     assert "references/output-format.md" in discovery
     assert "references/search-protocol.md" in discovery
     assert "references/source-tiers.md" in discovery
     assert "references/dedup-engine.md" in discovery
     assert "references/venue-prior.md" in discovery
+    assert "references/two-stage-retrieval.md" in discovery
+    assert "references/citation-graph.md" in discovery
+    assert "references/evaluation-set.md" in discovery
     assert "references/workflows/multi-source-discovery.md" in discovery
     assert "references/quality-gate.md" in discovery
     assert "The full EPI chain stays documented" in discovery
@@ -146,10 +151,16 @@ def test_paper_discovery_skill_documents_quality_first_chat_recommendations():
 def test_paper_discovery_skill_defines_stronger_high_quality_search_protocol():
     discovery = _read(SKILL_DIR / "paper-discovery" / "SKILL.md")
 
+    assert "query-planner.py" in discovery
+    assert "references/query-planner.md" in discovery
+    assert "references/domain-ontology.md" in discovery
     assert "references/search-protocol.md" in discovery
     assert "references/source-tiers.md" in discovery
     assert "references/dedup-engine.md" in discovery
     assert "references/venue-prior.md" in discovery
+    assert "references/two-stage-retrieval.md" in discovery
+    assert "references/citation-graph.md" in discovery
+    assert "references/evaluation-set.md" in discovery
     assert "references/workflows/multi-source-discovery.md" in discovery
     assert "references/quality-gate.md" in discovery
     assert "references/output-format.md" in discovery
@@ -158,10 +169,15 @@ def test_paper_discovery_skill_defines_stronger_high_quality_search_protocol():
 
 def test_paper_discovery_reference_files_exist_and_hold_split_protocol():
     readme = _read(SKILL_DIR / "paper-discovery" / "README.md")
+    query_planner = _read(SKILL_DIR / "paper-discovery" / "references" / "query-planner.md")
+    domain_ontology = _read(SKILL_DIR / "paper-discovery" / "references" / "domain-ontology.md")
     search_protocol = _read(SKILL_DIR / "paper-discovery" / "references" / "search-protocol.md")
     source_tiers = _read(SKILL_DIR / "paper-discovery" / "references" / "source-tiers.md")
     dedup_engine = _read(SKILL_DIR / "paper-discovery" / "references" / "dedup-engine.md")
     venue_prior = _read(SKILL_DIR / "paper-discovery" / "references" / "venue-prior.md")
+    two_stage = _read(SKILL_DIR / "paper-discovery" / "references" / "two-stage-retrieval.md")
+    citation_graph = _read(SKILL_DIR / "paper-discovery" / "references" / "citation-graph.md")
+    evaluation_set = _read(SKILL_DIR / "paper-discovery" / "references" / "evaluation-set.md")
     workflow = _read(
         SKILL_DIR
         / "paper-discovery"
@@ -174,7 +190,13 @@ def test_paper_discovery_reference_files_exist_and_hold_split_protocol():
 
     assert "EPI 论文发现子 Skill 说明" in readme
     assert "nature-academic-search" in readme
-    assert "3-5 query variants" in search_protocol
+    assert "Query Planner" in readme
+    assert "5-8 query variants" in query_planner
+    assert "AUV / Marine Control" in domain_ontology
+    assert "autonomous underwater vehicle" in domain_ontology
+    assert "5-8 query variants" in search_protocol
+    assert "two-stage-retrieval.md" in search_protocol
+    assert "citation-graph.md" in search_protocol
     assert "paper_search_mcp" in search_protocol
     assert "source tier" in source_tiers.lower()
     assert "RoboWiki" in source_tiers
@@ -184,10 +206,16 @@ def test_paper_discovery_reference_files_exist_and_hold_split_protocol():
     assert "RoboWiki" in venue_prior
     assert "Zhihu" in venue_prior
     assert "Ocean Engineering" in venue_prior
+    assert "High Recall Candidate Pool" in two_stage
+    assert "precision_at_10" in evaluation_set
+    assert "recent cited-by" in citation_graph
+    assert "query_plan" in workflow
     assert "verified_metrics" in workflow
     assert "Tier A" in quality_gate
+    assert "Two-stage retrieval" in quality_gate
     assert "venue-prior.md" in quality_gate
     assert "recall gap" in quality_gate
     assert "推荐优先看" in output_format
     assert "venue prior" in output_format
+    assert "citation graph expansion" in output_format
     assert "EPI 实测证据" in output_format

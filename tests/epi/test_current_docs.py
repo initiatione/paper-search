@@ -52,6 +52,11 @@ def test_progress_doc_records_status_verification_and_next_steps():
     assert "当前 `plugin.json` 中的版本" in text
     assert "runtime.json" in text
     assert "venue prior" in text
+    assert "query planner" in text
+    assert "domain ontology" in text
+    assert "two-stage retrieval" in text
+    assert "citation graph" in text
+    assert "evaluation set" in text
     assert "RoboWiki" in text
     assert "发布前必须重跑" in text
     assert "Plugin Eval" in text
@@ -62,10 +67,19 @@ def test_linkage_doc_records_paper_discovery_bundle_and_venue_prior():
     text = _read("epi-linkage.md")
 
     assert "nature-academic-search" in text
+    assert "scripts/query-planner.py" in text
+    assert "references/query-planner.md" in text
+    assert "references/domain-ontology.md" in text
     assert "references/source-tiers.md" in text
     assert "references/dedup-engine.md" in text
     assert "references/venue-prior.md" in text
+    assert "references/two-stage-retrieval.md" in text
+    assert "references/citation-graph.md" in text
+    assert "references/evaluation-set.md" in text
     assert "references/workflows/multi-source-discovery.md" in text
+    assert "query_plan" in text
+    assert "5-8 条 query variants" in text
+    assert "two-stage retrieval" in text
     assert "venue_prior" in text
     assert "verified_metrics" in text
     assert "RoboWiki" in text

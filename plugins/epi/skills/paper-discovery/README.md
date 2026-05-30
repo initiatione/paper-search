@@ -10,11 +10,18 @@
 paper-discovery/
   SKILL.md
   README.md
+  scripts/
+    query-planner.py
   references/
+    query-planner.md
+    domain-ontology.md
     search-protocol.md
     source-tiers.md
     dedup-engine.md
     venue-prior.md
+    two-stage-retrieval.md
+    citation-graph.md
+    evaluation-set.md
     quality-gate.md
     output-format.md
     workflows/
@@ -30,9 +37,12 @@ paper-discovery/
 ## 执行原则
 
 - 不把 `paper_search_mcp` 返回结果本身当成质量定义。
-- 先做概念块拆分，再构造 3-5 个 query variants。
+- 先用 Query Planner 做概念块拆分，再构造 5-8 个 query variants。
+- 用领域词表展开平台、方法、任务、环境、验证证据和排除项。
+- 两阶段检索：先做高召回 candidate pool，再去重、核验、精排。
 - 按 source tier 路由：结构化学术源优先，网页/出版社页面用于核验和补召回。
 - 用期刊/会议分层做 `venue_prior`，但不把主观榜单当成最终质量判断。
+- 对高质量 seed paper 使用 citation graph 查 related、references、cited-by 和 journal/conference version。
 - 跨 query/source 去重，再和 `_raw/papers` 已下载文献去重。
 - 输出给用户时列出本轮保留的全部候选，按阅读优先级排序。
 - 影响因子、分区、引用数等质量指标必须有来源或标注未核实。
@@ -40,12 +50,13 @@ paper-discovery/
 ## 常用命令
 
 ```powershell
+python skills\paper-discovery\scripts\query-planner.py --topic "<topic>" --domain auto --non-review --max-queries 8
 python scripts\orchestrator.py dry-run --query "<topic>" --max-results 10 --sources arxiv,semantic,openalex --plugin-root <plugin-root> --vault <vault>
 python scripts\orchestrator.py prepare-ranked --run-id <run-id> --max-papers 1 --vault <vault>
 ```
 
-`dry-run` 只写 `_runs`。`prepare-ranked` 只写 `_raw/papers/<slug>`，完成 PDF 下载和 MinerU 解析后停止。
+`query-planner.py` 不访问网络，只把用户主题转换成可审计的检索计划。`dry-run` 只写 `_runs`。`prepare-ranked` 只写 `_raw/papers/<slug>`，完成 PDF 下载和 MinerU 解析后停止。
 
 ## 参考来源
 
-本子 skill 蒸馏的是 `nature-academic-search` 的结构化检索思想，不迁移它的医学/PubMed 默认语境。迁移点包括 source tiers、multi-source workflow、dedup engine、venue prior 和 citation/venue verification 思路。
+本子 skill 蒸馏的是 `nature-academic-search` 的结构化检索思想，不迁移它的医学/PubMed 默认语境。迁移点包括 query planning、source tiers、multi-source workflow、dedup engine、venue prior、citation graph、evaluation set 和 citation/venue verification 思路。
