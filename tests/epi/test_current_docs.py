@@ -54,8 +54,8 @@ def test_progress_doc_records_status_verification_and_next_steps():
     assert "wiki-ingest-handoff" in text
     assert "record-wiki-ingest" in text
     assert "wiki_ingest_recorded" in text
-    assert "287 passed in 29.83s" in text
-    assert "37 passed in 0.92s" in text
+    assert "287 passed in 30.16s" in text
+    assert "45 passed in 10.19s" in text
     assert "pass rate `1`" in text
     assert "82/100" in text
     assert "waiting_for_human_gate" in text
@@ -100,6 +100,8 @@ def test_linkage_doc_records_paper_discovery_bundle_and_venue_prior():
     assert "query_plan" in text
     assert "research_mode" in text
     assert "paper_classification" in text
+    assert "quality_gate" in text
+    assert "quality_tier" in text
     assert "ranking_rubric" in text
     assert "reader/claim-support.json" in text
     assert "domain_focus_terms" in text

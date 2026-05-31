@@ -57,6 +57,7 @@ def test_write_report_groups_dry_run_candidates_by_research_queue(tmp_path):
                 "year": 2025,
                 "pdf_url": "https://example.org/strong.pdf",
                 "paper_type": "benchmark",
+                "quality_tier": "Tier A",
                 "paper_classification": {"primary_type": "benchmark", "confidence": 0.69},
                 "ranking_confidence": 0.82,
                 "ranking_protocol": {
@@ -106,6 +107,7 @@ def test_write_report_groups_dry_run_candidates_by_research_queue(tmp_path):
     assert "### Advance Candidates" in report_md
     assert "Strong Embodied Control Paper - score 0.91" in report_md
     assert "paper_type: benchmark (confidence=0.69)" in report_md
+    assert "quality_tier: Tier A" in report_md
     assert "ranking_confidence: 0.82" in report_md
     assert "reasons: matched keywords: humanoid, control; code availability signal present" in report_md
     assert "rationale: Advance for low-burden reading report and wiki deposition." in report_md

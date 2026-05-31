@@ -138,6 +138,9 @@ def test_dry_run_writes_phase_1_artifacts(tmp_path):
     assert ranked[0]["ranking_protocol"]["schema_version"] == "epi-ranking-protocol-v1"
     assert ranked[0]["paper_classification"]["schema_version"] == "epi-paper-classification-v1"
     assert ranked[0]["ranking_rubric"]["schema_version"] == "epi-ranking-rubric-v1"
+    assert ranked[0]["quality_gate"]["schema_version"] == "epi-quality-gate-v1"
+    assert ranked[0]["ranking_protocol"]["quality_tier"] == ranked[0]["quality_tier"]
+    assert ranked[0]["ranking_protocol"]["quality_gate"] == ranked[0]["quality_gate"]
     assert ranked[0]["ranking_protocol"]["paper_type"] == ranked[0]["paper_type"]
     assert ranked[0]["ranking_protocol"]["ranking_confidence"] == ranked[0]["ranking_confidence"]
     assert ranked[0]["ranking_protocol"]["lenses"]["editorial"]["signals"] == [
@@ -147,6 +150,7 @@ def test_dry_run_writes_phase_1_artifacts(tmp_path):
     ]
     assert ranked[0]["ranking_protocol"]["decision"] in {"advance-candidate", "review-candidate"}
     assert report["accepted"][0]["ranking_protocol"] == ranked[0]["ranking_protocol"]
+    assert report["accepted"][0]["quality_tier"] == ranked[0]["quality_tier"]
     assert report["research_queue"]["advance_candidates"] or report["research_queue"]["review_candidates"]
     queued_titles = [
         paper["title"]
@@ -171,6 +175,7 @@ def test_dry_run_writes_phase_1_artifacts(tmp_path):
     assert f"Run ID: {run_dir.name}" in report_md
     assert report_md.startswith("# EPI Dry Run")
     assert "## Budget Usage" in report_md
+    assert "quality_tier:" in report_md
     assert "## Next Actions" in report_md
     assert index_payload["runs"][0]["run_id"] == run_dir.name
     assert index_payload["runs"][0]["workflow_type"] == "paper-discovery-dry-run"

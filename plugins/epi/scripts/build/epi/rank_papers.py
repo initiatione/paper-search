@@ -301,6 +301,88 @@ def _ranking_protocol(
     }
 
 
+def _quality_gate(
+    *,
+    candidate: dict,
+    signals: dict[str, float],
+    classification: dict,
+    score: float,
+) -> dict:
+    evidence: list[str] = []
+    cautions: list[str] = []
+    blockers: list[str] = []
+    has_stable_identifier = bool(candidate.get("doi") or candidate.get("arxiv_id"))
+
+    if has_stable_identifier:
+        evidence.append("stable_identifier")
+    else:
+        cautions.append("stable_identifier_unverified")
+    if signals["pdf_score"] > 0:
+        evidence.append("pdf_available")
+    else:
+        blockers.append("missing_pdf")
+    if signals["domain_fit_score"] >= 0.67:
+        evidence.append("high_topic_fit")
+    elif signals["domain_fit_score"] >= 0.34:
+        evidence.append("topic_fit")
+    else:
+        blockers.append("weak_topic_fit")
+    if signals["venue_score"] >= 0.75:
+        evidence.append("configured_venue_prior")
+    elif signals["venue_score"] >= 0.45:
+        evidence.append("generic_venue_metadata")
+    else:
+        cautions.append("weak_venue_signal")
+    if signals["citation_score"] >= 0.5:
+        evidence.append("strong_citation_signal")
+    elif signals["citation_score"] > 0:
+        evidence.append("citation_signal")
+    if signals["benchmark_score"] >= 0.34:
+        evidence.append("benchmark_signal")
+    else:
+        cautions.append("weak_benchmark_signal")
+    if signals["reproducibility_score"] >= 0.35:
+        evidence.append("reproducibility_signal")
+    else:
+        cautions.append("weak_reproducibility_signal")
+    if signals["negative_keyword_penalty"] >= 0.5:
+        blockers.append("negative_keyword_overlap")
+
+    if blockers:
+        tier = "Reject"
+    elif (
+        score >= 0.78
+        and has_stable_identifier
+        and signals["domain_fit_score"] >= 0.67
+        and signals["pdf_score"] > 0
+        and (signals["venue_score"] >= 0.75 or signals["citation_score"] >= 0.5)
+        and (signals["benchmark_score"] >= 0.34 or signals["reproducibility_score"] >= 0.35)
+    ):
+        tier = "Tier A"
+    elif (
+        score >= 0.60
+        and signals["domain_fit_score"] >= 0.34
+        and signals["pdf_score"] > 0
+        and (
+            signals["venue_score"] >= 0.45
+            or signals["citation_score"] > 0
+            or signals["benchmark_score"] >= 0.34
+        )
+    ):
+        tier = "Tier B"
+    else:
+        tier = "Tier C"
+
+    return {
+        "schema_version": "epi-quality-gate-v1",
+        "tier": tier,
+        "paper_type": classification["primary_type"],
+        "evidence": evidence,
+        "cautions": cautions,
+        "blocking_reasons": blockers,
+    }
+
+
 def _score_take(score: float, *, strong: str, weak: str) -> str:
     return strong if score >= 0.7 else weak
 
@@ -425,6 +507,12 @@ def rank_candidates(
             "reproducibility_score": reproducibility_score,
         }
         classification = _classify_paper_type(candidate)
+        quality_gate = _quality_gate(
+            candidate=candidate,
+            signals=ranked_candidate["ranking_signals"],
+            classification=classification,
+            score=score,
+        )
         rubric = _ranking_rubric(
             signals=ranked_candidate["ranking_signals"],
             matched_keywords=matched_keywords,
@@ -441,6 +529,8 @@ def rank_candidates(
         )
         protocol["paper_type"] = classification["primary_type"]
         protocol["classification_confidence"] = classification["confidence"]
+        protocol["quality_tier"] = quality_gate["tier"]
+        protocol["quality_gate"] = quality_gate
         protocol["rubric_scores"] = {
             name: dimension["score"]
             for name, dimension in rubric["dimensions"].items()
@@ -450,6 +540,8 @@ def rank_candidates(
         ranked_candidate["classification_confidence"] = classification["confidence"]
         ranked_candidate["classification_evidence"] = classification["evidence"]
         ranked_candidate["paper_classification"] = classification
+        ranked_candidate["quality_tier"] = quality_gate["tier"]
+        ranked_candidate["quality_gate"] = quality_gate
         ranked_candidate["ranking_rubric"] = rubric
         ranked_candidate["ranking_confidence"] = rubric["ranking_confidence"]
         ranked_candidate["ranking_protocol"] = protocol

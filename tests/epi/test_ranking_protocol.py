@@ -12,6 +12,7 @@ def test_rank_candidates_emits_explainable_research_quality_protocol():
             ),
             "year": 2025,
             "venue": "ICRA",
+            "doi": "10.1234/embodied-control",
             "citation_count": 42,
             "pdf_url": "https://example.org/paper.pdf",
             "code_url": "https://github.com/example/embodied-control",
@@ -42,6 +43,13 @@ def test_rank_candidates_emits_explainable_research_quality_protocol():
     assert top["ranking_protocol"]["schema_version"] == "epi-ranking-protocol-v1"
     assert top["ranking_protocol"]["paper_type"] == "benchmark"
     assert top["ranking_protocol"]["classification_confidence"] == top["classification_confidence"]
+    assert top["quality_tier"] == "Tier A"
+    assert top["quality_gate"]["schema_version"] == "epi-quality-gate-v1"
+    assert top["quality_gate"]["tier"] == "Tier A"
+    assert "stable_identifier" in top["quality_gate"]["evidence"]
+    assert "high_topic_fit" in top["quality_gate"]["evidence"]
+    assert top["ranking_protocol"]["quality_tier"] == "Tier A"
+    assert top["ranking_protocol"]["quality_gate"] == top["quality_gate"]
     assert top["ranking_protocol"]["ranking_confidence"] == top["ranking_confidence"]
     assert set(top["ranking_protocol"]["rubric_scores"]) == set(top["ranking_rubric"]["dimensions"])
     assert top["ranking_protocol"]["lenses"] == {
@@ -102,6 +110,9 @@ def test_rank_candidates_routes_weak_reproducibility_as_review_candidate():
 
     protocol = ranked[0]["ranking_protocol"]
     assert protocol["decision"] == "review-candidate"
+    assert protocol["quality_tier"] == "Tier B"
+    assert ranked[0]["quality_gate"]["tier"] == "Tier B"
+    assert "stable_identifier_unverified" in ranked[0]["quality_gate"]["cautions"]
     assert "weak_reproducibility_signal" in protocol["cautions"]
     assert ranked[0]["paper_type"] == "method"
     assert ranked[0]["ranking_rubric"]["dimensions"]["reproducibility"]["score"] == protocol["rubric_scores"]["reproducibility"]
@@ -146,5 +157,7 @@ def test_rank_candidates_penalizes_negative_profile_keywords():
     negative = ranked[1]
     assert negative["ranking_signals"]["negative_keyword_penalty"] > 0
     assert negative["ranking_signals"]["domain_fit_score"] < ranked[0]["ranking_signals"]["domain_fit_score"]
+    assert negative["quality_tier"] == "Reject"
+    assert "negative_keyword_overlap" in negative["quality_gate"]["blocking_reasons"]
     assert "negative_keyword_overlap: biomedical trial" in negative["ranking_protocol"]["cautions"]
     assert negative["ranking_protocol"]["decision"] == "review-candidate"

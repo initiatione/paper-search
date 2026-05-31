@@ -9,6 +9,7 @@ Each item should have:
 - a numbered title line
 - venue/year
 - paper type and classification confidence
+- quality tier and the strongest `quality_gate` evidence
 - DOI
 - citation count
 - impact factor/quartile or `未核实`
@@ -23,7 +24,7 @@ Then add `EPI 实测证据` with:
 - query strategy: `query_plan_multi_query`, `single_query`, or fixture mode
 - query plan summary: domain, concept blocks, query variants
 - candidate pool size before/after dedup/filter when available
-- ranking evidence: `paper_type`, `ranking_confidence`, and key rubric dimensions
+- ranking evidence: `paper_type`, `quality_tier`, `quality_gate`, `ranking_confidence`, and key rubric dimensions
 - accepted/rejected counts
 - review exclusion evidence and already-downloaded exclusions such as `already_in_library:<slug>`
 - query variants and whether a sharper rerun was needed

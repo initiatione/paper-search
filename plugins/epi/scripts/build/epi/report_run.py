@@ -39,6 +39,8 @@ def _append_queue_section(report: list[str], title: str, papers: list[dict]) -> 
                 f"   - paper_type: {classification.get('primary_type')} "
                 f"(confidence={classification.get('confidence')})"
             )
+        if paper.get("quality_tier"):
+            report.append(f"   - quality_tier: {paper['quality_tier']}")
         if paper.get("ranking_confidence") or (paper.get("ranking_rubric") or {}).get("ranking_confidence"):
             confidence = paper.get("ranking_confidence") or (paper.get("ranking_rubric") or {}).get("ranking_confidence")
             report.append(f"   - ranking_confidence: {confidence}")
@@ -235,6 +237,8 @@ def write_report(
             report.append(f"{index}. {paper.get('title')} - score {paper.get('score')}")
             if paper.get("paper_type"):
                 report.append(f"   - paper_type: {paper.get('paper_type')}")
+            if paper.get("quality_tier"):
+                report.append(f"   - quality_tier: {paper.get('quality_tier')}")
             report.append(f"   - venue: {paper.get('venue')}")
             report.append(f"   - year: {paper.get('year')}")
             report.append(f"   - pdf: {paper.get('pdf_url')}")

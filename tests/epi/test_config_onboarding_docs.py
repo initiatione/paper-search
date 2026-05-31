@@ -257,6 +257,8 @@ def test_paper_discovery_reference_files_exist_and_hold_split_protocol():
     assert "推荐优先看" in output_format
     assert "query_plan_multi_query" in output_format
     assert "venue prior" in output_format
+    assert "quality_tier" in output_format
+    assert "quality_gate" in output_format
     assert "ranking_confidence" in output_format
     assert "citation graph expansion" in output_format
     assert "EPI 实测证据" in output_format

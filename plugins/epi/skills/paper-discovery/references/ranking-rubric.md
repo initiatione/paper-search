@@ -8,9 +8,10 @@ EPI ranking is intentionally multi-layered:
 
 1. `ranking_signals`: numeric heuristic signals for topic, venue, citation, freshness, PDF/code, benchmark, reproducibility, and negative keyword overlap.
 2. `paper_classification`: title/abstract paper type classification.
-3. `ranking_rubric`: human-readable dimensions derived from the signals.
-4. `ranking_protocol`: advance/review decision, reasons, cautions, lenses, type, rubric scores, and confidence.
-5. `ranking_rationale`: low-reading-burden explanation for the user and downstream wiki route suggestions.
+3. `quality_gate`: Tier A/B/C/Reject gate with stable identity, PDF, topic-fit, venue, citation, benchmark, reproducibility, and blocking/caution evidence.
+4. `ranking_rubric`: human-readable dimensions derived from the signals.
+5. `ranking_protocol`: advance/review decision, quality tier, reasons, cautions, lenses, type, rubric scores, and confidence.
+6. `ranking_rationale`: low-reading-burden explanation for the user and downstream wiki route suggestions.
 
 ## Rubric Dimensions
 
@@ -28,7 +29,8 @@ EPI ranking is intentionally multi-layered:
 2. Treat `ranking_confidence` as a heuristic confidence in the ranking evidence, not a truth probability.
 3. Use low confidence to trigger review, sharper rerun, citation-graph expansion, or source verification.
 4. Keep venue prior separate from verified metrics such as impact factor, quartile, CiteScore, and citation count.
-5. When `paper_type=survey` in a non-review run, explain the exclusion rather than silently promoting it.
+5. Do not let venue prior alone create `quality_tier=Tier A`; Tier A also needs stable identity, PDF, topic fit, and validation evidence.
+6. When `paper_type=survey` in a non-review run, explain the exclusion rather than silently promoting it.
 
 ## Chat Recommendation Shape
 
