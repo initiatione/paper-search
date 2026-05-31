@@ -1,6 +1,7 @@
 import json
 
-from epi.reader_evidence import validate_evidence_map, validate_reader_evidence
+from epi.claim_support import build_claim_support_map
+from epi.reader_evidence import validate_claim_support_map, validate_evidence_map, validate_reader_evidence
 
 
 def _write_reader_evidence_fixture(tmp_path):
@@ -28,50 +29,50 @@ def _write_reader_evidence_fixture(tmp_path):
     (images_dir / "figure-1.png").write_bytes(b"png")
     (reader_dir / "reader.md").write_text("# Reader\n", encoding="utf-8")
     (reader_dir / "reproducibility.md").write_text("# Reproducibility\n", encoding="utf-8")
-    (reader_dir / "evidence-map.json").write_text(
-        json.dumps(
+    evidence_map = {
+        "schema_version": "epi-reader-evidence-map-v1",
+        "reader_roles": [
+            "nature-sci-editor",
+            "peer-reviewer",
+            "senior-domain-researcher",
+        ],
+        "required_artifacts": [
+            "reader/reader.md",
+            "reader/reproducibility.md",
+        ],
+        "claims": [
             {
-                "schema_version": "epi-reader-evidence-map-v1",
-                "reader_roles": [
-                    "nature-sci-editor",
-                    "peer-reviewer",
-                    "senior-domain-researcher",
-                ],
-                "required_artifacts": [
-                    "reader/reader.md",
-                    "reader/reproducibility.md",
-                ],
-                "claims": [
-                    {
-                        "claim_id": "claim-001",
-                        "reader_role": "nature-sci-editor",
-                        "reader_artifact": "reader/reader.md",
-                        "claim": "Grounded claim.",
-                        "source": "mineru/paper.md",
-                        "locator": {"heading": "Abstract"},
-                        "evidence_address": "source=mineru/paper.md; heading=Abstract",
-                    },
-                    {
-                        "claim_id": "claim-002",
-                        "reader_role": "peer-reviewer",
-                        "reader_artifact": "reader/reproducibility.md",
-                        "claim": "Source availability.",
-                        "source": "metadata.json",
-                        "locator": {"field": "sources"},
-                        "evidence_address": "source=metadata.json; field=sources",
-                    },
-                    {
-                        "claim_id": "claim-003",
-                        "reader_role": "senior-domain-researcher",
-                        "reader_artifact": "reader/reader.md",
-                        "claim": "Transfer judgment.",
-                        "source": "inference",
-                        "locator": {"basis": "domain-transfer"},
-                        "evidence_address": "source=inference; basis=domain-transfer",
-                    },
-                ],
-            }
-        ),
+                "claim_id": "claim-001",
+                "reader_role": "nature-sci-editor",
+                "reader_artifact": "reader/reader.md",
+                "claim": "Grounded claim.",
+                "source": "mineru/paper.md",
+                "locator": {"heading": "Abstract"},
+                "evidence_address": "source=mineru/paper.md; heading=Abstract",
+            },
+            {
+                "claim_id": "claim-002",
+                "reader_role": "peer-reviewer",
+                "reader_artifact": "reader/reproducibility.md",
+                "claim": "Source availability.",
+                "source": "metadata.json",
+                "locator": {"field": "sources"},
+                "evidence_address": "source=metadata.json; field=sources",
+            },
+            {
+                "claim_id": "claim-003",
+                "reader_role": "senior-domain-researcher",
+                "reader_artifact": "reader/reader.md",
+                "claim": "Transfer judgment.",
+                "source": "inference",
+                "locator": {"basis": "domain-transfer"},
+                "evidence_address": "source=inference; basis=domain-transfer",
+            },
+        ],
+    }
+    (reader_dir / "evidence-map.json").write_text(json.dumps(evidence_map), encoding="utf-8")
+    (reader_dir / "claim-support.json").write_text(
+        json.dumps(build_claim_support_map(paper_title="Grounded Embodied Control", claims=evidence_map["claims"])),
         encoding="utf-8",
     )
     return paper_root
@@ -111,3 +112,25 @@ def test_reader_evidence_module_rejects_evidence_map_without_all_reader_roles(tm
 
     assert passed is False
     assert any("missing claim(s) for reader role(s): senior-domain-researcher" in item for item in evidence)
+
+
+def test_reader_evidence_module_validates_claim_support_statuses(tmp_path):
+    paper_root = _write_reader_evidence_fixture(tmp_path)
+
+    passed, evidence = validate_claim_support_map(paper_root, required=True)
+
+    assert passed is True
+    assert evidence == ["Validated 3 claim-support record(s) across 3 support status(es)"]
+
+
+def test_reader_evidence_module_rejects_stale_claim_support_status(tmp_path):
+    paper_root = _write_reader_evidence_fixture(tmp_path)
+    support_path = paper_root / "reader" / "claim-support.json"
+    payload = json.loads(support_path.read_text(encoding="utf-8"))
+    payload["claims"][0]["support_status"] = "metadata-only"
+    support_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    passed, evidence = validate_claim_support_map(paper_root, required=True)
+
+    assert passed is False
+    assert any("support_status=metadata-only does not match source=mineru/paper.md" in item for item in evidence)

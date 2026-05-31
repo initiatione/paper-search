@@ -55,6 +55,7 @@ def _agent_checklist(
     source_bundle = brief.get("source_bundle") or {}
     raw_artifacts = source_bundle.get("raw_artifacts") or []
     primary_order = source_bundle.get("primary_source_reading_order") or []
+    claim_support_artifact = source_bundle.get("evidence", {}).get("claim_support_artifact")
     formula_figure_review = source_bundle.get("formula_figure_review") or {}
     checklist = [
         "Read target vault contract files before any final wiki write: " + ", ".join(str(item) for item in read_before),
@@ -65,6 +66,8 @@ def _agent_checklist(
         + ", ".join(str(item) for item in raw_artifacts or primary_order)
         + ".",
         "Source-first rule: " + str(source_policy or "reader outputs are navigation and quality signals, not substitutes for the source paper."),
+        "Use reader/evidence-map.json and reader/claim-support.json to separate source-grounded, metadata-only, and inferred claims."
+        + (f" Claim support artifact: {claim_support_artifact}." if claim_support_artifact else ""),
         "Review formulas, figures, tables, and images before distilling reusable claims: "
         + ", ".join(
             str(item)

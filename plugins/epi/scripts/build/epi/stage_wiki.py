@@ -407,6 +407,11 @@ def _build_wiki_ingest_brief(
                 "mineru/paper.tex",
                 "mineru/images/*",
                 "mineru/mineru-manifest.json",
+                "reader/evidence-map.json",
+                "reader/claim-support.json",
+                "reader/figures.md",
+                "critic/critic-report.json",
+                "critic/research-decision.json",
             ],
             "primary_source_reading_order": [
                 "metadata.json",
@@ -415,6 +420,7 @@ def _build_wiki_ingest_brief(
                 "mineru/images/*",
                 "mineru/mineru-manifest.json",
                 "reader/evidence-map.json",
+                "reader/claim-support.json",
                 "reader/figures.md",
                 "critic/critic-report.json",
                 "critic/research-decision.json",
@@ -441,6 +447,7 @@ def _build_wiki_ingest_brief(
                 "reader/figures.md",
                 "reader/reproducibility.md",
                 "reader/implementation-ideas.md",
+                "reader/claim-support.json",
             ],
             "critic_artifacts": [
                 "critic/critic-report.json",
@@ -453,6 +460,7 @@ def _build_wiki_ingest_brief(
                 "claim_count": len(claims),
                 "reader_roles": roles,
                 "exact_evidence_artifact": "reader/evidence-map.json",
+                "claim_support_artifact": "reader/claim-support.json",
             },
         },
         "reading_path": [
@@ -461,6 +469,7 @@ def _build_wiki_ingest_brief(
             "reader/technical-reading.md",
             "reader/research-notes.md",
             "reader/evidence-map.json",
+            "reader/claim-support.json",
         ],
     }
 
@@ -561,7 +570,7 @@ def _reading_report_lines(
         "",
         f"- Evidence claims tracked: {len(claims)}",
         f"- Reader roles covered: {', '.join(str(role) for role in roles) or 'None recorded'}",
-        "- Use `reader/evidence-map.json` when you need exact source addresses behind the summary.",
+        "- Use `reader/evidence-map.json` for exact source addresses and `reader/claim-support.json` for extracted/metadata/inferred support status.",
         "",
         "## Suggested Wiki Routes",
         "",

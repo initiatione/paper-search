@@ -272,3 +272,4 @@ def test_paper_ingest_source_first_reading_reference_exists():
     assert "Formula And Figure Rules" in source_first
     assert "mineru/paper.tex" in source_first
     assert "mineru/images/*" in source_first
+    assert "reader/claim-support.json" in source_first

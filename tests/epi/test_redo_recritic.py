@@ -391,6 +391,7 @@ def test_redo_read_cli_writes_routed_report_with_changed_artifacts(tmp_path, mon
         "reader/implementation-ideas.md",
         "reader/revision-guidance.md",
         "reader/evidence-map.json",
+        "reader/claim-support.json",
     ]
     assert report_json["next_actions"] == ["recritic the regenerated reader outputs"]
     assert report_json["wiki_pages_written"] == []
@@ -412,6 +413,7 @@ def test_redo_read_cli_writes_routed_report_with_changed_artifacts(tmp_path, mon
             "reader/implementation-ideas.md",
             "reader/revision-guidance.md",
             "reader/evidence-map.json",
+            "reader/claim-support.json",
             "redo-records.jsonl",
         ],
     )
@@ -499,6 +501,7 @@ def test_redo_read_cli_can_apply_revision_plan_and_recritic_in_one_routed_run(tm
         {"paper_slug": slug, "state": "critic_passed", "next_action": "stage"}
     ]
     assert "reader/revision-guidance.md" in report_json["changed_artifacts"]
+    assert "reader/claim-support.json" in report_json["changed_artifacts"]
     assert "critic/critic-report.json" in report_json["changed_artifacts"]
     assert "critic/reader-revision-plan.json" in report_json["changed_artifacts"]
     assert report_json["next_actions"] == ["stage the paper for promotion review"]
@@ -520,6 +523,7 @@ def test_redo_read_cli_can_apply_revision_plan_and_recritic_in_one_routed_run(tm
         required_input_hash_keys=["mineru/paper.md", "critic/reader-revision-plan.json"],
         required_output_hash_keys=[
             "reader/revision-guidance.md",
+            "reader/claim-support.json",
             "critic/critic-report.json",
             "critic/reader-revision-plan.json",
             "redo-records.jsonl",

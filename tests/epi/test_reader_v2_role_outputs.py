@@ -62,6 +62,7 @@ def test_reader_v2_emits_role_specific_human_artifacts_and_evidence_map_protocol
         "reader/figures.md",
         "reader/reproducibility.md",
         "reader/implementation-ideas.md",
+        "reader/claim-support.json",
     ]
     assert {
         "reader/editorial-summary.md",
@@ -72,6 +73,7 @@ def test_reader_v2_emits_role_specific_human_artifacts_and_evidence_map_protocol
     assert reader_record["output_artifact_hashes"]["technical-reading.md"]
     assert reader_record["output_artifact_hashes"]["research-notes.md"]
     assert reader_record["output_artifact_hashes"]["evidence-map.json"]
+    assert reader_record["output_artifact_hashes"]["claim-support.json"]
 
 
 def test_critic_rejects_reader_when_required_role_artifact_is_missing(tmp_path):

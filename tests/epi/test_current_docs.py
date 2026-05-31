@@ -33,6 +33,7 @@ def test_structure_doc_covers_current_plugin_boundaries():
     assert "paper-gate" in text
     assert "wiki-ingest-handoff" in text
     assert "agent-mediated" in text
+    assert "claim-support" in text
     assert "不要把安装 cache 当成开发源" in text
     assert "runtime_config.py" in text
     assert r"%USERPROFILE%\.codex\plugins\paper-search\epi\runtime.json" in text
@@ -47,10 +48,11 @@ def test_progress_doc_records_status_verification_and_next_steps():
     assert "config-setup" in text
     assert "paper-quality-critic" in text
     assert "wiki-ingest-handoff" in text
-    assert "268 passed in 29.24s" in text
+    assert "275 passed in 32.10s" in text
     assert "82/100" in text
     assert "waiting_for_human_gate" in text
-    assert "ready_for_agent=true" in text
+    assert "ready_for_agent=false" in text
+    assert "ready_after_human_approval=true" in text
     assert "当前 `plugin.json` 中的版本" in text
     assert "runtime.json" in text
     assert "venue prior" in text
@@ -89,6 +91,7 @@ def test_linkage_doc_records_paper_discovery_bundle_and_venue_prior():
     assert "research_mode" in text
     assert "paper_classification" in text
     assert "ranking_rubric" in text
+    assert "reader/claim-support.json" in text
     assert "domain_focus_terms" in text
     assert "5-8 条 query variants" in text
     assert "two-stage retrieval" in text

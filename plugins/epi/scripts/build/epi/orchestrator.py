@@ -513,6 +513,7 @@ def _repair_report_contract(vault_path: Path, slug: str, record: dict) -> tuple[
         if guidance_path.exists():
             changed_artifacts.append("reader/revision-guidance.md")
         changed_artifacts.append("reader/evidence-map.json")
+        changed_artifacts.append("reader/claim-support.json")
         return (
             {
                 "slug": slug,
@@ -567,6 +568,7 @@ def _repair_report_contract(vault_path: Path, slug: str, record: dict) -> tuple[
             "reader/implementation-ideas.md",
             "reader/revision-guidance.md",
             "reader/evidence-map.json",
+            "reader/claim-support.json",
             "critic/critic-report.json",
             "critic/critic-quorum.json",
             "critic/research-decision.json",

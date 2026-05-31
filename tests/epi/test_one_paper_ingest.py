@@ -57,6 +57,7 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
     assert (paper_root / "mineru" / "paper.tex").is_file()
     assert (paper_root / "reader" / "reader.md").read_text(encoding="utf-8").count("Evidence:") >= 2
     assert (paper_root / "reader" / "evidence-map.json").is_file()
+    assert (paper_root / "reader" / "claim-support.json").is_file()
     assert (paper_root / "critic" / "paper-quality-critic.md").is_file()
     assert (paper_root / "critic" / "parse-quality-critic.md").is_file()
     assert (paper_root / "critic" / "reader-quality-critic.md").is_file()
@@ -86,6 +87,7 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
     assert reader_record["output_artifact_hashes"]["reproducibility.md"]
     assert reader_record["output_artifact_hashes"]["implementation-ideas.md"]
     assert reader_record["output_artifact_hashes"]["evidence-map.json"]
+    assert reader_record["output_artifact_hashes"]["claim-support.json"]
 
     critic = json.loads((paper_root / "critic" / "critic-report.json").read_text(encoding="utf-8"))
     assert critic["outcome"] == "pass"
@@ -195,6 +197,11 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
         "mineru/paper.tex",
         "mineru/images/*",
         "mineru/mineru-manifest.json",
+        "reader/evidence-map.json",
+        "reader/claim-support.json",
+        "reader/figures.md",
+        "critic/critic-report.json",
+        "critic/research-decision.json",
     ]
     assert wiki_ingest_brief["source_bundle"]["primary_source_reading_order"][:5] == [
         "metadata.json",
@@ -208,6 +215,7 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
     assert "figures/tables/images" in formula_figure_review["figures_tables_images"]
     assert "paper.pdf" in formula_figure_review["parse_uncertainty"]
     assert wiki_ingest_brief["source_bundle"]["evidence"]["claim_count"] >= 3
+    assert wiki_ingest_brief["source_bundle"]["evidence"]["claim_support_artifact"] == "reader/claim-support.json"
     assert wiki_ingest_brief["source_bundle"]["evidence"]["reader_roles"] == [
         "nature-sci-editor",
         "peer-reviewer",

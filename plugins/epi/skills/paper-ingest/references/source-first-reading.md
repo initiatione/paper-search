@@ -48,4 +48,4 @@ Final wiki ingest must read the source bundle again:
 - `mineru/images/*`
 - `mineru/mineru-manifest.json`
 
-Use `reader/evidence-map.json`, `reader/figures.md`, and `critic/*.json` as supporting evidence only. The final wiki pages must not lose the original paper's formulas, figures, tables, source caveats, or negative findings.
+Use `reader/evidence-map.json`, `reader/claim-support.json`, `reader/figures.md`, and `critic/*.json` as supporting evidence only. Treat `source-grounded`, `metadata-only`, and `inferred` claims differently during final wiki writing. The final wiki pages must not lose the original paper's formulas, figures, tables, source caveats, or negative findings.

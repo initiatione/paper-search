@@ -14,6 +14,7 @@ REQUIRED_ARTIFACTS = [
     "reader/figures.md",
     "reader/reproducibility.md",
     "reader/implementation-ideas.md",
+    "reader/claim-support.json",
 ]
 
 

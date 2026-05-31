@@ -52,7 +52,7 @@ After critic pass, staging prepares evidence drafts, `wiki-ingest-brief.json`, a
 `reader/` and critic outputs reduce reading cost; they are not the source of truth for final wiki writing. Before final wiki ingest, load `references/source-first-reading.md`, run `wiki-ingest-handoff`, and verify the handoff requires:
 
 - source artifacts: `paper.pdf`, `metadata.json`, `mineru/paper.md`, `mineru/paper.tex`, `mineru/images/*`, `mineru/mineru-manifest.json`
-- evidence aids: `reader/evidence-map.json`, `reader/figures.md`, `critic/*.json`
+- evidence aids: `reader/evidence-map.json`, `reader/claim-support.json`, `reader/figures.md`, `critic/*.json`
 - formula/figure review: preserve central formulas, notation, derivation cues, figures, tables, image interpretations, parse uncertainty, and source provenance
 
 If the handoff lacks these fields, repair staging or rerun the relevant EPI step before final wiki writing.

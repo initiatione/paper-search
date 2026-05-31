@@ -6,7 +6,7 @@ from pathlib import Path
 from epi.artifacts import file_sha256, utc_now, write_json_atomic, write_text_atomic
 from epi.critic_contracts import critic_protocol
 from epi.paper_quality import review_paper_quality
-from epi.reader_evidence import validate_evidence_map, validate_reader_evidence
+from epi.reader_evidence import validate_claim_support_map, validate_evidence_map, validate_reader_evidence
 from epi.reader_revision_plan import write_reader_revision_plan
 from epi.reproduction_plan import write_reproduction_plan
 from epi.research_decision import write_research_decision
@@ -92,6 +92,7 @@ def run_critics(paper_root: Path) -> dict:
     reproducibility_path = paper_root / "reader" / "reproducibility.md"
     implementation_ideas_path = paper_root / "reader" / "implementation-ideas.md"
     evidence_map_path = paper_root / "reader" / "evidence-map.json"
+    claim_support_path = paper_root / "reader" / "claim-support.json"
     metadata_path = paper_root / "metadata.json"
     try:
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
@@ -135,8 +136,9 @@ def run_critics(paper_root: Path) -> dict:
             },
         )
         map_reader_quality, map_reader_evidence = validate_evidence_map(paper_root)
-        reader_quality = text_reader_quality and map_reader_quality
-        reader_evidence = text_reader_evidence + map_reader_evidence
+        claim_support_quality, claim_support_evidence = validate_claim_support_map(paper_root)
+        reader_quality = text_reader_quality and map_reader_quality and claim_support_quality
+        reader_evidence = text_reader_evidence + map_reader_evidence + claim_support_evidence
     else:
         reader_evidence = ["reader/reader.md missing"]
     role_reviewers = review_role_artifacts(paper_root)
@@ -235,6 +237,7 @@ def run_critics(paper_root: Path) -> dict:
             "reader/reproducibility.md": reproducibility_path,
             "reader/implementation-ideas.md": implementation_ideas_path,
             "reader/evidence-map.json": evidence_map_path,
+            "reader/claim-support.json": claim_support_path,
         }
     )
     finished_at = utc_now()

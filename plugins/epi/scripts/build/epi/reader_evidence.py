@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from epi.claim_support import classify_claim_support
+
 
 REQUIRED_READER_ROLES = {
     "nature-sci-editor",
@@ -200,3 +202,86 @@ def validate_evidence_map(paper_root: Path) -> tuple[bool, list[str]]:
     if failures:
         return False, failures
     return True, [f"Validated {len(claims)} evidence-map claim(s) across {len(seen_roles)} reader role(s)"]
+
+
+def validate_claim_support_map(paper_root: Path, *, required: bool = False) -> tuple[bool, list[str]]:
+    support_path = paper_root / "reader" / "claim-support.json"
+    if not support_path.exists():
+        if required:
+            return False, ["reader/claim-support.json missing"]
+        return True, ["reader/claim-support.json not present; using reader/evidence-map.json only"]
+
+    try:
+        support_map = json.loads(support_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return False, [f"reader/claim-support.json invalid JSON: {exc}"]
+
+    failures: list[str] = []
+    if support_map.get("schema_version") != "epi-claim-support-v1":
+        failures.append("reader/claim-support.json unsupported schema_version")
+
+    claims = support_map.get("claims")
+    if not isinstance(claims, list) or not claims:
+        failures.append("reader/claim-support.json missing claims")
+        claims = []
+
+    evidence_map_claims: dict[str, dict] = {}
+    evidence_map_path = paper_root / "reader" / "evidence-map.json"
+    if evidence_map_path.exists():
+        try:
+            evidence_map = json.loads(evidence_map_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            evidence_map = {}
+        evidence_map_claims = {
+            str(claim.get("claim_id")): claim
+            for claim in evidence_map.get("claims", [])
+            if isinstance(claim, dict) and claim.get("claim_id")
+        }
+
+    seen_statuses: set[str] = set()
+    for index, claim in enumerate(claims, start=1):
+        label = f"reader/claim-support.json claim {index}"
+        if not isinstance(claim, dict):
+            failures.append(f"{label}: claim must be an object")
+            continue
+        for field in (
+            "claim_id",
+            "claim",
+            "reader_role",
+            "reader_artifact",
+            "source",
+            "locator",
+            "evidence_address",
+            "support_status",
+            "support_grade",
+            "epistemic_status",
+        ):
+            if not claim.get(field):
+                failures.append(f"{label}: missing {field}")
+        source = str(claim.get("source") or "")
+        expected_support = classify_claim_support(source)
+        for field, expected in expected_support.items():
+            if claim.get(field) != expected:
+                failures.append(f"{label}: {field}={claim.get(field)} does not match source={source}")
+        support_status = claim.get("support_status")
+        if support_status:
+            seen_statuses.add(str(support_status))
+        claim_id = str(claim.get("claim_id") or "")
+        evidence_claim = evidence_map_claims.get(claim_id)
+        if evidence_claim:
+            for field in ("claim", "reader_role", "reader_artifact", "source", "locator", "evidence_address"):
+                if claim.get(field) != evidence_claim.get(field):
+                    failures.append(f"{label}: {field} does not match reader/evidence-map.json")
+
+    support_counts = support_map.get("support_counts")
+    if not isinstance(support_counts, dict):
+        failures.append("reader/claim-support.json support_counts must be an object")
+    else:
+        actual_counts = {status: sum(1 for claim in claims if isinstance(claim, dict) and claim.get("support_status") == status) for status in seen_statuses}
+        for status, count in actual_counts.items():
+            if support_counts.get(status) != count:
+                failures.append(f"reader/claim-support.json support_counts[{status}] is stale")
+
+    if failures:
+        return False, failures
+    return True, [f"Validated {len(claims)} claim-support record(s) across {len(seen_statuses)} support status(es)"]

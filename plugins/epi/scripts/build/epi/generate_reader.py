@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from epi.artifacts import file_sha256, utc_now, write_json_atomic, write_text_atomic
+from epi.claim_support import build_claim_support_map
 from epi.reader_protocol import (
     READER_ROLES,
     REQUIRED_ARTIFACTS,
@@ -155,9 +156,14 @@ def generate_reader_outputs(paper_root: Path) -> dict:
             "claims": claims,
         },
     )
+    write_json_atomic(
+        reader_dir / "claim-support.json",
+        build_claim_support_map(paper_title=title, claims=claims),
+    )
     return {
         "reader_dir": str(reader_dir),
         "evidence_count": len(claims),
+        "claim_support_count": len(claims),
         "started_at": started_at,
         "finished_at": utc_now(),
         "exit_status": 0,
@@ -174,5 +180,6 @@ def generate_reader_outputs(paper_root: Path) -> dict:
             "reproducibility.md": file_sha256(reader_dir / "reproducibility.md"),
             "implementation-ideas.md": file_sha256(reader_dir / "implementation-ideas.md"),
             "evidence-map.json": file_sha256(reader_dir / "evidence-map.json"),
+            "claim-support.json": file_sha256(reader_dir / "claim-support.json"),
         },
     }

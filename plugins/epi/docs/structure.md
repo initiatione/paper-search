@@ -117,7 +117,7 @@ skills/
 - `paper-discovery`：搜索、排序和 dry-run；当用户要求“1-3”时，指向 `prepare-ranked` 快路，只写 raw 采集和 MinerU 解析产物。
   - `paper-discovery/scripts/query-planner.py` 与 `paper-discovery/references/` 保存可维护检索策略：mode routing、query planner、paper type taxonomy、ranking rubric、domain ontology、source tiers、dedup engine、venue prior、two-stage retrieval、citation graph、evaluation set、multi-source workflow、quality gate、anti-patterns 和对话输出格式。venue prior 从用户画像/config 衍生，社区榜单只进入对应领域的弱 prior，真实指标仍需单独核验。
 - `paper-ingest`：推进已选论文进入 raw、reader、critic、staging 和 handoff。只需 1-3 时使用 `prepare-ranked`，不要误入完整 reader/critic/staging 链。
-  - `paper-ingest/references/source-first-reading.md` 是 reader/critic/staging/wiki handoff 的 source-first 阅读协议，要求最终沉淀前重读 MinerU Markdown、TeX、images、manifest 和必要时的 PDF。
+  - `paper-ingest/references/source-first-reading.md` 是 reader/critic/staging/wiki handoff 的 source-first 阅读协议，要求最终沉淀前重读 MinerU Markdown、TeX、images、manifest 和必要时的 PDF，并使用 `reader/claim-support.json` 区分源文摘取、metadata-only 与 inference。
 - `mineru-paper-parser`：低层 PDF -> Markdown/TeX/images/manifest 解析能力；成功后最终产物只放在 `mineru/`，`paper.tex` 必须非空，必要时使用 Markdown fallback。
 - `skill-aware-evolve`：根据 evidence 和验证结果提出受控变更；配置问题必须走配置 proposal。
 - `wiki-setup`：初始化、检查、修复和重置 paper wiki vault。入口只保留边界和命令，详细恢复与误删清单见 `skills/wiki-setup/references/reset-recovery.md`。初始化会创建 `AGENTS.md` 和 `_meta/agent-operating-contract.md`、`_meta/schema.md`、`_meta/taxonomy.md`、`_meta/directory-structure.md`，默认要求 source-first paper ingest：最终 wiki 写入先读 `mineru/paper.md`、`mineru/paper.tex`、`mineru/images/*` 和 manifest。
