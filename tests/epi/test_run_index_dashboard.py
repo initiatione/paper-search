@@ -472,6 +472,65 @@ def test_refresh_run_index_surfaces_research_decisions(tmp_path):
     assert "decision: embodied-control -> revise-reader / revise-reader" in dashboard_text
 
 
+def test_refresh_run_index_surfaces_zotero_results_in_index_and_dashboard(tmp_path):
+    vault_path = tmp_path / "vault"
+    runs_root = vault_path / "_runs"
+    runs_root.mkdir(parents=True, exist_ok=True)
+
+    _seed_run(
+        runs_root,
+        "20260528T122000Z-record-wiki",
+        run_state={
+            "run_id": "20260528T122000Z-record-wiki",
+            "workflow_type": "record-wiki-ingest",
+            "state": "wiki_ingest_recorded",
+            "status": "success",
+            "paper_slug": "paper-a",
+            "started_at": "2026-05-28T12:20:00Z",
+            "finished_at": "2026-05-28T12:21:00Z",
+        },
+        report={
+            "next_actions": ["review-recorded-wiki-pages"],
+            "human_gate": {"status": "approved", "approved_by": "codex-test"},
+            "zotero_results": {
+                "status": "recorded",
+                "collection": "Reading Lab",
+                "wiki_ingest": {"final_wiki_pages": [{"relative_path": "papers/paper-a.md"}]},
+            },
+        },
+    )
+    _seed_run(
+        runs_root,
+        "20260528T121000Z-promote",
+        run_state={
+            "run_id": "20260528T121000Z-promote",
+            "workflow_type": "promote-to-wiki",
+            "state": "promoted",
+            "status": "success",
+            "paper_slug": "paper-b",
+            "started_at": "2026-05-28T12:10:00Z",
+            "finished_at": "2026-05-28T12:11:00Z",
+            "zotero_results": {
+                "status": "skipped",
+                "reason": "zotero_disabled",
+                "collection": "EPI",
+            },
+        },
+        report={"next_actions": []},
+    )
+
+    index_payload = refresh_run_index(vault_path)
+    dashboard_text = (runs_root / "dashboard.md").read_text(encoding="utf-8")
+    success_text = (runs_root / "dashboard-recent-success.md").read_text(encoding="utf-8")
+
+    assert index_payload["runs"][0]["zotero_results"]["status"] == "recorded"
+    assert index_payload["runs"][0]["zotero_results"]["collection"] == "Reading Lab"
+    assert index_payload["runs"][1]["zotero_results"]["reason"] == "zotero_disabled"
+    assert "zotero: recorded | collection=Reading Lab" in dashboard_text
+    assert "zotero: skipped | collection=EPI | reason=zotero_disabled" in dashboard_text
+    assert "zotero: recorded | collection=Reading Lab" in success_text
+
+
 def test_refresh_run_index_writes_research_queue_from_decisions_revision_plans_and_delta(tmp_path):
     vault_path = tmp_path / "vault"
     runs_root = vault_path / "_runs"

@@ -537,12 +537,14 @@ def _handle_promote_to_wiki(args: argparse.Namespace) -> int:
     record = workflows.promote_paper(args.vault, args.slug, approved_by=args.approved_by)
     paper_root = raw_paper_root(vault_path, args.slug)
     promotion_record_path = paper_root / "promotion-record.json"
+    zotero_results = workflows._zotero_record_only(vault_path, paper_root)
     workflows._write_promotion_routed_report(
         run_dir,
         run_id=run_id,
         slug=args.slug,
         promoted_page_paths=record["promoted_page_paths"],
         human_gate=record.get("human_gate_decision", {}),
+        zotero_results=zotero_results,
     )
     workflows._write_promotion_or_rollback_run_state(
         run_dir,
@@ -556,10 +558,12 @@ def _handle_promote_to_wiki(args: argparse.Namespace) -> int:
         output_artifact_hashes=workflows._hash_existing_outputs(
             {
                 "promotion-record.json": promotion_record_path,
+                "zotero-record.json": paper_root / "zotero-record.json",
                 "report.md": run_dir / "report.md",
                 "report.json": run_dir / "report.json",
             }
         ),
+        zotero_results=zotero_results,
     )
     workflows._refresh_run_index(vault_path)
     print(f"promotion_status={record['status']}")

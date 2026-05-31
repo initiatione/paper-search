@@ -113,6 +113,25 @@ def _append_reproduction_plan_section(report: list[str], plans: list[dict]) -> N
         report.append("   - note: keep reproduction as a short verification cue unless the user asks for a full run.")
 
 
+def _append_zotero_section(report: list[str], zotero_results: dict) -> None:
+    status = zotero_results.get("status")
+    if status in {None, "not_run"}:
+        return
+    report.append("")
+    report.append("## Zotero")
+    report.append(f"- status: {status}")
+    if zotero_results.get("reason"):
+        report.append(f"- reason: {zotero_results['reason']}")
+    if zotero_results.get("collection"):
+        report.append(f"- collection: {zotero_results['collection']}")
+    if zotero_results.get("item_key"):
+        report.append(f"- item_key: {zotero_results['item_key']}")
+    wiki_ingest = zotero_results.get("wiki_ingest") if isinstance(zotero_results.get("wiki_ingest"), dict) else {}
+    final_pages = wiki_ingest.get("final_wiki_pages") if isinstance(wiki_ingest.get("final_wiki_pages"), list) else []
+    if final_pages:
+        report.append(f"- final_wiki_pages: {len(final_pages)}")
+
+
 def write_report(
     run_dir: Path,
     ranked: list[dict],
@@ -204,6 +223,7 @@ def write_report(
             report.append("## Errors")
             for error in errors:
                 report.append(f"- {error}")
+        _append_zotero_section(report, zotero_results)
         report.append("")
         report.append("## Research Queue")
         _append_queue_section(report, "Advance Candidates", research_queue["advance_candidates"])
@@ -283,6 +303,7 @@ def write_report(
         _append_reader_revision_plan_section(report, reader_revision_plans)
         report.append("")
         _append_reproduction_plan_section(report, reproduction_plans)
+        _append_zotero_section(report, zotero_results)
         if human_gate:
             report.append("")
             report.append("## Human Gate")

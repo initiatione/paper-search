@@ -7,7 +7,7 @@ from pathlib import Path
 
 from epi.acquire_papers import acquire_paper, acquire_paper_from_url
 from epi.artifacts import file_sha256, json_sha256, raw_paper_root, utc_now, write_json_atomic, write_text_atomic
-from epi.config import load_config
+from epi.config import load_config, load_wiki_config
 from epi.feedback import record_feedback
 from epi.evaluation_loop import build_improvement_brief, render_improvement_brief, write_improvement_brief
 from epi.filter_candidates import default_discovery_exclusion_terms, filter_candidates, filter_candidates_with_report
@@ -66,6 +66,21 @@ def _hash_existing_outputs(paths: dict[str, Path]) -> dict[str, str]:
         if path.exists():
             hashes[name] = file_sha256(path)
     return hashes
+
+
+def _zotero_record_only(vault_path: Path, paper_root: Path) -> dict:
+    config = load_wiki_config(vault_path) or {}
+    zotero_config = config.get("zotero") if isinstance(config.get("zotero"), dict) else {}
+    enabled = bool(zotero_config.get("enabled", False))
+    collection = str(zotero_config.get("collection") or "EPI")
+    reason = "zotero_not_configured" if not config else "zotero_disabled"
+    return sync_zotero_record(
+        paper_root,
+        enabled=enabled,
+        collection=collection,
+        mode="record-only",
+        reason=reason,
+    )
 
 
 def _tool_versions(*tool_names: str) -> dict[str, str]:
@@ -334,26 +349,27 @@ def _write_promotion_or_rollback_run_state(
     finished_at: str,
     input_artifact_hashes: dict[str, str],
     output_artifact_hashes: dict[str, str],
+    zotero_results: dict | None = None,
 ) -> None:
-    _write_json(
-        run_dir / "run-state.json",
-        {
-            "stage": workflow_type,
-            "run_id": run_id,
-            "workflow_type": workflow_type,
-            "state": "reported",
-            "status": "success",
-            "paper_slug": slug,
-            "vault_path": str(vault_path),
-            "compiled_wiki_write": True,
-            "started_at": started_at,
-            "finished_at": finished_at,
-            "exit_status": 0,
-            "tool_versions": _tool_versions("orchestrator", "report_run", "promote_to_wiki"),
-            "input_artifact_hashes": input_artifact_hashes,
-            "output_artifact_hashes": output_artifact_hashes,
-        },
-    )
+    state = {
+        "stage": workflow_type,
+        "run_id": run_id,
+        "workflow_type": workflow_type,
+        "state": "reported",
+        "status": "success",
+        "paper_slug": slug,
+        "vault_path": str(vault_path),
+        "compiled_wiki_write": True,
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "exit_status": 0,
+        "tool_versions": _tool_versions("orchestrator", "report_run", "promote_to_wiki"),
+        "input_artifact_hashes": input_artifact_hashes,
+        "output_artifact_hashes": output_artifact_hashes,
+    }
+    if zotero_results is not None:
+        state["zotero_results"] = zotero_results
+    _write_json(run_dir / "run-state.json", state)
 
 
 def _write_wiki_ingest_record_report(
@@ -362,6 +378,7 @@ def _write_wiki_ingest_record_report(
     run_id: str,
     slug: str,
     record: dict,
+    zotero_results: dict,
 ) -> None:
     next_actions = ["review-recorded-wiki-pages"]
     page_paths = record.get("relative_page_paths") or record.get("page_paths") or []
@@ -391,7 +408,7 @@ def _write_wiki_ingest_record_report(
         failed_papers=[],
         budget_usage={"paper_count": 1, "recorded_page_count": len(page_paths)},
         wiki_pages_written=page_paths,
-        zotero_results={"status": "not_run", "records": []},
+        zotero_results=zotero_results,
         next_actions=next_actions,
         human_gate=human_gate,
         changed_artifacts=changed_artifacts,
@@ -408,6 +425,7 @@ def _write_wiki_ingest_record_report(
     report_payload["next_actions"] = next_actions
     report_payload["wiki_ingest_record"] = record
     report_payload["page_records"] = record.get("page_records") or []
+    report_payload["zotero_results"] = zotero_results
     _write_json(report_json_path, report_payload)
 
 
@@ -439,7 +457,14 @@ def record_wiki_ingest(
         f"final_page:{page['relative_path']}": page["sha256"]
         for page in record.get("page_records") or []
     }
-    _write_wiki_ingest_record_report(run_dir, run_id=run_id, slug=slug, record=record)
+    zotero_results = _zotero_record_only(vault_path, paper_root)
+    _write_wiki_ingest_record_report(
+        run_dir,
+        run_id=run_id,
+        slug=slug,
+        record=record,
+        zotero_results=zotero_results,
+    )
     _write_json(
         run_dir / "run-state.json",
         {
@@ -471,10 +496,12 @@ def record_wiki_ingest(
                 {
                     "wiki-ingest-record.raw.json": raw_record_path,
                     "wiki-ingest-record.staging.json": staging_record_path,
+                    "zotero-record.json": paper_root / "zotero-record.json",
                     "report.md": run_dir / "report.md",
                     "report.json": run_dir / "report.json",
                 }
             ),
+            "zotero_results": zotero_results,
         },
     )
     _write_paper_run_state(
@@ -496,6 +523,8 @@ def record_wiki_ingest(
         "record": record,
         "record_path": str(raw_record_path),
         "staging_record_path": str(staging_record_path),
+        "zotero_results": zotero_results,
+        "zotero_record_path": str(paper_root / "zotero-record.json"),
     }
 
 
@@ -506,6 +535,7 @@ def _write_promotion_routed_report(
     slug: str,
     promoted_page_paths: list[str],
     human_gate: dict,
+    zotero_results: dict,
 ) -> None:
     next_actions = ["review-promoted-pages"]
     report_paper_states = [
@@ -529,7 +559,7 @@ def _write_promotion_routed_report(
         failed_papers=[],
         budget_usage={},
         wiki_pages_written=promoted_page_paths,
-        zotero_results={"status": "not_run", "records": []},
+        zotero_results=zotero_results,
         next_actions=next_actions,
     )
     report_json_path = run_dir / "report.json"
@@ -541,6 +571,7 @@ def _write_promotion_routed_report(
     report_payload["wiki_pages_written"] = promoted_page_paths
     report_payload["human_gate"] = human_gate
     report_payload["next_actions"] = next_actions
+    report_payload["zotero_results"] = zotero_results
     _write_json(report_json_path, report_payload)
     _append_report_sections(
         run_dir / "report.md",

@@ -135,6 +135,23 @@ def _write_final_page(vault, relative, content):
     return path
 
 
+def _enable_zotero(vault, *, collection="EPI Lab"):
+    config = vault / "_meta" / "epi-config.yaml"
+    config.parent.mkdir(parents=True, exist_ok=True)
+    config.write_text(
+        "\n".join(
+            [
+                "profile: general_academic_research",
+                "zotero:",
+                "  enabled: true",
+                f"  collection: {json.dumps(collection)}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 def _run_orchestrator_cli(monkeypatch, capsys, *args):
     monkeypatch.setattr(sys, "argv", ["epi.orchestrator", *args])
     exit_code = main()
@@ -197,10 +214,42 @@ def test_record_wiki_ingest_records_agent_pages_without_modifying_them(tmp_path)
     assert report_json["wiki_pages_written"] == ["papers/fixture-paper.md", "concepts/fixture-concept.md"]
     assert report_json["human_gate"]["status"] == "approved"
     assert report_json["page_records"][0]["relative_path"] == "papers/fixture-paper.md"
+    assert report_json["zotero_results"]["status"] == "skipped"
+    assert report_json["zotero_results"]["reason"] == "zotero_not_configured"
+    zotero_record = json.loads((vault / "_raw" / "papers" / slug / "zotero-record.json").read_text(encoding="utf-8"))
+    assert zotero_record["wiki_ingest"]["final_wiki_pages"][0]["relative_path"] == "papers/fixture-paper.md"
     assert run_state["compiled_wiki_write"] is False
     assert run_state["record_only"] is True
+    assert run_state["zotero_results"]["reason"] == "zotero_not_configured"
     assert paper_state["state"] == "wiki_ingest_recorded"
     assert paper_state["next_action"] == "review-recorded-wiki-pages"
+
+
+def test_record_wiki_ingest_uses_enabled_zotero_config_in_report(tmp_path):
+    vault = tmp_path / "vault"
+    slug = _seed_agent_handoff(vault)
+    _enable_zotero(vault, collection="Reading Lab")
+    page = _write_final_page(vault, "papers/fixture-paper.md", "# Final Reference\n")
+
+    result = record_wiki_ingest(vault, slug, [str(page)], approved_by="codex-test")
+
+    raw_zotero = json.loads((vault / "_raw" / "papers" / slug / "zotero-record.json").read_text(encoding="utf-8"))
+    assert raw_zotero["schema_version"] == "epi-zotero-record-v1"
+    assert raw_zotero["status"] == "recorded"
+    assert raw_zotero["record_only"] is True
+    assert raw_zotero["collection"] == "Reading Lab"
+    assert raw_zotero["paper_metadata"]["title"] == "Fixture Paper"
+    assert raw_zotero["wiki_ingest"]["status"] == "recorded"
+    assert raw_zotero["wiki_ingest"]["final_wiki_pages"][0]["relative_path"] == "papers/fixture-paper.md"
+
+    run_dir = vault / "_runs" / result["run_id"]
+    report_json = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
+    report_md = (run_dir / "report.md").read_text(encoding="utf-8")
+    assert report_json["zotero_results"]["status"] == "recorded"
+    assert report_json["zotero_results"]["collection"] == "Reading Lab"
+    assert "## Zotero" in report_md
+    assert "- status: recorded" in report_md
+    assert "- final_wiki_pages: 1" in report_md
 
 
 def test_create_wiki_ingest_record_rejects_missing_human_approval(tmp_path):
@@ -258,3 +307,5 @@ def test_record_wiki_ingest_cli_outputs_json(tmp_path, monkeypatch, capsys):
     assert payload["record"]["status"] == "recorded"
     assert payload["record"]["relative_page_paths"] == ["papers/fixture-paper.md"]
     assert payload["run_id"].startswith("record-wiki-ingest-")
+    assert payload["zotero_results"]["status"] == "skipped"
+    assert payload["zotero_record_path"].endswith("zotero-record.json")

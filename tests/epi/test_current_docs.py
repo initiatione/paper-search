@@ -54,8 +54,8 @@ def test_progress_doc_records_status_verification_and_next_steps():
     assert "wiki-ingest-handoff" in text
     assert "record-wiki-ingest" in text
     assert "wiki_ingest_recorded" in text
-    assert "279 passed in 37.63s" in text
-    assert "36 passed in 5.42s" in text
+    assert "287 passed in 29.83s" in text
+    assert "37 passed in 0.92s" in text
     assert "pass rate `1`" in text
     assert "82/100" in text
     assert "waiting_for_human_gate" in text

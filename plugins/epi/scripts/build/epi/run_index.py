@@ -61,6 +61,11 @@ def _normalize_run_entry(run_dir):
         "next_actions": report.get("next_actions", []),
         "human_gate": report.get("human_gate"),
     }
+    zotero_results = report.get("zotero_results")
+    if not isinstance(zotero_results, dict):
+        zotero_results = run_state.get("zotero_results")
+    if isinstance(zotero_results, dict):
+        entry["zotero_results"] = zotero_results
     research_decisions = report.get("research_decisions") or []
     if research_decisions:
         entry["research_decisions"] = research_decisions
@@ -411,6 +416,34 @@ def _render_revision_plan_lines(entry):
     return lines
 
 
+def _render_zotero_line(entry):
+    zotero_results = entry.get("zotero_results")
+    if not isinstance(zotero_results, dict):
+        return None
+    status = zotero_results.get("status")
+    if status in {None, "not_run"}:
+        return None
+    parts = [f"  zotero: {status}"]
+    if zotero_results.get("collection"):
+        parts.append(f"collection={zotero_results['collection']}")
+    if zotero_results.get("reason"):
+        parts.append(f"reason={zotero_results['reason']}")
+    if zotero_results.get("item_key"):
+        parts.append(f"item_key={zotero_results['item_key']}")
+    return " | ".join(parts)
+
+
+def _append_run_detail_lines(lines, entry):
+    next_line = _render_next_line(entry)
+    if next_line:
+        lines.append(next_line)
+    zotero_line = _render_zotero_line(entry)
+    if zotero_line:
+        lines.append(zotero_line)
+    lines.extend(_render_decision_lines(entry))
+    lines.extend(_render_revision_plan_lines(entry))
+
+
 def _render_research_queue(queue):
     lines = ["# EPI Research Queue", ""]
     for bucket in _RESEARCH_QUEUE_BUCKETS:
@@ -691,11 +724,7 @@ def _render_dashboard(entries, summary, research_queue=None):
     if attention_entries:
         for entry in attention_entries:
             lines.append(_render_run_line(entry))
-            next_line = _render_next_line(entry)
-            if next_line:
-                lines.append(next_line)
-            lines.extend(_render_decision_lines(entry))
-            lines.extend(_render_revision_plan_lines(entry))
+            _append_run_detail_lines(lines, entry)
     else:
         lines.append("No runs need attention.")
 
@@ -707,11 +736,7 @@ def _render_dashboard(entries, summary, research_queue=None):
     if grouped["latest_failures"]:
         for entry in grouped["latest_failures"]:
             lines.append(_render_run_line(entry))
-            next_line = _render_next_line(entry)
-            if next_line:
-                lines.append(next_line)
-            lines.extend(_render_decision_lines(entry))
-            lines.extend(_render_revision_plan_lines(entry))
+            _append_run_detail_lines(lines, entry)
     else:
         lines.append("No failed runs.")
 
@@ -719,11 +744,7 @@ def _render_dashboard(entries, summary, research_queue=None):
     if grouped["latest_human_gate_pending"]:
         for entry in grouped["latest_human_gate_pending"]:
             lines.append(_render_run_line(entry))
-            next_line = _render_next_line(entry)
-            if next_line:
-                lines.append(next_line)
-            lines.extend(_render_decision_lines(entry))
-            lines.extend(_render_revision_plan_lines(entry))
+            _append_run_detail_lines(lines, entry)
     else:
         lines.append("No runs waiting on a human gate.")
 
@@ -732,11 +753,7 @@ def _render_dashboard(entries, summary, research_queue=None):
         for workflow_type, entry in grouped["latest_success_by_workflow"].items():
             lines.append(f"- {workflow_type}: {entry.get('run_id', '-')}")
             lines.append(f"  {entry.get('status', 'unknown')} / {entry.get('state', 'unknown')} | {entry.get('paper_slug') or '-'}")
-            next_line = _render_next_line(entry)
-            if next_line:
-                lines.append(next_line)
-            lines.extend(_render_decision_lines(entry))
-            lines.extend(_render_revision_plan_lines(entry))
+            _append_run_detail_lines(lines, entry)
     else:
         lines.append("No successful runs yet.")
 
@@ -747,11 +764,7 @@ def _render_dashboard(entries, summary, research_queue=None):
     lines.extend(["", "## Recent Runs", ""])
     for entry in entries:
         lines.append(_render_run_line(entry))
-        next_line = _render_next_line(entry)
-        if next_line:
-            lines.append(next_line)
-        lines.extend(_render_decision_lines(entry))
-        lines.extend(_render_revision_plan_lines(entry))
+        _append_run_detail_lines(lines, entry)
     lines.append("")
     return "\n".join(lines)
 
@@ -764,11 +777,7 @@ def _render_filtered_dashboard(title, entries, empty_text):
 
     for entry in entries:
         lines.append(_render_run_line(entry))
-        next_line = _render_next_line(entry)
-        if next_line:
-            lines.append(next_line)
-        lines.extend(_render_decision_lines(entry))
-        lines.extend(_render_revision_plan_lines(entry))
+        _append_run_detail_lines(lines, entry)
     lines.append("")
     return "\n".join(lines)
 

@@ -100,7 +100,8 @@ scripts/build/epi/
 - `wiki_ingest_handoff.py` 是只读 handoff 渲染器，给最终 wiki ingest agent 提供路径、规则优先级和 checklist。
 - `wiki_ingest_record.py` 是 agent-mediated 完成态记录器：只读取最终 Markdown 页面、校验路径在 vault 内且不在 EPI 内部目录、记录 hash 和 human approval，不写最终页面。
 - `promote_to_wiki.py` 只保留 legacy compiled-draft promotion 和 rollback，不能替代 agent-mediated wiki ingest。
-- `run_index.py` 负责 `_runs/index.json`、dashboard 和 `research-queue.json`，并在 ready queue 里嵌入当前 paper-gate 摘要。
+- `zotero_sync.py` 负责本地 record-only Zotero sidecar：读取论文 metadata 和 wiki ingest record，写 `zotero-record.json`，不调用外部 Zotero API。
+- `run_index.py` 负责 `_runs/index.json`、dashboard 和 `research-queue.json`，并在 ready queue 里嵌入当前 paper-gate 摘要；record/promote routed runs 会把 `zotero_results` 带入 index 和 dashboard。
 - `wiki_query.py` 只查询 legacy manifest/index 视角，不能代表目标 vault 的全部知识图谱。
 - `skill_aware_evolve.py` 负责 proposal-based 自进化，默认不直接修改插件代码、用户配置或 compiled wiki。
 - `evaluation_loop.py` 负责插件开发质量环：合并 Plugin Eval、`epi-quality-gates`、benchmark、before/after metrics，写出 `epi-improvement-brief-v1` JSON/Markdown 和 `proposed_evolution` payload。默认输出目录是 `.plugin-eval/improvement-briefs/`，属于本地开发产物。
@@ -125,7 +126,7 @@ skills/
 - `mineru-paper-parser`：低层 PDF -> Markdown/TeX/images/manifest 解析能力；成功后最终产物只放在 `mineru/`，`paper.tex` 必须非空，必要时使用 Markdown fallback。
 - `skill-aware-evolve`：根据 evidence 和验证结果提出受控变更；配置问题必须走配置 proposal。
 - `wiki-setup`：初始化、检查、修复和重置 paper wiki vault。入口只保留边界和命令，详细恢复与误删清单见 `skills/wiki-setup/references/reset-recovery.md`。初始化会创建 `AGENTS.md` 和 `_meta/agent-operating-contract.md`、`_meta/schema.md`、`_meta/taxonomy.md`、`_meta/directory-structure.md`，默认要求 source-first paper ingest：最终 wiki 写入先读 `mineru/paper.md`、`mineru/paper.tex`、`mineru/images/*` 和 manifest。
-- `zotero-sync`：Zotero 记录和可选同步，默认安全边界是本地记录优先。
+- `zotero-sync`：Zotero 记录和可选同步，默认安全边界是本地记录优先；`record-wiki-ingest` 和 legacy `promote-to-wiki` 会自动写 record-only sidecar 并把结果带入 report。
 
 ## Vault Artifact 结构
 
@@ -150,6 +151,7 @@ EPI 默认 vault 形态：
       paper.pdf
       metadata.json
       acquire-record.json
+      zotero-record.json
       mineru/
       reader/
       critic/
@@ -177,6 +179,7 @@ EPI 默认 vault 形态：
 - `wiki-ingest-handoff` 和 `paper-gate` 都是只读。
 - 当前默认 agent-mediated plan 不写 compiled wiki。
 - agent-mediated wiki ingest 完成后，用 `record-wiki-ingest` 只写 `_raw/papers/<slug>/wiki-ingest-record.json` 和 `_staging/papers/<slug>/wiki-ingest-record.json`，记录目标 vault agent 已写出的最终 Markdown 页及其 sha256；它不得修改最终页、manifest、index、log 或 hot。
+- Zotero 集成只写 `_raw/papers/<slug>/zotero-record.json` 和 run report 中的 `zotero_results`；它不得调用外部 API、改 final wiki 页或删除 Zotero 数据。
 - legacy `promote-to-wiki` 只处理显式 compiled targets，并要求 `approved-by`。
 
 ## 测试与发布结构
