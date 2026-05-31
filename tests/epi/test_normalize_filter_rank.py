@@ -71,6 +71,25 @@ def test_filter_candidates_can_hard_exclude_reviews_when_requested():
     assert report["rejected"][0]["filter_reasons"] == ["excluded_terms:review,systematic review"]
 
 
+def test_filter_candidates_matches_domain_anchors_across_method_words():
+    candidates = [
+        {
+            "title": "AUV Reinforcement Learning Control: A Systematic Review",
+            "abstract": "This systematic review surveys autonomous underwater vehicle control.",
+            "pdf_url": "https://example.org/review.pdf",
+        }
+    ]
+
+    report = filter_candidates_with_report(
+        candidates,
+        domains=["auv control"],
+        require_pdf=True,
+        exclude_terms=[],
+    )
+
+    assert report["kept"][0]["title"] == "AUV Reinforcement Learning Control: A Systematic Review"
+
+
 def test_exclusion_terms_from_query_accepts_chinese_review_request():
     terms = exclusion_terms_from_query("AUV 结合 RL AI 控制方向论文，这次不找综述类型论文")
 

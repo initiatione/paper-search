@@ -39,6 +39,7 @@ paper-discovery/
 - 不把 `paper_search_mcp` 返回结果本身当成质量定义。
 - 先用用户画像/config + Query Planner 做概念块拆分，再构造 5-8 个 query variants。
 - 从 config 的 domains、positive_keywords、negative_keywords、venue_prior 和当前请求衍生匹配词、同义词、验证证据和排除项；不要把某个学科写成全局默认。
+- Query plan 会额外计算 `domain_focus_terms`；这组词是当前请求的对象/任务/应用锚点，用来做 hard gate。像 reinforcement learning、graph neural network、deep learning 这种宽方法词只用于召回，不足以单独放行。
 - Query plan 的扩展词用于召回和 gap checks；ranking 的画像匹配词只用用户 config 和当前请求核心词，避免宽召回词稀释窄主题相关性。
 - 两阶段检索：先做高召回 candidate pool，再去重、核验、精排。
 - 按 source tier 路由：结构化学术源优先，网页/出版社页面用于核验和补召回。

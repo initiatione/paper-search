@@ -166,6 +166,12 @@ def test_query_planner_promotes_explicit_topic_domain_over_broad_profile_terms()
     )
 
     assert plan["domain"] == "profile-derived"
+    assert plan["concept_blocks"]["domain_focus_terms"] == [
+        "AUV control",
+        "autonomous underwater vehicle",
+        "unmanned underwater vehicle",
+        "underwater robot",
+    ]
     assert plan["concept_blocks"]["domain_terms"][0] in {"AUV control", "autonomous underwater vehicle"}
     assert "autonomous underwater vehicle" in plan["concept_blocks"]["domain_terms"]
     assert "Ocean Engineering" in plan["recall_gap_checks"]["venue_families"]
@@ -174,6 +180,23 @@ def test_query_planner_promotes_explicit_topic_domain_over_broad_profile_terms()
         query.startswith('robotics "robot control"')
         for query in plan["query_variants"][:3]
     )
+
+
+def test_query_planner_derives_generic_topic_anchors_from_narrow_request():
+    plan = build_query_plan(
+        "latest high quality graph neural network molecular property prediction papers not review",
+        domain="auto",
+        non_review=True,
+        max_queries=5,
+        profile="machine_learning_research",
+        domains=["machine learning", "artificial intelligence"],
+        positive_keywords=["graph neural network", "deep learning"],
+    )
+
+    assert plan["domain"] == "profile-derived"
+    assert "molecular property prediction" in plan["concept_blocks"]["domain_focus_terms"]
+    assert "graph neural network" not in plan["concept_blocks"]["domain_focus_terms"]
+    assert plan["concept_blocks"]["domain_terms"][0] == "molecular property prediction"
 
 
 def test_query_planner_module_matches_skill_wrapper_shape():

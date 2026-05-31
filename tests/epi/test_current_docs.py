@@ -81,6 +81,7 @@ def test_linkage_doc_records_paper_discovery_bundle_and_venue_prior():
     assert "references/evaluation-set.md" in text
     assert "references/workflows/multi-source-discovery.md" in text
     assert "query_plan" in text
+    assert "domain_focus_terms" in text
     assert "5-8 条 query variants" in text
     assert "two-stage retrieval" in text
     assert "--no-query-plan" in text

@@ -130,13 +130,16 @@ def _venue_tiers_from_profile(config, query_plan: dict | None) -> dict[str, floa
 
 
 def _filter_domains_from_profile(config, query_plan: dict | None) -> list[str]:
-    if config.domains:
-        return config.domains
     if query_plan:
         blocks = query_plan.get("concept_blocks") or {}
+        domain_focus_terms = blocks.get("domain_focus_terms") or []
+        if isinstance(domain_focus_terms, list) and domain_focus_terms:
+            return [str(term) for term in domain_focus_terms]
         domain_terms = blocks.get("domain_terms") or []
         if isinstance(domain_terms, list):
             return [str(term) for term in domain_terms]
+    if config.domains:
+        return config.domains
     return []
 
 

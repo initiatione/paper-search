@@ -8,7 +8,7 @@ Use the query planner before the first search whenever the user asks for high-qu
 | --- | --- |
 | `domain` | `profile-derived` by default when config has a user profile; explicit packs are only optional hints |
 | `profile` | The config fields used to derive search terms: profile name, domains, positive/negative keywords, venue prior |
-| `concept_blocks` | Profile terms, domain terms, method/topic terms, problem terms, context terms, quality signals, and exclusions |
+| `concept_blocks` | Profile terms, domain terms, `domain_focus_terms`, method/topic terms, problem terms, context terms, quality signals, and exclusions |
 | `query_variants` | 5-8 query variants derived from config/profile plus the request topic |
 | `source_route` | T1/T2/T3 sources to search and what each source is expected to contribute |
 | `recall_gap_checks` | Venue families, citation graph checks, and missing-source checks to run if first results look weak |
@@ -35,3 +35,4 @@ Use it when the user gives a compact request. The helper output is a starting po
 5. If the plan produces fewer than 5 strong variants, expand from the user's configured field vocabulary before broadening into generic AI/science terms.
 6. Domain hint packs such as AUV/control or embodied AI are examples only. They must activate from explicit user request/config, never as global plugin defaults.
 7. Treat query-plan expansion terms as recall aids, not ranking requirements. Ranking/profile fit should use configured interests plus the current topic focus terms, so broad recall terms do not demote a precise, high-quality paper.
+8. For narrow requests, compute `domain_focus_terms` before filtering. Prefer request/config terms that identify the object, task, disease, material, platform, organism, venue family, or application domain; broad method family phrases such as reinforcement learning, graph neural network, deep learning, or generic AI are recall/method terms, not enough to pass the hard domain gate by themselves.

@@ -314,6 +314,73 @@ def test_dry_run_with_generic_config_derives_filter_terms_from_query_plan(tmp_pa
     assert "outside_domain" in report["rejected"][0]["filter_reasons"]
 
 
+def test_dry_run_filters_method_only_results_with_generic_topic_anchors(tmp_path):
+    plugin_root = tmp_path / "plugin"
+    templates = plugin_root / "templates"
+    templates.mkdir(parents=True)
+    (templates / "interests.example.yaml").write_text(
+        "profile: machine_learning_research\n"
+        "domains:\n"
+        "  - machine learning\n"
+        "  - artificial intelligence\n"
+        "positive_keywords:\n"
+        "  - graph neural network\n"
+        "  - deep learning\n"
+        "negative_keywords:\n"
+        "  - review\n"
+        "venue_prior: []\n"
+        "budget:\n"
+        "  max_results: 5\n",
+        encoding="utf-8",
+    )
+    fixture = tmp_path / "fixture.json"
+    fixture.write_text(
+        json.dumps(
+            [
+                {
+                    "source": "fixture",
+                    "title": "Graph Neural Networks for Molecular Property Prediction",
+                    "authors": ["C. Chemist"],
+                    "year": 2025,
+                    "venue": "Journal of Chemical Information and Modeling",
+                    "abstract": "Molecular property prediction with graph neural network benchmarks.",
+                    "pdf_url": "https://example.org/molecule.pdf",
+                    "citation_count": 12,
+                },
+                {
+                    "source": "fixture",
+                    "title": "Scalable Graph Neural Network Training",
+                    "authors": ["M. Researcher"],
+                    "year": 2025,
+                    "venue": "arXiv",
+                    "abstract": "A graph neural network and deep learning benchmark for generic node classification.",
+                    "pdf_url": "https://example.org/gnn.pdf",
+                    "citation_count": 3,
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    run_dir = run_dry_run(
+        plugin_root=plugin_root,
+        vault_path=tmp_path / "vault",
+        query="latest high quality graph neural network molecular property prediction papers not review",
+        max_results=5,
+        fixture_path=fixture,
+    )
+
+    query_plan = json.loads((run_dir / "query-plan.json").read_text(encoding="utf-8"))
+    report = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
+
+    assert "molecular property prediction" in query_plan["concept_blocks"]["domain_focus_terms"]
+    assert [candidate["title"] for candidate in report["accepted"]] == [
+        "Graph Neural Networks for Molecular Property Prediction"
+    ]
+    rejected = {candidate["title"]: candidate["filter_reasons"] for candidate in report["rejected"]}
+    assert rejected["Scalable Graph Neural Network Training"] == ["outside_domain"]
+
+
 def test_dry_run_ranking_does_not_dilute_topic_fit_with_recall_expansion_terms(tmp_path):
     plugin_root = tmp_path / "plugin"
     _write_minimal_plugin_template(plugin_root)
@@ -356,6 +423,76 @@ def test_dry_run_ranking_does_not_dilute_topic_fit_with_recall_expansion_terms(t
     assert "world model" not in ranked[0]["ranking_protocol"]["matched_positive_keywords"]
     assert ranked[0]["ranking_signals"]["topic_score"] >= 0.6
     assert ranked[0]["ranking_protocol"]["decision"] == "advance-candidate"
+
+
+def test_dry_run_filters_method_only_results_when_topic_has_domain_anchors(tmp_path):
+    plugin_root = tmp_path / "plugin"
+    templates = plugin_root / "templates"
+    templates.mkdir(parents=True)
+    (templates / "interests.example.yaml").write_text(
+        "profile: robotics_ai_control\n"
+        "domains:\n"
+        "  - robotics\n"
+        "  - robot control\n"
+        "  - reinforcement learning\n"
+        "  - AUV control\n"
+        "positive_keywords:\n"
+        "  - reinforcement learning\n"
+        "  - AUV\n"
+        "  - underwater robot\n"
+        "negative_keywords:\n"
+        "  - review\n"
+        "budget:\n"
+        "  max_results: 5\n",
+        encoding="utf-8",
+    )
+    fixture = tmp_path / "fixture.json"
+    fixture.write_text(
+        json.dumps(
+            [
+                {
+                    "source": "fixture",
+                    "title": "Fault-tolerant AUV Trajectory Tracking Control",
+                    "authors": ["A. Researcher"],
+                    "year": 2025,
+                    "venue": "Ocean Engineering",
+                    "abstract": (
+                        "Autonomous underwater vehicle control with trajectory tracking, "
+                        "benchmark simulation, and current disturbance experiments."
+                    ),
+                    "pdf_url": "https://example.org/auv.pdf",
+                    "citation_count": 4,
+                },
+                {
+                    "source": "fixture",
+                    "title": "Causal-Paced Deep Reinforcement Learning",
+                    "authors": ["B. Researcher"],
+                    "year": 2025,
+                    "venue": "arXiv",
+                    "abstract": "A curriculum reinforcement learning method for point-mass benchmark tasks.",
+                    "pdf_url": "https://example.org/rl.pdf",
+                    "citation_count": 0,
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    run_dir = run_dry_run(
+        plugin_root=plugin_root,
+        vault_path=tmp_path / "vault",
+        query="latest high quality AUV reinforcement learning control papers not review",
+        max_results=5,
+        fixture_path=fixture,
+    )
+
+    report = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
+
+    assert [candidate["title"] for candidate in report["accepted"]] == [
+        "Fault-tolerant AUV Trajectory Tracking Control"
+    ]
+    rejected = {candidate["title"]: candidate["filter_reasons"] for candidate in report["rejected"]}
+    assert rejected["Causal-Paced Deep Reinforcement Learning"] == ["outside_domain"]
 
 
 def test_dry_run_keeps_review_query_when_user_explicitly_requests_reviews(tmp_path):

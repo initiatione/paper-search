@@ -10,10 +10,11 @@ Before running the first query:
 4. Default discovery is non-review: every query variant should carry `-review -survey` and the filter stage should still enforce the exclusion. Skip this only when the user explicitly asks for review or survey papers.
 5. Route sources by intent: use `paper_search_mcp` first with configured sources such as `arxiv,semantic,openalex,crossref`; use live academic/web search to verify recent journal papers, DOI pages, citation counts, JCR/CiteScore-style metrics, code/PDF availability, and gaps that MCP missed.
 6. Apply `two-stage-retrieval.md`: first form a high-recall candidate pool, then deduplicate, verify, and precision-rank.
-7. Apply `venue-prior.md` as a recall/ranking prior from user config. Check whether the user's configured flagship venues, journals, conferences, or field databases are missing before accepting the result set.
-8. Deduplicate across variants by DOI first, then normalized title.
-9. Deduplicate against the downloaded wiki library under `_raw\papers`. A paper already present in `_raw\papers\<slug>\metadata.json` must be rejected with `already_in_library:<slug>` and should not be recommended again unless the user explicitly asks to repair or reprocess that existing paper.
-10. For strong seed papers, use `citation-graph.md` to check journal versions, related papers, references, and recent cited-by papers.
+7. Apply the `domain_focus_terms` hard anchor gate before ranking when the query plan provides it. A paper that only matches a broad method term, such as reinforcement learning, graph neural network, or deep learning, but not the requested object/task/domain anchor should be rejected as `outside_domain`.
+8. Apply `venue-prior.md` as a recall/ranking prior from user config. Check whether the user's configured flagship venues, journals, conferences, or field databases are missing before accepting the result set.
+9. Deduplicate across variants by DOI first, then normalized title.
+10. Deduplicate against the downloaded wiki library under `_raw\papers`. A paper already present in `_raw\papers\<slug>\metadata.json` must be rejected with `already_in_library:<slug>` and should not be recommended again unless the user explicitly asks to repair or reprocess that existing paper.
+11. For strong seed papers, use `citation-graph.md` to check journal versions, related papers, references, and recent cited-by papers.
 
 For any narrow field, do not let the query planner blur the target into generic AI/science terms. If the first planned run broadens away from the user's configured profile or current request, rerun with `--no-query-plan` and exact phrases from the user's wording, or update config before rerunning.
 

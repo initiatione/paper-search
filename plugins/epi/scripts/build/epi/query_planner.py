@@ -51,6 +51,59 @@ STOPWORDS = {
     "with",
 }
 
+TOPIC_ANCHOR_STOPWORDS = STOPWORDS | {
+    "exclude",
+    "excluding",
+    "non",
+    "not",
+    "review",
+    "reviews",
+    "survey",
+    "surveys",
+}
+
+METHOD_FAMILY_PHRASES = [
+    "deep reinforcement learning",
+    "offline reinforcement learning",
+    "model based reinforcement learning",
+    "model-based reinforcement learning",
+    "reinforcement learning",
+    "machine learning",
+    "deep learning",
+    "artificial intelligence",
+    "graph neural networks",
+    "graph neural network",
+    "neural networks",
+    "neural network",
+    "large language models",
+    "large language model",
+    "diffusion models",
+    "diffusion model",
+    "diffusion policy",
+    "transformer",
+    "transformers",
+    "model predictive control",
+    "adaptive control",
+    "robust control",
+    "learning based control",
+    "learning-based control",
+    "control barrier function",
+    "physics informed",
+    "physics-informed",
+    "foundation model",
+    "foundation models",
+    "algorithm",
+    "algorithms",
+    "approach",
+    "approaches",
+    "framework",
+    "frameworks",
+    "method",
+    "methods",
+    "rl",
+    "ai",
+]
+
 
 DOMAIN_HINT_PACKS: dict[str, dict[str, Any]] = {
     "auv-control": {
@@ -167,6 +220,32 @@ def topic_focus_terms(topic: str, *, limit: int = 8) -> list[str]:
     return _topic_terms(topic, limit=limit)
 
 
+def _remove_method_family_phrases(topic: str) -> str:
+    lowered = f" {topic.lower()} "
+    for phrase in sorted(METHOD_FAMILY_PHRASES, key=len, reverse=True):
+        pattern = r"(?<![a-z0-9])" + re.escape(phrase).replace(r"\ ", r"[\s\-]+") + r"(?![a-z0-9])"
+        lowered = re.sub(pattern, " ", lowered)
+    return lowered
+
+
+def _topic_domain_anchor_terms(topic: str, *, limit: int = 4) -> list[str]:
+    residual = _remove_method_family_phrases(topic)
+    words = [
+        word
+        for word in re.split(r"[^a-z0-9+\-]+", residual)
+        if len(word) > 2 and word not in TOPIC_ANCHOR_STOPWORDS
+    ]
+    if not words:
+        return []
+    terms: list[str] = []
+    for width in (3, 2):
+        for index in range(0, max(0, len(words) - width + 1)):
+            terms.append(" ".join(words[index : index + width]))
+    if not terms:
+        terms.extend(words)
+    return unique(terms)[:limit]
+
+
 def _profile_terms(profile: str, domains: list[str] | None, positive_keywords: list[str] | None) -> list[str]:
     profile_text = profile.replace("_", " ").replace("-", " ").strip()
     profile_items = [profile_text] if profile_text and profile_text != "general academic research" else []
@@ -267,12 +346,13 @@ def _term_blocks(
         for term in configured_domains
         if any(marker in term.lower() for marker in topic_hint_pack.get("detect", []))
     ]
-    domain_terms = unique(
+    domain_focus_terms = unique(
         topic_domain_terms
+        + _topic_domain_anchor_terms(topic)
         + topic_hint_pack.get("domain_terms", [])
-        + configured_domains
-        + hint_pack.get("domain_terms", [])
     )
+
+    domain_terms = unique(domain_focus_terms + configured_domains + hint_pack.get("domain_terms", []))
     if not domain_terms:
         domain_terms = topic_terms[:3]
 
@@ -286,10 +366,10 @@ def _term_blocks(
     context_terms = unique(topic_hint_pack.get("context_terms", []) + hint_pack.get("context_terms", []) + GENERIC_CONTEXT_TERMS)
     quality_signals = unique(topic_hint_pack.get("quality_signals", []) + hint_pack.get("quality_signals", []) + GENERIC_QUALITY_SIGNALS)
     exclusions = unique(_as_terms(negative_keywords) + topic_hint_pack.get("exclude", []) + hint_pack.get("exclude", []))
-
     return {
         "profile_terms": profile_seed_terms,
         "domain_terms": domain_terms,
+        "domain_focus_terms": domain_focus_terms,
         "method_or_topic_terms": method_or_topic_terms,
         "problem_terms": problem_terms,
         "context_terms": context_terms,

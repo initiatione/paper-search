@@ -208,6 +208,8 @@ def test_paper_discovery_reference_files_exist_and_hold_split_protocol():
     assert "5-8 query variants" in search_protocol
     assert "--no-query-plan" in search_protocol
     assert "profile or current request" in search_protocol
+    assert "domain_focus_terms" in search_protocol
+    assert "hard anchor gate" in search_protocol
     assert "publisher PDF blocks" in search_protocol
     assert "two-stage-retrieval.md" in search_protocol
     assert "citation-graph.md" in search_protocol
@@ -222,6 +224,7 @@ def test_paper_discovery_reference_files_exist_and_hold_split_protocol():
     assert "Robotics/control profiles may list" in venue_prior
     assert "High Recall Candidate Pool" in two_stage
     assert "query-plan.json" in two_stage
+    assert "domain_focus_terms" in two_stage
     assert "precision_at_10" in evaluation_set
     assert "recent cited-by" in citation_graph
     assert "query_plan" in workflow
@@ -230,6 +233,7 @@ def test_paper_discovery_reference_files_exist_and_hold_split_protocol():
     assert "Two-stage retrieval" in quality_gate
     assert "venue-prior.md" in quality_gate
     assert "recall gap" in quality_gate
+    assert "method family" in quality_gate
     assert "推荐优先看" in output_format
     assert "query_plan_multi_query" in output_format
     assert "venue prior" in output_format

@@ -6,6 +6,8 @@ Venue prior from `venue-prior.md` can raise or lower reading priority, but it ca
 
 Two-stage retrieval changes when the gate runs: do not reject too early during the high-recall pool stage unless the item is clearly off-topic, duplicated, or explicitly excluded. Apply strict Tier A/B/C/Reject labels only after deduplication, source verification, and citation/venue checks.
 
+For narrow requests, a paper that only matches a broad method family but misses the request's object/task/domain anchor should be rejected as `outside_domain` or left in Tier C at most. This is how EPI avoids letting generic reinforcement learning / GNN / deep learning papers crowd out the actual target field.
+
 Separate quality tiers:
 
 - Tier A: configured top venue or strong field venue, DOI, PDF, high topic fit, and strong validation such as field study, replication, safety proof, clinical/engineering/data evidence where appropriate, or convincing benchmark.

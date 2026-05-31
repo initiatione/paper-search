@@ -50,6 +50,19 @@ def exclusion_terms_from_query(query: str) -> list[str]:
     return terms
 
 
+def _term_matches_haystack(term: str, haystack: str) -> bool:
+    term = " ".join(term.lower().split())
+    if not term:
+        return False
+    if term in haystack:
+        return True
+    tokens = [token for token in re.split(r"\s+", term) if token]
+    if len(tokens) < 2:
+        return False
+    pattern = r"\b" + r".*".join(re.escape(token) for token in tokens) + r"\b"
+    return re.search(pattern, haystack) is not None
+
+
 def default_discovery_exclusion_terms(query: str) -> list[str]:
     requested_terms = exclusion_terms_from_query(query)
     if requested_terms:
@@ -93,7 +106,7 @@ def filter_candidates_with_report(
         library_match = existing_library_match(candidate, existing_library_index)
         if library_match:
             reasons.append(f"already_in_library:{library_match.get('slug')}")
-        if domain_terms and not any(term in haystack for term in domain_terms):
+        if domain_terms and not any(_term_matches_haystack(term, haystack) for term in domain_terms):
             reasons.append("outside_domain")
         filtered = dict(candidate)
         if library_match:

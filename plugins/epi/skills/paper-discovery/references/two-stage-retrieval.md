@@ -26,10 +26,11 @@ Filter and rank after the pool exists:
 1. Deduplicate by DOI, arXiv ID, stable URL, normalized title, and title+first-author+year.
 2. Deduplicate against `_raw/papers/*/metadata.json`.
 3. Remove hard exclusions such as review/survey when requested.
-4. Verify identity: title, year, venue, DOI/arXiv ID, PDF.
-5. Score topic fit by concept block coverage.
-6. Score quality by evidence: venue prior, citation count, field-specific validation, replication, benchmark, code/data, or other quality signals from config/query plan.
-7. Mark metrics not verified in the current run as `未核实`.
+4. Enforce `domain_focus_terms` when present. This is the hard anchor gate for the current request; broad config or method terms should not let method-only papers pass.
+5. Verify identity: title, year, venue, DOI/arXiv ID, PDF.
+6. Score topic fit by concept block coverage.
+7. Score quality by evidence: venue prior, citation count, field-specific validation, replication, benchmark, code/data, or other quality signals from config/query plan.
+8. Mark metrics not verified in the current run as `未核实`.
 
 ## Scoring Shape
 
@@ -45,6 +46,7 @@ reading_priority =
   + recency
   + pdf_code_availability
   - review_or_survey_penalty
+  - method_only_without_domain_anchor_penalty
   - weak_identity_penalty
   - already_in_library_penalty
 ```
