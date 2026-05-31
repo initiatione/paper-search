@@ -292,6 +292,14 @@ def build_parser() -> argparse.ArgumentParser:
     wiki_ingest_handoff.add_argument("--slug", required=True)
     wiki_ingest_handoff.add_argument("--json", action="store_true")
 
+    record_wiki_ingest = subparsers.add_parser("record-wiki-ingest")
+    _add_common_vault(record_wiki_ingest)
+    record_wiki_ingest.add_argument("--slug", required=True)
+    record_wiki_ingest.add_argument("--page", action="append", required=True)
+    record_wiki_ingest.add_argument("--approved-by", required=True)
+    record_wiki_ingest.add_argument("--notes", default=None)
+    record_wiki_ingest.add_argument("--json", action="store_true")
+
     paper_gate = subparsers.add_parser("paper-gate")
     _add_common_vault(paper_gate)
     paper_gate.add_argument("--slug", required=True)
@@ -924,6 +932,25 @@ def _handle_wiki_ingest_handoff(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_record_wiki_ingest(args: argparse.Namespace) -> int:
+    result = workflows.record_wiki_ingest(
+        args.vault.resolve(),
+        args.slug,
+        args.page,
+        approved_by=args.approved_by,
+        notes=args.notes,
+    )
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        record = result["record"]
+        print(f"record_status={record['status']}")
+        print(f"record_path={result['record_path']}")
+        print(f"recorded_pages={len(record['page_records'])}")
+        print(f"run_dir={result['run_dir']}")
+    return 0
+
+
 def _handle_paper_gate(args: argparse.Namespace) -> int:
     result = workflows.build_paper_gate(args.vault.resolve(), args.slug)
     if args.json:
@@ -968,6 +995,7 @@ HANDLERS: dict[str, Handler] = {
     "research-queue": _handle_research_queue,
     "wiki-query": _handle_wiki_query,
     "wiki-ingest-handoff": _handle_wiki_ingest_handoff,
+    "record-wiki-ingest": _handle_record_wiki_ingest,
     "paper-gate": _handle_paper_gate,
 }
 

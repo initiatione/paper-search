@@ -372,6 +372,32 @@ def test_wiki_ingest_handoff_parser_accepts_slug_and_json():
     assert args.json is True
 
 
+def test_record_wiki_ingest_parser_accepts_pages_approval_notes_and_json():
+    args = build_parser().parse_args(
+        [
+            "record-wiki-ingest",
+            "--slug",
+            "fixture-paper",
+            "--page",
+            "papers/fixture-paper.md",
+            "--page",
+            "concepts/fixture-concept.md",
+            "--approved-by",
+            "codex-test",
+            "--notes",
+            "agent applied target vault contract",
+            "--json",
+        ]
+    )
+
+    assert args.command == "record-wiki-ingest"
+    assert args.slug == "fixture-paper"
+    assert args.page == ["papers/fixture-paper.md", "concepts/fixture-concept.md"]
+    assert args.approved_by == "codex-test"
+    assert args.notes == "agent applied target vault contract"
+    assert args.json is True
+
+
 def test_paper_gate_parser_accepts_slug_and_json():
     args = build_parser().parse_args(
         [

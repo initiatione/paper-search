@@ -41,6 +41,7 @@ python scripts\orchestrator.py advance-ranked --run-id <dry-run-id> --max-papers
 python scripts\orchestrator.py advance-batch --candidates <candidate-json> --max-papers 3 --vault <vault>
 python scripts\orchestrator.py paper-gate --slug <slug> --vault <vault>
 python scripts\orchestrator.py wiki-ingest-handoff --slug <slug> --vault <vault>
+python scripts\orchestrator.py record-wiki-ingest --slug <slug> --page <final-page.md> --approved-by <name> --vault <vault>
 python scripts\orchestrator.py research-queue --bucket needs_reader_repair --vault <vault>
 python scripts\orchestrator.py research-queue --bucket reproducibility_caveats --actions --json --vault <vault>
 ```
@@ -60,5 +61,7 @@ If the handoff lacks these fields, repair staging or rerun the relevant EPI step
 ## Wiki Boundary
 
 Final Obsidian/LLM Wiki pages are agent-mediated under the target vault contract. Before final writing, run `wiki-ingest-handoff`, resolve `AGENTS.md` and `_meta/*`, use the framework references named in `docs\epi-linkage.md`, keep local wiki skills as adapters, and require `wiki_rule_source_model`.
+
+After the wiki ingest agent has written or staged the final Markdown pages, run `record-wiki-ingest --page ... --approved-by ...`. This command is record-only: it rechecks `paper-gate`, verifies each final page is inside the vault and outside EPI internal folders, records sha256 hashes in raw/staging, and marks the paper `wiki_ingest_recorded`. It must not rewrite final pages or replace the target vault's ingest agent.
 
 Safety: raw/staging writes are allowed. Compiled wiki writes require critic pass, handoff, and human approval.

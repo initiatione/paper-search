@@ -282,24 +282,55 @@ def _critic_quorum_check(paper_root: Path, critic_report: dict[str, Any]) -> dic
     )
 
 
-def _promotion_record_check(paper_root: Path) -> dict[str, Any] | None:
+def _completion_record_check(paper_root: Path) -> dict[str, Any] | None:
     record_path = paper_root / "promotion-record.json"
     record = _read_json(record_path)
-    if not record:
+    if record:
+        human_gate = record.get("human_gate_decision") if isinstance(record.get("human_gate_decision"), dict) else {}
+        if record.get("status") == "promoted" and human_gate.get("status") == "approved":
+            return _check_run(
+                "human-approval",
+                "success",
+                "Human approval is recorded in the promotion record.",
+                details={
+                    "path": str(record_path),
+                    "approved_by": human_gate.get("approved_by"),
+                    "record_type": "promotion-record",
+                },
+            )
+        return _check_run(
+            "human-approval",
+            "failure",
+            "Promotion record exists but does not contain approved human gate metadata.",
+            details={"path": str(record_path), "record_type": "promotion-record"},
+        )
+
+    wiki_record_path = paper_root / "wiki-ingest-record.json"
+    wiki_record = _read_json(wiki_record_path)
+    if not wiki_record:
         return None
-    human_gate = record.get("human_gate_decision") if isinstance(record.get("human_gate_decision"), dict) else {}
-    if record.get("status") == "promoted" and human_gate.get("status") == "approved":
+    human_gate = (
+        wiki_record.get("human_gate_decision")
+        if isinstance(wiki_record.get("human_gate_decision"), dict)
+        else {}
+    )
+    if wiki_record.get("status") == "recorded" and human_gate.get("status") == "approved":
         return _check_run(
             "human-approval",
             "success",
-            "Human approval is recorded in the promotion record.",
-            details={"path": str(record_path), "approved_by": human_gate.get("approved_by")},
+            "Human approval is recorded in the agent-mediated wiki ingest record.",
+            details={
+                "path": str(wiki_record_path),
+                "approved_by": human_gate.get("approved_by"),
+                "record_type": "wiki-ingest-record",
+                "page_count": len(wiki_record.get("page_records") or []),
+            },
         )
     return _check_run(
         "human-approval",
         "failure",
-        "Promotion record exists but does not contain approved human gate metadata.",
-        details={"path": str(record_path)},
+        "Wiki ingest record exists but does not contain approved human gate metadata.",
+        details={"path": str(wiki_record_path), "record_type": "wiki-ingest-record"},
     )
 
 
@@ -382,7 +413,7 @@ def build_paper_gate(vault_path: Path, slug: str) -> dict[str, Any]:
             )
         )
 
-    promotion_check = _promotion_record_check(paper_root)
+    promotion_check = _completion_record_check(paper_root)
     if promotion_check is not None:
         check_runs.append(promotion_check)
     elif critic_outcome == "pass" and plan and _suite_conclusion(check_runs) == "success":
@@ -415,6 +446,9 @@ def _next_action(
     promotion_check: dict[str, Any] | None,
 ) -> str:
     if promotion_check and promotion_check.get("conclusion") == "success":
+        details = promotion_check.get("details") if isinstance(promotion_check.get("details"), dict) else {}
+        if details.get("record_type") == "wiki-ingest-record":
+            return "review-recorded-wiki-pages"
         return "review-promoted-pages"
     if critic_report.get("outcome") != "pass":
         return str(critic_report.get("next_action") or "revise-reader")
@@ -429,6 +463,9 @@ def _next_action(
 
 def _gate_status(conclusion: str, next_action: str, promotion_check: dict[str, Any] | None) -> str:
     if promotion_check and promotion_check.get("conclusion") == "success":
+        details = promotion_check.get("details") if isinstance(promotion_check.get("details"), dict) else {}
+        if details.get("record_type") == "wiki-ingest-record":
+            return "wiki_ingest_recorded"
         return "promoted"
     if conclusion == "failure":
         return "blocked"

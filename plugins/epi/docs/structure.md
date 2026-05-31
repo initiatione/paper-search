@@ -43,7 +43,7 @@ python scripts\orchestrator.py <command>
 - 发现与推进：`dry-run`、`advance-ranked`、`advance-paper`、`advance-batch`、`ingest-one`、`acquire-paper`。
 - 解析与修复：`parse-paper`、`redo-acquire`、`redo-parse`、`redo-read`、`recritic`。
 - Reader/Critic/Gate：推进命令内部生成 reader 和 critic；只读检查用 `paper-gate`。
-- Staging 与 Wiki handoff：`wiki-ingest-handoff` 渲染 agent-mediated handoff；`promote-to-wiki` 仅保留 legacy compiled-draft 兼容。
+- Staging 与 Wiki handoff：`wiki-ingest-handoff` 渲染 agent-mediated handoff；`record-wiki-ingest` 记录外部 agent 已完成的最终页路径和 hash；`promote-to-wiki` 仅保留 legacy compiled-draft 兼容。
 - 索引与查询：`runs-query`、`research-queue`、`wiki-query`。
 - 反馈、评估与进化：`record-feedback`、`evaluation-brief`、`propose-evolution`、`activate-evolution`、`evolution-query`。`evaluation-brief` 把 Plugin Eval、`epi-quality-gates`、benchmark 和 before/after metrics 合并成本地 improvement brief，再交给 `propose-evolution`。
 - 外部集成：`zotero-sync`，以及 MinerU 解析相关命令。
@@ -74,6 +74,7 @@ scripts/build/epi/
   stage_wiki.py
   paper_gate.py
   wiki_ingest_handoff.py
+  wiki_ingest_record.py
   promote_to_wiki.py
   run_index.py
   wiki_query.py
@@ -97,6 +98,7 @@ scripts/build/epi/
 - `stage_wiki.py` 负责 `_staging` 草稿、轻阅读报告、`wiki-ingest-brief.json` 和 `promotion-plan.json`。
 - `paper_gate.py` 是只读质量门面板，决定当前 slug 是 failure、waiting for human gate，还是允许进入下一动作。
 - `wiki_ingest_handoff.py` 是只读 handoff 渲染器，给最终 wiki ingest agent 提供路径、规则优先级和 checklist。
+- `wiki_ingest_record.py` 是 agent-mediated 完成态记录器：只读取最终 Markdown 页面、校验路径在 vault 内且不在 EPI 内部目录、记录 hash 和 human approval，不写最终页面。
 - `promote_to_wiki.py` 只保留 legacy compiled-draft promotion 和 rollback，不能替代 agent-mediated wiki ingest。
 - `run_index.py` 负责 `_runs/index.json`、dashboard 和 `research-queue.json`，并在 ready queue 里嵌入当前 paper-gate 摘要。
 - `wiki_query.py` 只查询 legacy manifest/index 视角，不能代表目标 vault 的全部知识图谱。
@@ -174,6 +176,7 @@ EPI 默认 vault 形态：
 - critic pass 后才允许写 `_staging/papers/<slug>`。
 - `wiki-ingest-handoff` 和 `paper-gate` 都是只读。
 - 当前默认 agent-mediated plan 不写 compiled wiki。
+- agent-mediated wiki ingest 完成后，用 `record-wiki-ingest` 只写 `_raw/papers/<slug>/wiki-ingest-record.json` 和 `_staging/papers/<slug>/wiki-ingest-record.json`，记录目标 vault agent 已写出的最终 Markdown 页及其 sha256；它不得修改最终页、manifest、index、log 或 hot。
 - legacy `promote-to-wiki` 只处理显式 compiled targets，并要求 `approved-by`。
 
 ## 测试与发布结构

@@ -36,6 +36,7 @@ from epi.run_mineru_parse import materialize_mineru_fixture, run_mineru_command
 from epi.skill_aware_evolve import activate_evolution, propose_evolution, query_evolution, render_evolution_query
 from epi.stage_wiki import stage_paper
 from epi.wiki_ingest_handoff import build_wiki_ingest_handoff, render_wiki_ingest_handoff
+from epi.wiki_ingest_record import create_wiki_ingest_record
 from epi.wiki_query import query_wiki, render_wiki_query
 from epi.wiki_init import initialize_paper_wiki
 from epi.zotero_sync import sync_zotero_record
@@ -353,6 +354,149 @@ def _write_promotion_or_rollback_run_state(
             "output_artifact_hashes": output_artifact_hashes,
         },
     )
+
+
+def _write_wiki_ingest_record_report(
+    run_dir: Path,
+    *,
+    run_id: str,
+    slug: str,
+    record: dict,
+) -> None:
+    next_actions = ["review-recorded-wiki-pages"]
+    page_paths = record.get("relative_page_paths") or record.get("page_paths") or []
+    human_gate = record.get("human_gate_decision") or {}
+    changed_artifacts = [
+        f"_raw/papers/{slug}/wiki-ingest-record.json",
+        f"_staging/papers/{slug}/wiki-ingest-record.json",
+    ]
+    report_paper_states = [
+        {
+            "slug": slug,
+            "paper_slug": slug,
+            "title": record.get("title") or slug,
+            "state": "wiki_ingest_recorded",
+            "last_action": "record-wiki-ingest",
+            "next_action": next_actions[0],
+            "human_gate_required": False,
+        }
+    ]
+    write_report(
+        run_dir,
+        [{"slug": slug, "title": record.get("title") or slug, "state": "wiki_ingest_recorded"}],
+        [],
+        workflow_type="record-wiki-ingest",
+        run_id=run_id,
+        paper_states=report_paper_states,
+        failed_papers=[],
+        budget_usage={"paper_count": 1, "recorded_page_count": len(page_paths)},
+        wiki_pages_written=page_paths,
+        zotero_results={"status": "not_run", "records": []},
+        next_actions=next_actions,
+        human_gate=human_gate,
+        changed_artifacts=changed_artifacts,
+    )
+    report_json_path = run_dir / "report.json"
+    report_payload = json.loads(report_json_path.read_text(encoding="utf-8"))
+    report_payload["paper_states"] = [
+        {"paper_slug": slug, "state": "wiki_ingest_recorded", "next_action": next_actions[0]}
+    ]
+    report_payload["failed_papers"] = []
+    report_payload["wiki_pages_written"] = page_paths
+    report_payload["changed_artifacts"] = changed_artifacts
+    report_payload["human_gate"] = human_gate
+    report_payload["next_actions"] = next_actions
+    report_payload["wiki_ingest_record"] = record
+    report_payload["page_records"] = record.get("page_records") or []
+    _write_json(report_json_path, report_payload)
+
+
+def record_wiki_ingest(
+    vault_path: Path,
+    slug: str,
+    pages: list[str],
+    *,
+    approved_by: str,
+    notes: str | None = None,
+) -> dict:
+    vault_path = vault_path.resolve()
+    run_id, run_dir = _new_run_dir(vault_path, "record-wiki-ingest")
+    started_at = utc_now()
+    record = create_wiki_ingest_record(
+        vault_path,
+        slug,
+        pages,
+        approved_by=approved_by,
+        notes=notes,
+    )
+    paper_root = raw_paper_root(vault_path, slug)
+    staging_root = vault_path / "_staging" / "papers" / slug
+    raw_record_path = paper_root / "wiki-ingest-record.json"
+    staging_record_path = staging_root / "wiki-ingest-record.json"
+    plan_path = staging_root / "promotion-plan.json"
+    brief_path = Path(record.get("paths", {}).get("wiki_ingest_brief") or staging_root / "wiki-ingest-brief.json")
+    final_page_hashes = {
+        f"final_page:{page['relative_path']}": page["sha256"]
+        for page in record.get("page_records") or []
+    }
+    _write_wiki_ingest_record_report(run_dir, run_id=run_id, slug=slug, record=record)
+    _write_json(
+        run_dir / "run-state.json",
+        {
+            "stage": "record-wiki-ingest",
+            "run_id": run_id,
+            "workflow_type": "record-wiki-ingest",
+            "state": "wiki_ingest_recorded",
+            "status": "success",
+            "paper_slug": slug,
+            "vault_path": str(vault_path),
+            "compiled_wiki_write": False,
+            "record_only": True,
+            "started_at": started_at,
+            "finished_at": utc_now(),
+            "exit_status": 0,
+            "tool_versions": _tool_versions("orchestrator", "wiki_ingest_record", "report_run"),
+            "input_artifact_hashes": _hash_existing_outputs(
+                {
+                    "promotion-plan.json": plan_path,
+                    "wiki-ingest-brief.json": brief_path,
+                    **{
+                        f"final_page:{page['relative_path']}": Path(page["path"])
+                        for page in record.get("page_records") or []
+                    },
+                }
+            ),
+            "final_page_hashes": final_page_hashes,
+            "output_artifact_hashes": _hash_existing_outputs(
+                {
+                    "wiki-ingest-record.raw.json": raw_record_path,
+                    "wiki-ingest-record.staging.json": staging_record_path,
+                    "report.md": run_dir / "report.md",
+                    "report.json": run_dir / "report.json",
+                }
+            ),
+        },
+    )
+    _write_paper_run_state(
+        paper_root,
+        _paper_run_state(
+            paper_root=paper_root,
+            slug=slug,
+            state="wiki_ingest_recorded",
+            last_action="record-wiki-ingest",
+            next_action="review-recorded-wiki-pages",
+            stage_record=record,
+            human_gate_required=False,
+        ),
+    )
+    _refresh_run_index(vault_path)
+    return {
+        "run_id": run_id,
+        "run_dir": str(run_dir),
+        "record": record,
+        "record_path": str(raw_record_path),
+        "staging_record_path": str(staging_record_path),
+    }
 
 
 def _write_promotion_routed_report(

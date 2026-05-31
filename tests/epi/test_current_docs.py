@@ -34,6 +34,8 @@ def test_structure_doc_covers_current_plugin_boundaries():
     assert "evaluation-brief" in text
     assert "paper-gate" in text
     assert "wiki-ingest-handoff" in text
+    assert "record-wiki-ingest" in text
+    assert "wiki_ingest_record.py" in text
     assert "agent-mediated" in text
     assert "claim-support" in text
     assert "不要把安装 cache 当成开发源" in text
@@ -50,6 +52,8 @@ def test_progress_doc_records_status_verification_and_next_steps():
     assert "config-setup" in text
     assert "paper-quality-critic" in text
     assert "wiki-ingest-handoff" in text
+    assert "record-wiki-ingest" in text
+    assert "wiki_ingest_recorded" in text
     assert "279 passed in 37.63s" in text
     assert "36 passed in 5.42s" in text
     assert "pass rate `1`" in text

@@ -40,6 +40,9 @@ def test_epi_linkage_doc_defines_scope_pipeline_and_sync_rule():
     assert "不能把 Obsidian Wiki 写入规则简化成" in text
     assert "wiki_rule_source_model" in text
     assert "wiki-ingest-handoff" in text
+    assert "record-wiki-ingest" in text
+    assert "wiki-ingest-record.json" in text
+    assert "wiki_ingest_recorded" in text
     assert "resolution_order" in text
     assert "must_read_before_final_write" in text
     assert "write_contract_requirements" in text
