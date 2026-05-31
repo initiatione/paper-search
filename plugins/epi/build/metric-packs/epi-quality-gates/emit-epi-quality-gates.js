@@ -58,6 +58,11 @@ const hasDevelopmentQualityLoop = (
   corpus.includes("evaluation-brief") &&
   corpus.includes("propose-evolution")
 );
+const hasQualityLoopSourcesComplete = (
+  corpus.includes("source_completeness") &&
+  corpus.includes("quality_loop_sources_complete") &&
+  corpus.includes("collect-missing-quality-evidence")
+);
 
 const checks = [
   check(
@@ -94,6 +99,13 @@ const checks = [
     hasDevelopmentQualityLoop,
     hasDevelopmentQualityLoop ? ["Found development quality loop contract text."] : ["Missing development quality loop contract text."],
     ["Document the Plugin Eval -> epi-quality-gates -> benchmark -> compare before/after -> evaluation-brief -> propose-evolution loop."]
+  ),
+  check(
+    "epi-quality-loop-sources-complete",
+    "EPI evaluation-brief must record source completeness and a required gate when evidence sources are missing.",
+    hasQualityLoopSourcesComplete,
+    hasQualityLoopSourcesComplete ? ["Found source completeness contract text."] : ["Missing source completeness contract text."],
+    ["Document source_completeness.complete, quality_loop_sources_complete, and collect-missing-quality-evidence in the evaluation-brief contract."]
   )
 ];
 

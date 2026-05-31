@@ -28,6 +28,27 @@ def _seed_agent_handoff(vault, slug="fixture-paper"):
             "venue": "IROS",
         },
     )
+    (paper_root / "paper.pdf").write_bytes(b"%PDF-1.4\nfixture paper\n")
+    mineru_dir = paper_root / "mineru"
+    mineru_dir.mkdir(parents=True, exist_ok=True)
+    (mineru_dir / "paper.md").write_text(
+        "# Abstract\n\nFixture paper abstract.\n\n## Method\n\nFixture paper method.\n",
+        encoding="utf-8",
+    )
+    (mineru_dir / "paper.tex").write_text(
+        "\\section{Method}\n\\begin{equation}y = x + 1\\end{equation}\n",
+        encoding="utf-8",
+    )
+    image_dir = mineru_dir / "images"
+    image_dir.mkdir(parents=True, exist_ok=True)
+    (image_dir / "figure-1.png").write_bytes(b"fixture-image")
+    _write_json(
+        mineru_dir / "mineru-manifest.json",
+        {
+            "outputs": [{"file_name": "paper.pdf", "state": "done", "image_count": 1}],
+            "warnings": [],
+        },
+    )
     _write_json(
         paper_root / "critic" / "critic-report.json",
         {
@@ -66,6 +87,20 @@ def _seed_agent_handoff(vault, slug="fixture-paper"):
                 {"name": "kepano/obsidian-skills"},
                 {"name": "initiatione/obsidian-wiki-dev"},
             ],
+            "final_source_review_contract": {
+                "schema_version": "epi-final-source-review-contract-v1",
+                "required": True,
+                "suggested_output_path": "final-source-review.json",
+                "required_artifacts": [
+                    "paper.pdf",
+                    "metadata.json",
+                    "mineru/paper.md",
+                    "mineru/paper.tex",
+                    "mineru/images/*",
+                    "mineru/mineru-manifest.json",
+                ],
+                "record_schema_version": "epi-final-source-review-v1",
+            },
             "wiki_rule_source_model": {
                 "resolution_order": [
                     {"source": "target vault AGENTS.md", "role": "owner contract"},
@@ -135,6 +170,68 @@ def _write_final_page(vault, relative, content):
     return path
 
 
+def _source_artifact_record(paper_root, artifact):
+    path = paper_root / artifact
+    return {
+        "artifact": artifact,
+        "status": "reviewed",
+        "sha256": file_sha256(path),
+    }
+
+
+def _write_final_source_review(vault, slug, pages):
+    paper_root = vault / "_raw" / "papers" / slug
+    staging_root = vault / "_staging" / "papers" / slug
+    image_files = sorted((paper_root / "mineru" / "images").glob("*"))
+    payload = {
+        "schema_version": "epi-final-source-review-v1",
+        "paper_slug": slug,
+        "reviewed_artifacts": [
+            _source_artifact_record(paper_root, "paper.pdf"),
+            _source_artifact_record(paper_root, "metadata.json"),
+            _source_artifact_record(paper_root, "mineru/paper.md"),
+            _source_artifact_record(paper_root, "mineru/paper.tex"),
+            {
+                "artifact": "mineru/images/*",
+                "status": "reviewed",
+                "file_count": len(image_files),
+                "files": [
+                    {
+                        "relative_path": image.relative_to(paper_root).as_posix(),
+                        "sha256": file_sha256(image),
+                    }
+                    for image in image_files
+                    if image.is_file()
+                ],
+            },
+            _source_artifact_record(paper_root, "mineru/mineru-manifest.json"),
+        ],
+        "formula_review": {
+            "status": "reviewed",
+            "summary": "Reviewed TeX formula notation against the parsed Markdown.",
+        },
+        "figure_table_image_review": {
+            "status": "reviewed",
+            "summary": "Reviewed MinerU image assets and checked figure provenance.",
+        },
+        "pdf_fallback_review": {
+            "status": "reviewed",
+            "summary": "PDF fallback was available for source checks.",
+        },
+        "final_page_provenance": [
+            {
+                "relative_path": page.resolve().relative_to(vault.resolve()).as_posix(),
+                "sha256": file_sha256(page),
+                "source_grounded": True,
+            }
+            for page in pages
+        ],
+    }
+    path = staging_root / "final-source-review.json"
+    _write_json(path, payload)
+    return path
+
+
 def _enable_zotero(vault, *, collection="EPI Lab"):
     config = vault / "_meta" / "epi-config.yaml"
     config.parent.mkdir(parents=True, exist_ok=True)
@@ -164,6 +261,7 @@ def test_record_wiki_ingest_records_agent_pages_without_modifying_them(tmp_path)
     slug = _seed_agent_handoff(vault)
     reference = _write_final_page(vault, "papers/fixture-paper.md", "# Final Reference\n")
     concept = _write_final_page(vault, "concepts/fixture-concept.md", "# Final Concept\n")
+    source_review = _write_final_source_review(vault, slug, [reference, concept])
     before_hashes = {path: file_sha256(path) for path in [reference, concept]}
 
     result = record_wiki_ingest(
@@ -172,6 +270,7 @@ def test_record_wiki_ingest_records_agent_pages_without_modifying_them(tmp_path)
         [str(reference), "concepts/fixture-concept.md"],
         approved_by="codex-test",
         notes="wiki agent applied target vault contract",
+        source_review_path=str(source_review),
     )
 
     record = result["record"]
@@ -181,6 +280,9 @@ def test_record_wiki_ingest_records_agent_pages_without_modifying_them(tmp_path)
     assert record["final_pages_modified_by_epi"] is False
     assert record["human_gate_decision"]["approved_by"] == "codex-test"
     assert record["source_first_confirmed"] is True
+    assert record["source_first_verification_method"] == "final-source-review-json"
+    assert record["final_source_review"]["status"] == "verified"
+    assert record["paths"]["final_source_review"] == str(source_review)
     assert record["relative_page_paths"] == [
         "papers/fixture-paper.md",
         "concepts/fixture-concept.md",
@@ -214,12 +316,14 @@ def test_record_wiki_ingest_records_agent_pages_without_modifying_them(tmp_path)
     assert report_json["wiki_pages_written"] == ["papers/fixture-paper.md", "concepts/fixture-concept.md"]
     assert report_json["human_gate"]["status"] == "approved"
     assert report_json["page_records"][0]["relative_path"] == "papers/fixture-paper.md"
+    assert report_json["wiki_ingest_record"]["final_source_review"]["status"] == "verified"
     assert report_json["zotero_results"]["status"] == "skipped"
     assert report_json["zotero_results"]["reason"] == "zotero_not_configured"
     zotero_record = json.loads((vault / "_raw" / "papers" / slug / "zotero-record.json").read_text(encoding="utf-8"))
     assert zotero_record["wiki_ingest"]["final_wiki_pages"][0]["relative_path"] == "papers/fixture-paper.md"
     assert run_state["compiled_wiki_write"] is False
     assert run_state["record_only"] is True
+    assert run_state["input_artifact_hashes"]["final-source-review.json"] == file_sha256(source_review)
     assert run_state["zotero_results"]["reason"] == "zotero_not_configured"
     assert paper_state["state"] == "wiki_ingest_recorded"
     assert paper_state["next_action"] == "review-recorded-wiki-pages"
@@ -230,8 +334,15 @@ def test_record_wiki_ingest_uses_enabled_zotero_config_in_report(tmp_path):
     slug = _seed_agent_handoff(vault)
     _enable_zotero(vault, collection="Reading Lab")
     page = _write_final_page(vault, "papers/fixture-paper.md", "# Final Reference\n")
+    source_review = _write_final_source_review(vault, slug, [page])
 
-    result = record_wiki_ingest(vault, slug, [str(page)], approved_by="codex-test")
+    result = record_wiki_ingest(
+        vault,
+        slug,
+        [str(page)],
+        approved_by="codex-test",
+        source_review_path=str(source_review),
+    )
 
     raw_zotero = json.loads((vault / "_raw" / "papers" / slug / "zotero-record.json").read_text(encoding="utf-8"))
     assert raw_zotero["schema_version"] == "epi-zotero-record-v1"
@@ -282,10 +393,32 @@ def test_create_wiki_ingest_record_rejects_internal_staging_page_as_final_page(t
         create_wiki_ingest_record(vault, slug, [str(staging_page)], approved_by="codex-test")
 
 
+def test_create_wiki_ingest_record_rejects_invalid_final_source_review(tmp_path):
+    vault = tmp_path / "vault"
+    slug = _seed_agent_handoff(vault)
+    page = _write_final_page(vault, "papers/fixture-paper.md", "# Final Reference\n")
+    source_review = _write_final_source_review(vault, slug, [page])
+    payload = json.loads(source_review.read_text(encoding="utf-8"))
+    payload["reviewed_artifacts"] = [
+        item for item in payload["reviewed_artifacts"] if item["artifact"] != "mineru/paper.tex"
+    ]
+    _write_json(source_review, payload)
+
+    with pytest.raises(ValueError, match="final source review.*mineru/paper.tex"):
+        create_wiki_ingest_record(
+            vault,
+            slug,
+            [str(page)],
+            approved_by="codex-test",
+            source_review_path=str(source_review),
+        )
+
+
 def test_record_wiki_ingest_cli_outputs_json(tmp_path, monkeypatch, capsys):
     vault = tmp_path / "vault"
     slug = _seed_agent_handoff(vault)
     page = _write_final_page(vault, "papers/fixture-paper.md", "# Final Reference\n")
+    source_review = _write_final_source_review(vault, slug, [page])
 
     exit_code, output = _run_orchestrator_cli(
         monkeypatch,
@@ -299,6 +432,8 @@ def test_record_wiki_ingest_cli_outputs_json(tmp_path, monkeypatch, capsys):
         str(page),
         "--approved-by",
         "codex-test",
+        "--source-review",
+        str(source_review),
         "--json",
     )
 
@@ -306,6 +441,7 @@ def test_record_wiki_ingest_cli_outputs_json(tmp_path, monkeypatch, capsys):
     assert exit_code == 0
     assert payload["record"]["status"] == "recorded"
     assert payload["record"]["relative_page_paths"] == ["papers/fixture-paper.md"]
+    assert payload["record"]["source_first_verification_method"] == "final-source-review-json"
     assert payload["run_id"].startswith("record-wiki-ingest-")
     assert payload["zotero_results"]["status"] == "skipped"
     assert payload["zotero_record_path"].endswith("zotero-record.json")

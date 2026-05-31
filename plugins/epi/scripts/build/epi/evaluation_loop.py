@@ -18,6 +18,7 @@ QUALITY_LOOP_STEPS = [
     "improvement-brief",
     "skill-aware-evolve-proposal",
 ]
+REQUIRED_QUALITY_SOURCES = ["plugin_eval", "epi_quality_gates", "benchmark"]
 NON_REGRESSION_METRICS = [
     "plugin_eval_score",
     "coverage_percent",
@@ -167,6 +168,24 @@ def _source_record(path: Path | None, source_kind: str) -> dict[str, Any]:
     }
 
 
+def _source_completeness(sources: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    missing_sources = [
+        source_name
+        for source_name in REQUIRED_QUALITY_SOURCES
+        if not sources.get(source_name, {}).get("present")
+    ]
+    return {
+        "required_sources": REQUIRED_QUALITY_SOURCES,
+        "present_sources": [
+            source_name
+            for source_name in REQUIRED_QUALITY_SOURCES
+            if sources.get(source_name, {}).get("present")
+        ],
+        "missing_sources": missing_sources,
+        "complete": not missing_sources,
+    }
+
+
 def build_improvement_brief(
     *,
     target_asset: str,
@@ -202,8 +221,23 @@ def build_improvement_brief(
         if source["present"]:
             evidence_items.append(source["path"])
 
+    source_completeness = _source_completeness(sources)
     gates = default_acceptance_gates(before)
+    if not source_completeness["complete"]:
+        gates.append(
+            {
+                "id": "quality_loop_sources_complete",
+                "required": True,
+                "status": "missing",
+                "missing_sources": source_completeness["missing_sources"],
+            }
+        )
     comparisons = _metric_comparisons(before, after)
+    next_action = (
+        "propose-evolution"
+        if source_completeness["complete"]
+        else "collect-missing-quality-evidence"
+    )
     return {
         "schema_version": SCHEMA_VERSION,
         "id": brief_id or f"brief-{uuid.uuid4().hex[:12]}",
@@ -213,6 +247,7 @@ def build_improvement_brief(
         "rationale": rationale,
         "proposed_change": proposed_change,
         "sources": sources,
+        "source_completeness": source_completeness,
         "before_metrics": before,
         "after_metrics": after,
         "metric_comparisons": comparisons,
@@ -223,7 +258,7 @@ def build_improvement_brief(
             "improved_metrics": [
                 item["metric"] for item in comparisons if item["trend"] == "improved"
             ],
-            "next_action": "propose-evolution",
+            "next_action": next_action,
         },
         "proposed_evolution": {
             "reflection_type": reflection_type,
@@ -250,6 +285,14 @@ def render_improvement_brief(brief: dict[str, Any]) -> str:
         "",
     ]
     lines.extend(f"- {step}" for step in brief.get("quality_loop", []))
+    completeness = brief.get("source_completeness") or {}
+    lines.extend(["", "## Source Completeness", ""])
+    lines.append(f"- complete: {completeness.get('complete')}")
+    missing_sources = completeness.get("missing_sources") or []
+    if missing_sources:
+        lines.append(f"- missing_sources: {', '.join(missing_sources)}")
+    else:
+        lines.append("- missing_sources: none")
     lines.extend(["", "## Metric Comparison", ""])
     comparisons = brief.get("metric_comparisons") or []
     if comparisons:

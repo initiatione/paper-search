@@ -386,6 +386,8 @@ def test_record_wiki_ingest_parser_accepts_pages_approval_notes_and_json():
             "codex-test",
             "--notes",
             "agent applied target vault contract",
+            "--source-review",
+            "_staging/papers/fixture-paper/final-source-review.json",
             "--json",
         ]
     )
@@ -395,6 +397,7 @@ def test_record_wiki_ingest_parser_accepts_pages_approval_notes_and_json():
     assert args.page == ["papers/fixture-paper.md", "concepts/fixture-concept.md"]
     assert args.approved_by == "codex-test"
     assert args.notes == "agent applied target vault contract"
+    assert args.source_review == "_staging/papers/fixture-paper/final-source-review.json"
     assert args.json is True
 
 
@@ -444,6 +447,21 @@ def test_research_queue_parser_accepts_actions_flag():
     assert args.command == "research-queue"
     assert args.bucket == "needs_reader_repair"
     assert args.actions is True
+
+
+def test_report_parser_accepts_run_id_and_json():
+    args = build_parser().parse_args(
+        [
+            "report",
+            "--run-id",
+            "run-001",
+            "--json",
+        ]
+    )
+
+    assert args.command == "report"
+    assert args.run_id == "run-001"
+    assert args.json is True
 
 
 def test_run_lifecycle_parser_defaults_to_dry_run():

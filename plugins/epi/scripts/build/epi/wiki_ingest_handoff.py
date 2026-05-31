@@ -57,6 +57,12 @@ def _agent_checklist(
     primary_order = source_bundle.get("primary_source_reading_order") or []
     claim_support_artifact = source_bundle.get("evidence", {}).get("claim_support_artifact")
     formula_figure_review = source_bundle.get("formula_figure_review") or {}
+    final_source_review_contract = (
+        brief.get("final_source_review_contract")
+        if isinstance(brief.get("final_source_review_contract"), dict)
+        else {}
+    )
+    final_source_review_path = final_source_review_contract.get("suggested_output_path") or "final-source-review.json"
     checklist = [
         "Read target vault contract files before any final wiki write: " + ", ".join(str(item) for item in read_before),
         "Read the EPI evidence handoff: "
@@ -79,6 +85,11 @@ def _agent_checklist(
             if item
         )
         + ".",
+        "Before record-wiki-ingest, write "
+        + str(final_source_review_path)
+        + " using schema "
+        + str(final_source_review_contract.get("record_schema_version") or "epi-final-source-review-v1")
+        + "; record artifact hashes, formula review, figure/image review, PDF fallback decision, and final page provenance.",
         f"Inspect paper-gate status={gate.get('status')} next_action={gate.get('next_action')}; stop on any failure checks.",
         "Search existing wiki pages with index/frontmatter, QMD when configured, and grep before creating a new page.",
         "Merge or update existing notes before creating duplicates.",
@@ -154,6 +165,11 @@ def build_wiki_ingest_handoff(vault_path: Path, slug: str) -> dict[str, Any]:
             "wiki_ingest_brief": str(brief_path),
             "agent_handoff_paths": plan.get("agent_handoff_paths") or [],
         },
+        "final_source_review_contract": (
+            brief.get("final_source_review_contract")
+            if isinstance(brief.get("final_source_review_contract"), dict)
+            else {}
+        ),
         "contract_files": _contract_file_status(vault_path),
         "framework_references": framework_references,
         "wiki_rule_source_model": rule_source_model,
@@ -199,6 +215,11 @@ def render_wiki_ingest_handoff(handoff: dict[str, Any]) -> str:
     lines.extend(["", "## Suggested Routes", ""])
     for item in handoff.get("suggested_routes") or []:
         lines.append(f"- {item.get('page_type')}: {item.get('target')}")
+    contract = handoff.get("final_source_review_contract") or {}
+    lines.extend(["", "## Final Source Review", ""])
+    lines.append(f"- required: {str(bool(contract.get('required'))).lower()}")
+    lines.append(f"- suggested_output_path: {contract.get('suggested_output_path') or 'final-source-review.json'}")
+    lines.append(f"- schema: {contract.get('record_schema_version') or 'epi-final-source-review-v1'}")
     lines.extend(["", "## Agent Checklist", ""])
     for item in handoff.get("agent_checklist") or []:
         lines.append(f"- {item}")

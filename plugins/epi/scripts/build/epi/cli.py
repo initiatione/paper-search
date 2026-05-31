@@ -18,6 +18,7 @@ from epi.config import (
     restore_config_from_file,
 )
 from epi.doctor import collect_doctor_report, open_setup_links, render_doctor_report
+from epi.report_run import load_run_report
 from epi.runtime_config import apply_runtime_config
 from epi.run_index import RESEARCH_QUEUE_BUCKETS
 from epi.wiki_reset import reset_wiki_vault
@@ -262,6 +263,11 @@ def build_parser() -> argparse.ArgumentParser:
     runs_query.add_argument("--workflow", default=None)
     runs_query.add_argument("--limit", type=int, default=10)
 
+    report = subparsers.add_parser("report")
+    _add_common_vault(report)
+    report.add_argument("--run-id", required=True)
+    report.add_argument("--json", action="store_true")
+
     run_lifecycle = subparsers.add_parser("run-lifecycle")
     _add_common_vault(run_lifecycle)
     run_lifecycle.add_argument("--keep-latest", type=int, default=15)
@@ -298,6 +304,7 @@ def build_parser() -> argparse.ArgumentParser:
     record_wiki_ingest.add_argument("--page", action="append", required=True)
     record_wiki_ingest.add_argument("--approved-by", required=True)
     record_wiki_ingest.add_argument("--notes", default=None)
+    record_wiki_ingest.add_argument("--source-review", default=None)
     record_wiki_ingest.add_argument("--json", action="store_true")
 
     paper_gate = subparsers.add_parser("paper-gate")
@@ -808,6 +815,19 @@ def _handle_runs_query(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_report(args: argparse.Namespace) -> int:
+    result = load_run_report(args.vault, args.run_id)
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        markdown = result.get("markdown") or ""
+        if markdown:
+            print(markdown.rstrip())
+        else:
+            print(json.dumps(result.get("report") or {}, ensure_ascii=False, indent=2))
+    return 0
+
+
 def _handle_config_recover(args: argparse.Namespace) -> int:
     result = recover_config_candidates(args.vault, backup_root=args.backup_root)
     if args.json:
@@ -943,6 +963,7 @@ def _handle_record_wiki_ingest(args: argparse.Namespace) -> int:
         args.page,
         approved_by=args.approved_by,
         notes=args.notes,
+        source_review_path=args.source_review,
     )
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -995,6 +1016,7 @@ HANDLERS: dict[str, Handler] = {
     "activate-evolution": _handle_activate_evolution,
     "evolution-query": _handle_evolution_query,
     "runs-query": _handle_runs_query,
+    "report": _handle_report,
     "run-lifecycle": _handle_run_lifecycle,
     "research-queue": _handle_research_queue,
     "wiki-query": _handle_wiki_query,

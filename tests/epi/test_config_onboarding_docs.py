@@ -134,6 +134,7 @@ def test_epi_skills_document_precise_one_to_three_prepare_ranked_path():
     assert "--skip-existing" in ingest
     assert "Do not use `advance-paper`, `advance-ranked`, or `advance-batch`" in ingest
     assert "Source-First Wiki Handoff" in ingest
+    assert "report --run-id <run-id>" in ingest
     assert "mineru/paper.md" in ingest
     assert "mineru/images/*" in ingest
     assert "central formulas" in ingest

@@ -41,12 +41,16 @@ python scripts\orchestrator.py advance-ranked --run-id <dry-run-id> --max-papers
 python scripts\orchestrator.py advance-batch --candidates <candidate-json> --max-papers 3 --vault <vault>
 python scripts\orchestrator.py paper-gate --slug <slug> --vault <vault>
 python scripts\orchestrator.py wiki-ingest-handoff --slug <slug> --vault <vault>
-python scripts\orchestrator.py record-wiki-ingest --slug <slug> --page <final-page.md> --approved-by <name> --vault <vault>
+python scripts\orchestrator.py record-wiki-ingest --slug <slug> --page <final-page.md> --approved-by <name> --source-review <final-source-review.json> --vault <vault>
+python scripts\orchestrator.py report --run-id <run-id> --vault <vault>
+python scripts\orchestrator.py report --run-id <run-id> --vault <vault> --json
 python scripts\orchestrator.py research-queue --bucket needs_reader_repair --vault <vault>
 python scripts\orchestrator.py research-queue --bucket reproducibility_caveats --actions --json --vault <vault>
 ```
 
 After critic pass, staging prepares evidence drafts, `wiki-ingest-brief.json`, and `reports/<slug>-reading-report.md`. The report should emphasize theory insight, experiment design, Reading Trust Status, evidence strength, suggested wiki routes, and reproducibility caveats.
+
+The workflow image's Report step is read-only: use `report --run-id` to display an existing `_runs/<run-id>/report.md` or `report.json`. The internal module is `report_run.py`; do not invent a `run-report` command.
 
 ## Source-First Wiki Handoff
 
@@ -55,6 +59,7 @@ After critic pass, staging prepares evidence drafts, `wiki-ingest-brief.json`, a
 - source artifacts: `paper.pdf`, `metadata.json`, `mineru/paper.md`, `mineru/paper.tex`, `mineru/images/*`, `mineru/mineru-manifest.json`
 - evidence aids: `reader/evidence-map.json`, `reader/claim-support.json`, `reader/figures.md`, `critic/*.json`
 - formula/figure review: preserve central formulas, notation, derivation cues, figures, tables, image interpretations, parse uncertainty, and source provenance
+- final source review: require `final-source-review.json` with source artifact hashes, formula review, figure/image review, PDF fallback decision, and final page provenance
 
 If the handoff lacks these fields, repair staging or rerun the relevant EPI step before final wiki writing.
 
@@ -62,6 +67,6 @@ If the handoff lacks these fields, repair staging or rerun the relevant EPI step
 
 Final Obsidian/LLM Wiki pages are agent-mediated under the target vault contract. Before final writing, run `wiki-ingest-handoff`, resolve `AGENTS.md` and `_meta/*`, use the framework references named in `docs\epi-linkage.md`, keep local wiki skills as adapters, and require `wiki_rule_source_model`.
 
-After the wiki ingest agent has written or staged the final Markdown pages, run `record-wiki-ingest --page ... --approved-by ...`. This command is record-only: it rechecks `paper-gate`, verifies each final page is inside the vault and outside EPI internal folders, records sha256 hashes in raw/staging, and marks the paper `wiki_ingest_recorded`. It must not rewrite final pages or replace the target vault's ingest agent.
+After the wiki ingest agent has written or staged the final Markdown pages, create `final-source-review.json`, then run `record-wiki-ingest --page ... --approved-by ... --source-review ...`. This command is record-only: it rechecks `paper-gate`, validates final source review, verifies each final page is inside the vault and outside EPI internal folders, records sha256 hashes in raw/staging, and marks the paper `wiki_ingest_recorded`. It must not rewrite final pages or replace the target vault's ingest agent.
 
 Safety: raw/staging writes are allowed. Compiled wiki writes require critic pass, handoff, and human approval.

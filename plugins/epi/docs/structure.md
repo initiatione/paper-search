@@ -43,6 +43,7 @@ python scripts\orchestrator.py <command>
 - 发现与推进：`dry-run`、`advance-ranked`、`advance-paper`、`advance-batch`、`ingest-one`、`acquire-paper`。
 - 解析与修复：`parse-paper`、`redo-acquire`、`redo-parse`、`redo-read`、`recritic`。
 - Reader/Critic/Gate：推进命令内部生成 reader 和 critic；只读检查用 `paper-gate`。
+- Report：`report` 是公开读取入口；`report --run-id <run-id> [--json]` 读取已有 run report artifact；内部生成模块是 `report_run.py`，不是额外的 `run-report` CLI。
 - Staging 与 Wiki handoff：`wiki-ingest-handoff` 渲染 agent-mediated handoff；`record-wiki-ingest` 记录外部 agent 已完成的最终页路径和 hash；`promote-to-wiki` 仅保留 legacy compiled-draft 兼容。
 - 索引与查询：`runs-query`、`research-queue`、`wiki-query`。
 - 反馈、评估与进化：`record-feedback`、`evaluation-brief`、`propose-evolution`、`activate-evolution`、`evolution-query`。`evaluation-brief` 把 Plugin Eval、`epi-quality-gates`、benchmark 和 before/after metrics 合并成本地 improvement brief，再交给 `propose-evolution`。
@@ -66,6 +67,7 @@ scripts/build/epi/
   generate_reader.py
   reader_*.py
   run_critic.py
+  report_run.py
   paper_quality.py
   role_critics.py
   research_decision.py
@@ -92,13 +94,14 @@ scripts/build/epi/
 - `paper_search_adapter.py` 优先调用外部 `paper-search-mcp` stdio server，并在失败、超时或空结果时回退到 `paper-search` CLI，把上游输出标准化为 EPI 候选记录。
 - `rank_papers.py` 负责 paper type classification、ranking signals、ranking rubric、ranking protocol 和三角色排序解释。
 - `run_mineru_parse.py` 负责 MinerU 命令调用、失败记录和 fixture materialization。
-- `generate_reader.py`、`reader_outputs.py`、`reader_evidence.py`、`reader_protocol.py` 负责多角色 reader、evidence map 和证据地址校验。
+- `generate_reader.py`、`reader_outputs.py`、`reader_evidence.py`、`reader_protocol.py` 负责多角色 reader、evidence map 和证据地址校验；reader 会把 TeX、MinerU manifest 和 PDF fallback 作为 source-first 证据写入 evidence/claim-support，而不是只输出摘要。
 - `run_critic.py`、`paper_quality.py`、`role_critics.py` 负责 critic quorum、学术论文可靠性检查和三角色质量门。
+- `report_run.py` 负责生成 `_runs/<run-id>/report.md` 和 `report.json`，并提供 `report --run-id` 的只读 loader；该 CLI 会展示 run report artifact 和 `run-state.json` payload，但不刷新 index、queue、raw、staging、Zotero 或 wiki。
 - `research_decision.py`、`reader_revision_plan.py`、`reader_revision_guidance.py`、`reproduction_plan.py` 把 critic 结果翻译成决策、修复建议和紧凑复现 caveat。
-- `stage_wiki.py` 负责 `_staging` 草稿、轻阅读报告、`wiki-ingest-brief.json` 和 `promotion-plan.json`。
+- `stage_wiki.py` 负责 `_staging` 草稿、轻阅读报告、`wiki-ingest-brief.json`、`final_source_review_contract` 和 `promotion-plan.json`。
 - `paper_gate.py` 是只读质量门面板，决定当前 slug 是 failure、waiting for human gate，还是允许进入下一动作。
-- `wiki_ingest_handoff.py` 是只读 handoff 渲染器，给最终 wiki ingest agent 提供路径、规则优先级和 checklist。
-- `wiki_ingest_record.py` 是 agent-mediated 完成态记录器：只读取最终 Markdown 页面、校验路径在 vault 内且不在 EPI 内部目录、记录 hash 和 human approval，不写最终页面。
+- `wiki_ingest_handoff.py` 是只读 handoff 渲染器，给最终 wiki ingest agent 提供路径、规则优先级、final-source-review 合同和 checklist。
+- `wiki_ingest_record.py` 是 agent-mediated 完成态记录器：只读取最终 Markdown 页面和 `final-source-review.json`，校验路径在 vault 内且不在 EPI 内部目录，验证源工件 hash、公式/图片/PDF 复核和 final page provenance，记录 hash 和 human approval，不写最终页面。
 - `promote_to_wiki.py` 只保留 legacy compiled-draft promotion 和 rollback，不能替代 agent-mediated wiki ingest。
 - `zotero_sync.py` 负责本地 record-only Zotero sidecar：读取论文 metadata 和 wiki ingest record，写 `zotero-record.json`，不调用外部 Zotero API。
 - `run_index.py` 负责 `_runs/index.json`、dashboard 和 `research-queue.json`，并在 ready queue 里嵌入当前 paper-gate 摘要；record/promote routed runs 会把 `zotero_results` 带入 index 和 dashboard。
@@ -122,7 +125,7 @@ skills/
 - `paper-discovery`：搜索、排序和 dry-run；当用户要求“1-3”时，指向 `prepare-ranked` 快路，只写 raw 采集和 MinerU 解析产物。
   - `paper-discovery/scripts/query-planner.py` 与 `paper-discovery/references/` 保存可维护检索策略：mode routing、query planner、paper type taxonomy、ranking rubric、domain ontology、source tiers、dedup engine、venue prior、two-stage retrieval、citation graph、evaluation set、multi-source workflow、quality gate、anti-patterns 和对话输出格式。venue prior 从用户画像/config 衍生，社区榜单只进入对应领域的弱 prior，真实指标仍需单独核验。
 - `paper-ingest`：推进已选论文进入 raw、reader、critic、staging 和 handoff。只需 1-3 时使用 `prepare-ranked`，不要误入完整 reader/critic/staging 链。
-  - `paper-ingest/references/source-first-reading.md` 是 reader/critic/staging/wiki handoff 的 source-first 阅读协议，要求最终沉淀前重读 MinerU Markdown、TeX、images、manifest 和必要时的 PDF，并使用 `reader/claim-support.json` 区分源文摘取、metadata-only 与 inference。
+  - `paper-ingest/references/source-first-reading.md` 是 reader/critic/staging/wiki handoff 的 source-first 阅读协议，要求最终沉淀前重读 MinerU Markdown、TeX、images、manifest 和必要时的 PDF，最终记录 `final-source-review.json`，并使用 `reader/claim-support.json` 区分源文摘取、metadata-only 与 inference。
 - `mineru-paper-parser`：低层 PDF -> Markdown/TeX/images/manifest 解析能力；成功后最终产物只放在 `mineru/`，`paper.tex` 必须非空，必要时使用 Markdown fallback。
 - `skill-aware-evolve`：根据 evidence 和验证结果提出受控变更；配置问题必须走配置 proposal。
 - `wiki-setup`：初始化、检查、修复和重置 paper wiki vault。入口只保留边界和命令，详细恢复与误删清单见 `skills/wiki-setup/references/reset-recovery.md`。初始化会创建 `AGENTS.md` 和 `_meta/agent-operating-contract.md`、`_meta/schema.md`、`_meta/taxonomy.md`、`_meta/directory-structure.md`，默认要求 source-first paper ingest：最终 wiki 写入先读 `mineru/paper.md`、`mineru/paper.tex`、`mineru/images/*` 和 manifest。
@@ -144,6 +147,8 @@ EPI 默认 vault 形态：
       normalized.json
       rank.json
       report.md
+      report.json
+      run-state.json
     index.json
     research-queue.json
   _raw/
@@ -178,7 +183,7 @@ EPI 默认 vault 形态：
 - critic pass 后才允许写 `_staging/papers/<slug>`。
 - `wiki-ingest-handoff` 和 `paper-gate` 都是只读。
 - 当前默认 agent-mediated plan 不写 compiled wiki。
-- agent-mediated wiki ingest 完成后，用 `record-wiki-ingest` 只写 `_raw/papers/<slug>/wiki-ingest-record.json` 和 `_staging/papers/<slug>/wiki-ingest-record.json`，记录目标 vault agent 已写出的最终 Markdown 页及其 sha256；它不得修改最终页、manifest、index、log 或 hot。
+- agent-mediated wiki ingest 完成后，先由 wiki agent 写 `final-source-review.json`，再用 `record-wiki-ingest --source-review ...` 只写 `_raw/papers/<slug>/wiki-ingest-record.json` 和 `_staging/papers/<slug>/wiki-ingest-record.json`，记录目标 vault agent 已写出的最终 Markdown 页、source review 及其 sha256；它不得修改最终页、manifest、index、log 或 hot。
 - Zotero 集成只写 `_raw/papers/<slug>/zotero-record.json` 和 run report 中的 `zotero_results`；它不得调用外部 API、改 final wiki 页或删除 Zotero 数据。
 - legacy `promote-to-wiki` 只处理显式 compiled targets，并要求 `approved-by`。
 

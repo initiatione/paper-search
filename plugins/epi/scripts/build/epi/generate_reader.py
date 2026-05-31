@@ -21,10 +21,25 @@ def _revision_guidance_text(reader_dir: Path) -> str:
     return guidance_path.read_text(encoding="utf-8") if guidance_path.exists() else ""
 
 
+def _read_optional_json_object(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
 def generate_reader_outputs(paper_root: Path) -> dict:
     started_at = utc_now()
     metadata = json.loads((paper_root / "metadata.json").read_text(encoding="utf-8"))
     mineru_text = (paper_root / "mineru" / "paper.md").read_text(encoding="utf-8")
+    paper_pdf_path = paper_root / "paper.pdf"
+    paper_tex_path = paper_root / "mineru" / "paper.tex"
+    mineru_manifest_path = paper_root / "mineru" / "mineru-manifest.json"
+    paper_tex_text = paper_tex_path.read_text(encoding="utf-8", errors="ignore") if paper_tex_path.exists() else ""
+    mineru_manifest = _read_optional_json_object(mineru_manifest_path)
     sections = markdown_sections(mineru_text)
     title = metadata.get("title", "Untitled Paper")
     reader_dir = paper_root / "reader"
@@ -78,6 +93,8 @@ def generate_reader_outputs(paper_root: Path) -> dict:
             sections=sections,
             first_claim_index=len(claims) + 1,
             revision_guidance=revision_guidance,
+            paper_tex_text=paper_tex_text,
+            mineru_manifest=mineru_manifest,
         )
     )
 
@@ -110,6 +127,16 @@ def generate_reader_outputs(paper_root: Path) -> dict:
         "",
         evidence_line("metadata.json", "field", "sources"),
     ]
+    if paper_pdf_path.exists():
+        reproducibility_lines.extend(
+            [
+                "",
+                "## PDF Fallback",
+                "",
+                "- PDF fallback artifact is available for parse checks.",
+                f"  {evidence_line('paper.pdf', 'field', 'available')}",
+            ]
+        )
     reproducibility_lines.extend(render_role_revision_focus_section(revision_guidance, "Peer Reviewer"))
     write_text_atomic(
         reader_dir / "reproducibility.md",
@@ -125,6 +152,17 @@ def generate_reader_outputs(paper_root: Path) -> dict:
             locator={"field": "sources"},
         )
     )
+    if paper_pdf_path.exists():
+        claims.append(
+            claim_record(
+                claim_id=f"reader-claim-{len(claims) + 1:03d}",
+                reader_role="peer-reviewer",
+                reader_artifact="reader/reproducibility.md",
+                claim="PDF fallback artifact is available for parse checks.",
+                source="paper.pdf",
+                locator={"field": "available"},
+            )
+        )
     ideas_lines = [
         "# Implementation Ideas",
         "",
@@ -160,6 +198,19 @@ def generate_reader_outputs(paper_root: Path) -> dict:
         reader_dir / "claim-support.json",
         build_claim_support_map(paper_title=title, claims=claims),
     )
+    input_artifact_hashes = {
+        "metadata.json": file_sha256(paper_root / "metadata.json"),
+        "mineru/paper.md": file_sha256(paper_root / "mineru" / "paper.md"),
+    }
+    optional_inputs = {
+        "paper.pdf": paper_pdf_path,
+        "mineru/paper.tex": paper_tex_path,
+        "mineru/mineru-manifest.json": mineru_manifest_path,
+    }
+    for label, path in optional_inputs.items():
+        if path.exists():
+            input_artifact_hashes[label] = file_sha256(path)
+
     return {
         "reader_dir": str(reader_dir),
         "evidence_count": len(claims),
@@ -167,10 +218,7 @@ def generate_reader_outputs(paper_root: Path) -> dict:
         "started_at": started_at,
         "finished_at": utc_now(),
         "exit_status": 0,
-        "input_artifact_hashes": {
-            "metadata.json": file_sha256(paper_root / "metadata.json"),
-            "mineru/paper.md": file_sha256(paper_root / "mineru" / "paper.md"),
-        },
+        "input_artifact_hashes": input_artifact_hashes,
         "output_artifact_hashes": {
             "reader.md": file_sha256(reader_dir / "reader.md"),
             "editorial-summary.md": file_sha256(reader_dir / "editorial-summary.md"),

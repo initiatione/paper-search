@@ -65,15 +65,36 @@ def _validate_evidence_reference(
         heading = parsed.get("heading")
         if not heading or heading not in headings:
             return [f"{label}: missing mineru heading for Evidence: {_evidence_address(parsed)}"]
+    elif source == "mineru/paper.tex":
+        tex_path = paper_root / "mineru" / "paper.tex"
+        cue = parsed.get("cue")
+        if not tex_path.exists():
+            return [f"{label}: missing mineru TeX for Evidence: {_evidence_address(parsed)}"]
+        if not cue:
+            return [f"{label}: missing TeX cue for Evidence: {_evidence_address(parsed)}"]
+        tex_text = tex_path.read_text(encoding="utf-8", errors="ignore")
+        if cue != "tex-source-available" and cue not in tex_text:
+            return [f"{label}: TeX cue not found for Evidence: {_evidence_address(parsed)}"]
     elif source == "metadata.json":
         field = parsed.get("field")
         if not field or field not in metadata:
             return [f"{label}: missing metadata field for Evidence: {_evidence_address(parsed)}"]
+    elif source == "mineru/mineru-manifest.json":
+        failures = _validate_mineru_manifest_reference(paper_root, label, parsed)
+        if failures:
+            return failures
     elif source == "mineru/images":
         image = parsed.get("image")
         image_path = paper_root / "mineru" / "images" / image if image else None
         if not image or image_path is None or not image_path.exists():
             return [f"{label}: missing mineru image for Evidence: {_evidence_address(parsed)}"]
+    elif source == "paper.pdf":
+        field = parsed.get("field")
+        if not field:
+            return [f"{label}: missing PDF evidence field for Evidence: {_evidence_address(parsed)}"]
+        pdf_path = paper_root / "paper.pdf"
+        if not pdf_path.exists():
+            return [f"{label}: missing paper PDF for Evidence: {_evidence_address(parsed)}"]
     elif source == "inference":
         basis = parsed.get("basis")
         if not basis:
@@ -81,6 +102,49 @@ def _validate_evidence_reference(
     else:
         return [f"{label}: unsupported evidence source for Evidence: {_evidence_address(parsed)}"]
     return []
+
+
+def _manifest_output_matches(output_record: dict, output_name: str) -> bool:
+    candidates = [
+        output_record.get("file_name"),
+        output_record.get("name"),
+        output_record.get("output"),
+        output_record.get("markdown_path"),
+        output_record.get("pdf_path"),
+        output_record.get("path"),
+    ]
+    normalized = output_name.replace("\\", "/")
+    return any(str(candidate or "").replace("\\", "/").endswith(normalized) for candidate in candidates)
+
+
+def _validate_mineru_manifest_reference(paper_root: Path, label: str, parsed: dict[str, str]) -> list[str]:
+    manifest_path = paper_root / "mineru" / "mineru-manifest.json"
+    if not manifest_path.exists():
+        return [f"{label}: missing MinerU manifest for Evidence: {_evidence_address(parsed)}"]
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return [f"{label}: invalid MinerU manifest JSON for Evidence: {_evidence_address(parsed)}: {exc}"]
+    if not isinstance(manifest, dict):
+        return [f"{label}: MinerU manifest must be an object for Evidence: {_evidence_address(parsed)}"]
+
+    field = parsed.get("field")
+    output_name = parsed.get("output")
+    if not field:
+        return [f"{label}: missing MinerU manifest field for Evidence: {_evidence_address(parsed)}"]
+
+    outputs = [item for item in manifest.get("outputs") or [] if isinstance(item, dict)]
+    if output_name:
+        matching_outputs = [item for item in outputs if _manifest_output_matches(item, output_name)]
+        if not matching_outputs:
+            return [f"{label}: missing MinerU manifest output for Evidence: {_evidence_address(parsed)}"]
+        if not any(field in item for item in matching_outputs):
+            return [f"{label}: missing MinerU manifest output field for Evidence: {_evidence_address(parsed)}"]
+        return []
+
+    if field in manifest or any(field in item for item in outputs):
+        return []
+    return [f"{label}: missing MinerU manifest field for Evidence: {_evidence_address(parsed)}"]
 
 
 def validate_reader_evidence(paper_root: Path, evidence_docs: dict[str, str]) -> tuple[bool, list[str]]:

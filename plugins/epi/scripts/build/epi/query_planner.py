@@ -417,11 +417,19 @@ def _term_blocks(
     topic_hint_pack = DOMAIN_HINT_PACKS.get(topic_hint_pack_name(topic) or "", {})
 
     configured_domains = _as_terms(domains)
-    topic_domain_terms = [
-        term
-        for term in configured_domains
-        if any(marker in term.lower() for marker in topic_hint_pack.get("detect", []))
-    ]
+    if topic_hint_pack:
+        topic_domain_terms = [
+            term
+            for term in configured_domains
+            if any(marker in term.lower() for marker in topic_hint_pack.get("detect", []))
+        ]
+    else:
+        lowered_topic = topic.lower()
+        topic_domain_terms = [
+            term
+            for term in configured_domains
+            if term.lower() in lowered_topic
+        ]
     topic_anchor_terms = [] if topic_hint_pack else _topic_domain_anchor_terms(topic)
     domain_focus_terms = unique(
         topic_domain_terms

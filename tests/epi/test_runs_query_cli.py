@@ -1,7 +1,10 @@
 import json
 import sys
 
+import pytest
+
 from epi.orchestrator import main
+from epi.report_run import load_run_report
 from epi.run_index import _paper_gate_allows_promotion, refresh_run_index
 
 
@@ -225,6 +228,142 @@ def _run_orchestrator_cli(monkeypatch, capsys, *args):
     exit_code = main()
     output = capsys.readouterr().out
     return exit_code, output
+
+
+def test_report_cli_prints_existing_run_markdown(tmp_path, monkeypatch, capsys):
+    vault = tmp_path / "vault"
+    runs_root = vault / "_runs"
+    run_dir = _seed_run(
+        runs_root,
+        "20260528T120000Z-report",
+        workflow_type="record-wiki-ingest",
+        state="wiki_ingest_recorded",
+        status="success",
+        paper_slug="paper-a",
+    )
+    (run_dir / "report.md").write_text("# Existing Report\n\n- status: ok\n", encoding="utf-8")
+
+    exit_code, output = _run_orchestrator_cli(
+        monkeypatch,
+        capsys,
+        "report",
+        "--vault",
+        str(vault),
+        "--run-id",
+        "20260528T120000Z-report",
+    )
+
+    assert exit_code == 0
+    assert output == "# Existing Report\n\n- status: ok\n"
+
+
+def test_report_cli_json_returns_paths_and_report_payload(tmp_path, monkeypatch, capsys):
+    vault = tmp_path / "vault"
+    runs_root = vault / "_runs"
+    run_dir = _seed_run(
+        runs_root,
+        "20260528T121000Z-report",
+        workflow_type="promote-to-wiki",
+        state="promoted",
+        status="success",
+        paper_slug="paper-b",
+        report_extra={
+            "workflow_type": "promote-to-wiki",
+            "run_id": "20260528T121000Z-report",
+            "zotero_results": {"status": "recorded", "collection": "EPI"},
+        },
+    )
+    (run_dir / "report.md").write_text("# Promotion Report\n", encoding="utf-8")
+
+    exit_code, output = _run_orchestrator_cli(
+        monkeypatch,
+        capsys,
+        "report",
+        "--vault",
+        str(vault),
+        "--run-id",
+        "20260528T121000Z-report",
+        "--json",
+    )
+
+    payload = json.loads(output)
+    assert exit_code == 0
+    assert payload["run_id"] == "20260528T121000Z-report"
+    assert payload["artifacts"]["report"] == str(run_dir / "report.md")
+    assert payload["artifacts"]["report_json"] == str(run_dir / "report.json")
+    assert payload["artifacts"]["run_state"] == str(run_dir / "run-state.json")
+    assert payload["run_state"]["workflow_type"] == "promote-to-wiki"
+    assert payload["run_state"]["state"] == "promoted"
+    assert payload["report"]["workflow_type"] == "promote-to-wiki"
+    assert payload["report"]["zotero_results"]["status"] == "recorded"
+    assert payload["markdown"] == "# Promotion Report\n"
+
+
+def test_report_cli_text_falls_back_to_json_when_markdown_missing(tmp_path, monkeypatch, capsys):
+    vault = tmp_path / "vault"
+    runs_root = vault / "_runs"
+    _seed_run(
+        runs_root,
+        "20260528T122000Z-report",
+        workflow_type="dry-run",
+        state="completed",
+        status="success",
+        paper_slug="paper-c",
+        report_extra={"workflow_type": "dry-run", "accepted_count": 2},
+    )
+
+    exit_code, output = _run_orchestrator_cli(
+        monkeypatch,
+        capsys,
+        "report",
+        "--vault",
+        str(vault),
+        "--run-id",
+        "20260528T122000Z-report",
+    )
+
+    assert exit_code == 0
+    payload = json.loads(output)
+    assert payload["workflow_type"] == "dry-run"
+    assert payload["accepted_count"] == 2
+
+
+def test_report_cli_json_allows_markdown_only_report(tmp_path, monkeypatch, capsys):
+    vault = tmp_path / "vault"
+    run_dir = vault / "_runs" / "20260528T123000Z-report"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "report.md").write_text("# Markdown Only\n", encoding="utf-8")
+
+    exit_code, output = _run_orchestrator_cli(
+        monkeypatch,
+        capsys,
+        "report",
+        "--vault",
+        str(vault),
+        "--run-id",
+        "20260528T123000Z-report",
+        "--json",
+    )
+
+    payload = json.loads(output)
+    assert exit_code == 0
+    assert payload["report"] == {}
+    assert payload["run_state"] == {}
+    assert payload["markdown"] == "# Markdown Only\n"
+    assert payload["artifacts"]["report_json"] is None
+
+
+def test_report_loader_errors_when_run_dir_missing(tmp_path):
+    with pytest.raises(FileNotFoundError, match="missing EPI run directory"):
+        load_run_report(tmp_path / "vault", "missing-run")
+
+
+def test_report_loader_errors_when_report_artifacts_missing(tmp_path):
+    vault = tmp_path / "vault"
+    (vault / "_runs" / "empty-report-run").mkdir(parents=True)
+
+    with pytest.raises(FileNotFoundError, match="missing report artifacts"):
+        load_run_report(vault, "empty-report-run")
 
 
 def test_research_queue_cli_actions_puts_paper_gate_before_promotion(tmp_path, monkeypatch, capsys):

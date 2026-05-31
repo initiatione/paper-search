@@ -226,6 +226,34 @@ def test_query_planner_derives_generic_topic_anchors_from_narrow_request():
     assert plan["concept_blocks"]["domain_terms"][0] == "molecular property prediction"
 
 
+def test_query_planner_keeps_non_robotics_profile_free_of_robotics_defaults():
+    plan = build_query_plan(
+        "latest high quality single cell RNA sequencing biomarker discovery papers not review",
+        domain="auto",
+        non_review=True,
+        max_queries=6,
+        profile="biomedical_genomics",
+        domains=["biomedical genomics", "single cell RNA sequencing", "biomarker discovery"],
+        positive_keywords=["spatial transcriptomics", "clinical validation"],
+        venue_prior=["Nature Genetics", "Genome Biology", "Cell Genomics"],
+    )
+
+    joined_blocks = json.dumps(plan["concept_blocks"], ensure_ascii=False).lower()
+    joined_venues = " ".join(plan["recall_gap_checks"]["venue_families"]).lower()
+    joined_queries = " ".join(plan["query_variants"]).lower()
+
+    assert plan["domain"] == "profile-derived"
+    assert "single cell RNA sequencing" in plan["concept_blocks"]["domain_focus_terms"]
+    assert "biomarker discovery" in plan["concept_blocks"]["domain_focus_terms"]
+    assert "clinical validation" in plan["concept_blocks"]["method_or_topic_terms"]
+    assert "nature genetics" in joined_venues
+    assert "robot" not in joined_blocks
+    assert "auv" not in joined_blocks
+    assert "icra" not in joined_venues
+    assert "single cell" in joined_queries
+    assert all("-review -survey" in query for query in plan["query_variants"])
+
+
 def test_query_planner_module_matches_skill_wrapper_shape():
     plan = build_query_plan(
         "latest high quality graph neural network molecular property prediction papers",

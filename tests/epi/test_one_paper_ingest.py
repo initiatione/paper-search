@@ -163,6 +163,12 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
     assert "Ar9av/obsidian-wiki" in framework_names
     assert "kepano/obsidian-skills" in framework_names
     assert "initiatione/obsidian-wiki-dev" in framework_names
+    final_source_review_contract = wiki_ingest_brief["final_source_review_contract"]
+    assert final_source_review_contract["schema_version"] == "epi-final-source-review-contract-v1"
+    assert final_source_review_contract["required"] is True
+    assert final_source_review_contract["suggested_output_path"] == "final-source-review.json"
+    assert final_source_review_contract["record_schema_version"] == "epi-final-source-review-v1"
+    assert "mineru/paper.tex" in final_source_review_contract["required_artifacts"]
     rule_sources = [
         item["source"]
         for item in wiki_ingest_brief["wiki_rule_source_model"]["resolution_order"]
@@ -227,6 +233,8 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
     assert promotion_plan["wiki_write_model"] == "agent-mediated-vault-contract"
     assert promotion_plan["final_page_authority"] == "target-vault-contract-and-wiki-ingest-agent"
     assert promotion_plan["wiki_ingest_brief_path"] == str(wiki_ingest_brief_path)
+    assert promotion_plan["suggested_final_source_review_path"] == str(staging_root / "final-source-review.json")
+    assert promotion_plan["final_source_review_contract"]["required"] is True
     assert str(reading_report_path) in promotion_plan["agent_handoff_paths"]
     assert str(wiki_ingest_brief_path) in promotion_plan["agent_handoff_paths"]
     assert "compiled_targets" not in promotion_plan

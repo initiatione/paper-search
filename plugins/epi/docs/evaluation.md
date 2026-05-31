@@ -33,7 +33,7 @@ Use the local `evaluation-brief` command to generate the brief:
 python scripts\orchestrator.py evaluation-brief --target-asset templates\ranking.example.yaml --rationale "<text>" --proposed-change-json "<json>" --before-metrics-json "<json>" --after-metrics-json "<json>" --plugin-eval-json <path> --metric-pack-json <path> --benchmark-json <path> --out-dir .plugin-eval\improvement-briefs
 ```
 
-The command writes both JSON and Markdown under `.plugin-eval\improvement-briefs\`. Those outputs are local development artifacts and stay out of commits.
+The command writes both JSON and Markdown under `.plugin-eval\improvement-briefs\`. Those outputs are local development artifacts and stay out of commits. A complete dev-loop brief must provide all three evidence sources: Plugin Eval JSON, `epi-quality-gates` metric-pack JSON, and a benchmark/comparison JSON. If any source is missing, the brief records `source_completeness.complete=false`, adds the required `quality_loop_sources_complete` gate, and sets `next_action=collect-missing-quality-evidence` instead of treating the brief as ready for `propose-evolution`.
 
 Current Windows Plugin Eval builds absolute paths with backslashes, while its Python test-file heuristic matches only `/tests/` or `/test_*.py`, so `py-tests-missing` can appear even when `python -m pytest plugins\epi -q` passes. Treat that warning as an evaluator path-normalization limitation unless Plugin Eval starts reporting `py_test_file_count > 0`.
 

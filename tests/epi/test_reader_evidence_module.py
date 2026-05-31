@@ -123,6 +123,135 @@ def test_reader_evidence_module_validates_claim_support_statuses(tmp_path):
     assert evidence == ["Validated 3 claim-support record(s) across 3 support status(es)"]
 
 
+def test_reader_evidence_module_validates_tex_manifest_and_pdf_sources(tmp_path):
+    paper_root = _write_reader_evidence_fixture(tmp_path)
+    mineru_dir = paper_root / "mineru"
+    (paper_root / "paper.pdf").write_bytes(b"%PDF-1.4\nfixture\n")
+    (mineru_dir / "paper.tex").write_text(
+        "\\section{Method}\n\\begin{equation}v = \\omega r\\end{equation}\n",
+        encoding="utf-8",
+    )
+    (mineru_dir / "mineru-manifest.json").write_text(
+        json.dumps(
+            {
+                "batch_id": "source-first-batch",
+                "outputs": [
+                    {
+                        "file_name": "paper.pdf",
+                        "state": "done",
+                        "image_count": 1,
+                    }
+                ],
+                "warnings": ["formula parse should be checked against PDF"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    passed, evidence = validate_reader_evidence(
+        paper_root,
+        {
+            "reader/technical-reading.md": (
+                "- TeX formula cue detected: equation.\n"
+                "  Evidence: source=mineru/paper.tex; cue=equation\n"
+                "- MinerU manifest reports parse output state.\n"
+                "  Evidence: source=mineru/mineru-manifest.json; output=paper.pdf; field=state\n"
+                "- MinerU manifest reports parse warning metadata.\n"
+                "  Evidence: source=mineru/mineru-manifest.json; field=warnings\n"
+                "- PDF fallback artifact is available for parse checks.\n"
+                "  Evidence: source=paper.pdf; field=available\n"
+            ),
+        },
+    )
+
+    assert passed is True
+    assert evidence == ["Validated 4 structured reader evidence address(es)"]
+
+
+def test_reader_evidence_map_and_claim_support_accept_source_first_optional_sources(tmp_path):
+    paper_root = _write_reader_evidence_fixture(tmp_path)
+    mineru_dir = paper_root / "mineru"
+    reader_dir = paper_root / "reader"
+    (paper_root / "paper.pdf").write_bytes(b"%PDF-1.4\nfixture\n")
+    (mineru_dir / "paper.tex").write_text(
+        "\\section{Method}\n\\begin{equation}v = \\omega r\\end{equation}\n",
+        encoding="utf-8",
+    )
+    (mineru_dir / "mineru-manifest.json").write_text(
+        json.dumps(
+            {
+                "batch_id": "source-first-batch",
+                "outputs": [{"file_name": "paper.pdf", "state": "done"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    claims = [
+        {
+            "claim_id": "claim-tex-001",
+            "reader_role": "nature-sci-editor",
+            "reader_artifact": "reader/reader.md",
+            "claim": "TeX formula cue detected: equation.",
+            "source": "mineru/paper.tex",
+            "locator": {"cue": "equation"},
+            "evidence_address": "source=mineru/paper.tex; cue=equation",
+        },
+        {
+            "claim_id": "claim-manifest-001",
+            "reader_role": "peer-reviewer",
+            "reader_artifact": "reader/reproducibility.md",
+            "claim": "MinerU manifest reports parse output state for paper.pdf.",
+            "source": "mineru/mineru-manifest.json",
+            "locator": {"output": "paper.pdf", "field": "state"},
+            "evidence_address": "source=mineru/mineru-manifest.json; output=paper.pdf; field=state",
+        },
+        {
+            "claim_id": "claim-pdf-001",
+            "reader_role": "senior-domain-researcher",
+            "reader_artifact": "reader/reader.md",
+            "claim": "PDF fallback artifact is available for parse checks.",
+            "source": "paper.pdf",
+            "locator": {"field": "available"},
+            "evidence_address": "source=paper.pdf; field=available",
+        },
+    ]
+    (reader_dir / "evidence-map.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "epi-reader-evidence-map-v1",
+                "reader_roles": [
+                    "nature-sci-editor",
+                    "peer-reviewer",
+                    "senior-domain-researcher",
+                ],
+                "required_artifacts": [
+                    "reader/reader.md",
+                    "reader/reproducibility.md",
+                ],
+                "claims": claims,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (reader_dir / "claim-support.json").write_text(
+        json.dumps(build_claim_support_map(paper_title="Grounded Embodied Control", claims=claims)),
+        encoding="utf-8",
+    )
+
+    map_passed, map_evidence = validate_evidence_map(paper_root)
+    support_passed, support_evidence = validate_claim_support_map(paper_root, required=True)
+
+    claim_support = json.loads((reader_dir / "claim-support.json").read_text(encoding="utf-8"))
+    by_source = {claim["source"]: claim for claim in claim_support["claims"]}
+    assert map_passed is True
+    assert map_evidence == ["Validated 3 evidence-map claim(s) across 3 reader role(s)"]
+    assert support_passed is True
+    assert support_evidence == ["Validated 3 claim-support record(s) across 2 support status(es)"]
+    assert by_source["mineru/paper.tex"]["support_status"] == "source-grounded"
+    assert by_source["mineru/mineru-manifest.json"]["support_status"] == "metadata-only"
+    assert by_source["paper.pdf"]["support_status"] == "source-grounded"
+
+
 def test_reader_evidence_module_rejects_stale_claim_support_status(tmp_path):
     paper_root = _write_reader_evidence_fixture(tmp_path)
     support_path = paper_root / "reader" / "claim-support.json"

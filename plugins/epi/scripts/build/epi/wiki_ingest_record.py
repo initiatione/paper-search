@@ -9,6 +9,15 @@ from epi.paper_gate import build_paper_gate
 
 
 _INTERNAL_VAULT_ROOTS = {"_raw", "_staging", "_runs", "_quarantine", ".git", ".obsidian"}
+FINAL_SOURCE_REVIEW_SCHEMA_VERSION = "epi-final-source-review-v1"
+REQUIRED_FINAL_SOURCE_ARTIFACTS = [
+    "paper.pdf",
+    "metadata.json",
+    "mineru/paper.md",
+    "mineru/paper.tex",
+    "mineru/images/*",
+    "mineru/mineru-manifest.json",
+]
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -106,6 +115,206 @@ def _source_first_confirmed(brief: dict[str, Any]) -> bool:
     ) and all(token in formula_figure_text for token in ["formula", "figure", "image"])
 
 
+def _resolve_review_candidate(value: str, *, vault_path: Path, staging_root: Path) -> Path:
+    candidate = Path(value)
+    if candidate.is_absolute():
+        return candidate
+    if candidate.parts and candidate.parts[0] in {"_staging", "_raw"}:
+        return vault_path / candidate
+    staging_candidate = staging_root / candidate
+    if staging_candidate.exists() or len(candidate.parts) == 1:
+        return staging_candidate
+    return vault_path / candidate
+
+
+def _resolve_final_source_review_path(
+    *,
+    vault_path: Path,
+    staging_root: Path,
+    contract: dict[str, Any],
+    source_review_path: str | Path | None,
+) -> Path | None:
+    if source_review_path:
+        return _resolve_review_candidate(str(source_review_path), vault_path=vault_path, staging_root=staging_root)
+
+    suggested = str(contract.get("suggested_output_path") or "").strip()
+    candidates = []
+    if suggested:
+        candidates.append(_resolve_review_candidate(suggested, vault_path=vault_path, staging_root=staging_root))
+    candidates.append(staging_root / "final-source-review.json")
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0] if candidates else None
+
+
+def _read_required_json(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"missing final source review: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"final source review is invalid JSON: {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"final source review must be a JSON object: {path}")
+    return payload
+
+
+def _review_records_by_artifact(payload: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    records = payload.get("reviewed_artifacts")
+    if not isinstance(records, list):
+        return {}, ["final source review must include reviewed_artifacts[]"]
+    by_artifact: dict[str, dict[str, Any]] = {}
+    failures: list[str] = []
+    for index, record in enumerate(records, start=1):
+        if not isinstance(record, dict):
+            failures.append(f"reviewed_artifacts[{index}] must be an object")
+            continue
+        artifact = str(record.get("artifact") or "").strip()
+        if not artifact:
+            failures.append(f"reviewed_artifacts[{index}] is missing artifact")
+            continue
+        if artifact in by_artifact:
+            failures.append(f"duplicate final source review artifact: {artifact}")
+            continue
+        by_artifact[artifact] = record
+    return by_artifact, failures
+
+
+def _validate_review_status(record: dict[str, Any], artifact: str, failures: list[str]) -> None:
+    if record.get("status") != "reviewed":
+        failures.append(f"final source review artifact must be status=reviewed: {artifact}")
+
+
+def _validate_file_artifact(
+    *,
+    paper_root: Path,
+    artifact: str,
+    record: dict[str, Any],
+    failures: list[str],
+) -> None:
+    _validate_review_status(record, artifact, failures)
+    artifact_path = paper_root / artifact
+    if not artifact_path.is_file():
+        failures.append(f"required source artifact is missing on disk: {artifact}")
+        return
+    actual_hash = file_sha256(artifact_path)
+    if record.get("sha256") != actual_hash:
+        failures.append(f"final source review sha256 mismatch: {artifact}")
+
+
+def _validate_image_artifact(
+    *,
+    paper_root: Path,
+    record: dict[str, Any],
+    failures: list[str],
+) -> None:
+    artifact = "mineru/images/*"
+    _validate_review_status(record, artifact, failures)
+    image_dir = paper_root / "mineru" / "images"
+    image_files = sorted(path for path in image_dir.rglob("*") if path.is_file()) if image_dir.exists() else []
+    if record.get("file_count") != len(image_files):
+        failures.append("final source review image file_count does not match mineru/images")
+    reviewed_files = record.get("files") if isinstance(record.get("files"), list) else []
+    reviewed_by_path = {
+        str(item.get("relative_path") or item.get("path") or "").replace("\\", "/"): item
+        for item in reviewed_files
+        if isinstance(item, dict)
+    }
+    for image_path in image_files:
+        relative = image_path.relative_to(paper_root).as_posix()
+        reviewed = reviewed_by_path.get(relative)
+        if not reviewed:
+            failures.append(f"final source review missing image hash: {relative}")
+            continue
+        if reviewed.get("sha256") != file_sha256(image_path):
+            failures.append(f"final source review image sha256 mismatch: {relative}")
+
+
+def _validate_review_section(payload: dict[str, Any], key: str, failures: list[str]) -> None:
+    section = payload.get(key) if isinstance(payload.get(key), dict) else {}
+    if section.get("status") != "reviewed":
+        failures.append(f"final source review {key} must be status=reviewed")
+    if not str(section.get("summary") or "").strip():
+        failures.append(f"final source review {key} must include a summary")
+
+
+def _validate_pdf_fallback_section(payload: dict[str, Any], failures: list[str]) -> None:
+    section = payload.get("pdf_fallback_review") if isinstance(payload.get("pdf_fallback_review"), dict) else {}
+    if section.get("status") not in {"reviewed", "not-needed"}:
+        failures.append("final source review pdf_fallback_review must be status=reviewed or not-needed")
+    if not str(section.get("summary") or "").strip():
+        failures.append("final source review pdf_fallback_review must include a summary")
+
+
+def _validate_final_page_provenance(
+    *,
+    payload: dict[str, Any],
+    page_records: list[dict[str, Any]],
+    failures: list[str],
+) -> None:
+    provenance = payload.get("final_page_provenance")
+    if not isinstance(provenance, list):
+        failures.append("final source review must include final_page_provenance[]")
+        return
+    provenance_by_path = {
+        str(item.get("relative_path") or "").replace("\\", "/"): item
+        for item in provenance
+        if isinstance(item, dict)
+    }
+    for page in page_records:
+        relative_path = str(page.get("relative_path") or "").replace("\\", "/")
+        item = provenance_by_path.get(relative_path)
+        if not item:
+            failures.append(f"final source review missing final page provenance: {relative_path}")
+            continue
+        if item.get("source_grounded") is not True:
+            failures.append(f"final page provenance must be source_grounded=true: {relative_path}")
+        if item.get("sha256") and item.get("sha256") != page.get("sha256"):
+            failures.append(f"final page provenance sha256 mismatch: {relative_path}")
+
+
+def _validate_final_source_review(
+    *,
+    source_review_path: Path,
+    paper_root: Path,
+    slug: str,
+    page_records: list[dict[str, Any]],
+) -> dict[str, Any]:
+    payload = _read_required_json(source_review_path)
+    failures: list[str] = []
+    if payload.get("schema_version") != FINAL_SOURCE_REVIEW_SCHEMA_VERSION:
+        failures.append("final source review has unsupported schema_version")
+    if payload.get("paper_slug") and payload.get("paper_slug") != slug:
+        failures.append("final source review paper_slug does not match record slug")
+
+    by_artifact, artifact_failures = _review_records_by_artifact(payload)
+    failures.extend(artifact_failures)
+    for artifact in REQUIRED_FINAL_SOURCE_ARTIFACTS:
+        record = by_artifact.get(artifact)
+        if not record:
+            failures.append(f"final source review missing required artifact: {artifact}")
+            continue
+        if artifact == "mineru/images/*":
+            _validate_image_artifact(paper_root=paper_root, record=record, failures=failures)
+        else:
+            _validate_file_artifact(
+                paper_root=paper_root,
+                artifact=artifact,
+                record=record,
+                failures=failures,
+            )
+
+    _validate_review_section(payload, "formula_review", failures)
+    _validate_review_section(payload, "figure_table_image_review", failures)
+    _validate_pdf_fallback_section(payload, failures)
+    _validate_final_page_provenance(payload=payload, page_records=page_records, failures=failures)
+
+    if failures:
+        raise ValueError("final source review failed validation: " + "; ".join(failures))
+    return payload
+
+
 def create_wiki_ingest_record(
     vault_path: Path,
     slug: str,
@@ -113,6 +322,7 @@ def create_wiki_ingest_record(
     *,
     approved_by: str,
     notes: str | None = None,
+    source_review_path: str | Path | None = None,
 ) -> dict[str, Any]:
     vault_path = vault_path.resolve()
     if not str(approved_by or "").strip():
@@ -148,6 +358,32 @@ def create_wiki_ingest_record(
     if duplicates:
         raise ValueError("duplicate final wiki page records: " + ", ".join(duplicates))
 
+    source_review_contract = (
+        brief.get("final_source_review_contract")
+        if isinstance(brief.get("final_source_review_contract"), dict)
+        else {}
+    )
+    resolved_source_review_path = _resolve_final_source_review_path(
+        vault_path=vault_path,
+        staging_root=staging_root,
+        contract=source_review_contract,
+        source_review_path=source_review_path,
+    )
+    source_review_payload: dict[str, Any] | None = None
+    if resolved_source_review_path and resolved_source_review_path.exists():
+        source_review_payload = _validate_final_source_review(
+            source_review_path=resolved_source_review_path,
+            paper_root=paper_root,
+            slug=slug,
+            page_records=page_records,
+        )
+    elif source_review_contract.get("required"):
+        raise ValueError(
+            "final source review is required before record-wiki-ingest: "
+            + str(resolved_source_review_path or staging_root / "final-source-review.json")
+        )
+    source_first_verified_by_source_review = source_review_payload is not None
+
     recorded_at = utc_now()
     failure_checks = _gate_check_names(gate, "failure")
     action_required_checks = _gate_check_names(gate, "action_required")
@@ -174,7 +410,29 @@ def create_wiki_ingest_record(
         "wiki_write_model": plan.get("wiki_write_model") or "agent-mediated-vault-contract",
         "handoff_type": plan.get("handoff_type") or brief.get("handoff_type"),
         "final_page_authority": plan.get("final_page_authority"),
-        "source_first_confirmed": _source_first_confirmed(brief),
+        "source_first_confirmed": source_first_verified_by_source_review or _source_first_confirmed(brief),
+        "source_first_verification_method": (
+            "final-source-review-json"
+            if source_first_verified_by_source_review
+            else "brief-contract-only"
+        ),
+        "final_source_review": (
+            {
+                "status": "verified",
+                "path": str(resolved_source_review_path),
+                "schema_version": source_review_payload.get("schema_version"),
+                "reviewed_artifacts": source_review_payload.get("reviewed_artifacts") or [],
+                "formula_review": source_review_payload.get("formula_review") or {},
+                "figure_table_image_review": source_review_payload.get("figure_table_image_review") or {},
+                "pdf_fallback_review": source_review_payload.get("pdf_fallback_review") or {},
+                "final_page_provenance": source_review_payload.get("final_page_provenance") or [],
+            }
+            if source_review_payload is not None
+            else {
+                "status": "missing",
+                "required": bool(source_review_contract.get("required")),
+            }
+        ),
         "human_gate_decision": human_gate_decision,
         "paper_gate": {
             "status": gate.get("status"),
@@ -201,6 +459,8 @@ def create_wiki_ingest_record(
             else {}
         ),
     }
+    if source_review_payload is not None and resolved_source_review_path is not None:
+        record_payload["paths"]["final_source_review"] = str(resolved_source_review_path)
     if notes:
         record_payload["notes"] = notes
 

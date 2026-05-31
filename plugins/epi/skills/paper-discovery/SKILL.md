@@ -60,6 +60,15 @@ python scripts\orchestrator.py dry-run --query "<topic>" --max-results 10 --sour
 python scripts\orchestrator.py dry-run --query "<topic>" --max-results 10 --sources arxiv,semantic,openalex,crossref --plugin-root <plugin-root> --vault <vault> --json
 ```
 
+Use the Report step to display an existing run without rerunning discovery:
+
+```powershell
+python scripts\orchestrator.py report --run-id <run-id> --vault <vault>
+python scripts\orchestrator.py report --run-id <run-id> --vault <vault> --json
+```
+
+The CLI command is `report`; `report_run.py` is the internal report generator. Do not refer users to a separate `run-report` command unless the CLI adds one.
+
 Use `--no-query-plan` only when debugging or when the profile-derived plan drifts from the narrow topic.
 
 ```powershell
@@ -78,6 +87,6 @@ Use `--max-papers 10 --skip-existing` for real runs; `--max-papers 1` is a smoke
 
 ## Evidence Check
 
-Before reporting success, inspect `search-record.json`, `rank.json`, `acquire-record.json`, `parse-record.json`, `paper.pdf`, `mineru\paper.md`, `mineru\paper.tex`, `mineru\images`, and `mineru\mineru-manifest.json`. Track `paper_type`, `classification_confidence`, `ranking_confidence`, and per-paper `acquire_failed`, `parse_failed`, or `prepare_failed`.
+Before reporting success, inspect `search-record.json`, `rank.json`, `_runs\<run-id>\report.md`, `_runs\<run-id>\report.json`, `acquire-record.json`, `parse-record.json`, `paper.pdf`, `mineru\paper.md`, `mineru\paper.tex`, `mineru\images`, and `mineru\mineru-manifest.json`. Track `paper_type`, `classification_confidence`, `ranking_confidence`, and per-paper `acquire_failed`, `parse_failed`, or `prepare_failed`.
 
 Safety: `dry-run` writes only `_runs/<run-id>/`; `prepare-ranked` writes only `_raw\papers\<slug>\...`; neither path enters reader, critic, staging, or wiki writing.

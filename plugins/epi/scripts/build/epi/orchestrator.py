@@ -436,6 +436,7 @@ def record_wiki_ingest(
     *,
     approved_by: str,
     notes: str | None = None,
+    source_review_path: str | Path | None = None,
 ) -> dict:
     vault_path = vault_path.resolve()
     run_id, run_dir = _new_run_dir(vault_path, "record-wiki-ingest")
@@ -446,6 +447,7 @@ def record_wiki_ingest(
         pages,
         approved_by=approved_by,
         notes=notes,
+        source_review_path=source_review_path,
     )
     paper_root = raw_paper_root(vault_path, slug)
     staging_root = vault_path / "_staging" / "papers" / slug
@@ -453,10 +455,22 @@ def record_wiki_ingest(
     staging_record_path = staging_root / "wiki-ingest-record.json"
     plan_path = staging_root / "promotion-plan.json"
     brief_path = Path(record.get("paths", {}).get("wiki_ingest_brief") or staging_root / "wiki-ingest-brief.json")
+    final_source_review_value = record.get("paths", {}).get("final_source_review")
+    final_source_review_path = Path(final_source_review_value) if final_source_review_value else None
     final_page_hashes = {
         f"final_page:{page['relative_path']}": page["sha256"]
         for page in record.get("page_records") or []
     }
+    input_artifacts = {
+        "promotion-plan.json": plan_path,
+        "wiki-ingest-brief.json": brief_path,
+        **{
+            f"final_page:{page['relative_path']}": Path(page["path"])
+            for page in record.get("page_records") or []
+        },
+    }
+    if final_source_review_path is not None:
+        input_artifacts["final-source-review.json"] = final_source_review_path
     zotero_results = _zotero_record_only(vault_path, paper_root)
     _write_wiki_ingest_record_report(
         run_dir,
@@ -481,16 +495,7 @@ def record_wiki_ingest(
             "finished_at": utc_now(),
             "exit_status": 0,
             "tool_versions": _tool_versions("orchestrator", "wiki_ingest_record", "report_run"),
-            "input_artifact_hashes": _hash_existing_outputs(
-                {
-                    "promotion-plan.json": plan_path,
-                    "wiki-ingest-brief.json": brief_path,
-                    **{
-                        f"final_page:{page['relative_path']}": Path(page["path"])
-                        for page in record.get("page_records") or []
-                    },
-                }
-            ),
+            "input_artifact_hashes": _hash_existing_outputs(input_artifacts),
             "final_page_hashes": final_page_hashes,
             "output_artifact_hashes": _hash_existing_outputs(
                 {

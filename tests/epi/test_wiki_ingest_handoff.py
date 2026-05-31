@@ -64,6 +64,20 @@ def _seed_agent_handoff(vault, slug="fixture-paper"):
                 {"name": "kepano/obsidian-skills"},
                 {"name": "initiatione/obsidian-wiki-dev"},
             ],
+            "final_source_review_contract": {
+                "schema_version": "epi-final-source-review-contract-v1",
+                "required": True,
+                "suggested_output_path": "final-source-review.json",
+                "required_artifacts": [
+                    "paper.pdf",
+                    "metadata.json",
+                    "mineru/paper.md",
+                    "mineru/paper.tex",
+                    "mineru/images/*",
+                    "mineru/mineru-manifest.json",
+                ],
+                "record_schema_version": "epi-final-source-review-v1",
+            },
             "wiki_rule_source_model": {
                 "resolution_order": [
                     {"source": "current user instruction", "role": "session goal"},
@@ -181,11 +195,14 @@ def test_build_wiki_ingest_handoff_resolves_contract_and_agent_checklist(tmp_pat
     assert handoff["contract_files"]["_meta/directory-structure.md"]["present"] is False
     assert handoff["local_skill_policy"] == "helpers-not-authority"
     assert handoff["suggested_routes_only"] is True
+    assert handoff["final_source_review_contract"]["required"] is True
+    assert handoff["final_source_review_contract"]["suggested_output_path"] == "final-source-review.json"
     assert "source-first rule" in handoff["agent_checklist"][2]
     assert any("mineru/paper.md" in item for item in handoff["agent_checklist"])
     assert any("mineru/images/*" in item for item in handoff["agent_checklist"])
     assert any("source paper artifacts" in item for item in handoff["agent_checklist"])
     assert any("figures, tables, and images" in item for item in handoff["agent_checklist"])
+    assert any("final-source-review.json" in item for item in handoff["agent_checklist"])
     assert handoff["agent_checklist"][0].startswith("Read target vault contract files")
     assert any("Search existing wiki pages" in item for item in handoff["agent_checklist"])
     assert any("Do not write final pages" in item for item in handoff["agent_checklist"])
@@ -208,6 +225,8 @@ def test_render_wiki_ingest_handoff_is_actionable_without_writing(tmp_path):
     assert "kepano/obsidian-skills" in output
     assert "local llm-wiki / wiki-ingest / obsidian-markdown skills" in output
     assert "Do not write final pages from EPI suggested routes directly." in output
+    assert "## Final Source Review" in output
+    assert "suggested_output_path: final-source-review.json" in output
     assert "mineru/paper.md" in output
     assert "mineru/images/*" in output
     assert "source paper artifacts" in output
@@ -235,3 +254,4 @@ def test_wiki_ingest_handoff_cli_outputs_json(tmp_path, monkeypatch, capsys):
     assert payload["ready_after_human_approval"] is True
     assert payload["paper_gate"]["next_action"] == "run-wiki-ingest-agent"
     assert payload["contract_files"]["AGENTS.md"]["present"] is True
+    assert payload["final_source_review_contract"]["required"] is True

@@ -76,6 +76,55 @@ def test_reader_v2_emits_role_specific_human_artifacts_and_evidence_map_protocol
     assert reader_record["output_artifact_hashes"]["claim-support.json"]
 
 
+def test_reader_v2_emits_source_first_optional_artifact_claims_and_hashes(tmp_path):
+    paper_root = _write_reader_v2_fixture(tmp_path)
+    mineru_dir = paper_root / "mineru"
+    (mineru_dir / "paper.tex").write_text(
+        "\\section{Method}\n\\begin{equation}v = \\omega r\\end{equation}\n",
+        encoding="utf-8",
+    )
+    (mineru_dir / "mineru-manifest.json").write_text(
+        json.dumps(
+            {
+                "batch_id": "source-first-batch",
+                "outputs": [
+                    {
+                        "file_name": "paper.pdf",
+                        "state": "done",
+                        "image_count": 0,
+                    }
+                ],
+                "warnings": ["formula parse should be checked against PDF"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    reader_record = generate_reader_outputs(paper_root)
+
+    reader_dir = paper_root / "reader"
+    technical = (reader_dir / "technical-reading.md").read_text(encoding="utf-8")
+    reproducibility = (reader_dir / "reproducibility.md").read_text(encoding="utf-8")
+    evidence_map = json.loads((reader_dir / "evidence-map.json").read_text(encoding="utf-8"))
+    claim_support = json.loads((reader_dir / "claim-support.json").read_text(encoding="utf-8"))
+    sources = {claim["source"] for claim in evidence_map["claims"]}
+
+    assert "Evidence: source=mineru/paper.tex; cue=equation" in technical
+    assert "Evidence: source=mineru/mineru-manifest.json; output=paper.pdf; field=state" in technical
+    assert "Evidence: source=mineru/mineru-manifest.json; field=warnings" in technical
+    assert "Evidence: source=paper.pdf; field=available" in reproducibility
+    assert {
+        "mineru/paper.tex",
+        "mineru/mineru-manifest.json",
+        "paper.pdf",
+    }.issubset(sources)
+    assert reader_record["input_artifact_hashes"]["paper.pdf"]
+    assert reader_record["input_artifact_hashes"]["mineru/paper.tex"]
+    assert reader_record["input_artifact_hashes"]["mineru/mineru-manifest.json"]
+    assert claim_support["support_counts"]["source-grounded"] >= 2
+    assert claim_support["support_counts"]["metadata-only"] >= 1
+
+
 def test_critic_rejects_reader_when_required_role_artifact_is_missing(tmp_path):
     paper_root = _write_reader_v2_fixture(tmp_path)
     generate_reader_outputs(paper_root)

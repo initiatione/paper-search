@@ -6,6 +6,16 @@ from pathlib import Path
 from epi.artifacts import staging_paper_root, utc_now, write_json_atomic, write_text_atomic
 
 
+SOURCE_FIRST_ARTIFACTS = [
+    "paper.pdf",
+    "metadata.json",
+    "mineru/paper.md",
+    "mineru/paper.tex",
+    "mineru/images/*",
+    "mineru/mineru-manifest.json",
+]
+
+
 def _frontmatter_value(value: object) -> str:
     return json.dumps(value, ensure_ascii=False)
 
@@ -292,6 +302,25 @@ def _wiki_rule_source_model() -> dict:
     }
 
 
+def _final_source_review_contract() -> dict:
+    return {
+        "schema_version": "epi-final-source-review-contract-v1",
+        "required": True,
+        "suggested_output_path": "final-source-review.json",
+        "required_artifacts": SOURCE_FIRST_ARTIFACTS,
+        "must_record": [
+            "reviewed_artifacts[] with artifact, status, and sha256 for file artifacts",
+            "mineru/images/* file_count plus per-image relative_path and sha256 when images exist",
+            "formula_review with status=reviewed and a summary of formulas, notation, assumptions, or parse gaps",
+            "figure_table_image_review with status=reviewed and a summary of figures, tables, image evidence, and uncertainty",
+            "pdf_fallback_review with status=reviewed or not-needed and a summary of PDF fallback decisions",
+            "final_page_provenance[] mapping every final wiki page to source_grounded=true",
+        ],
+        "record_command_flag": "--source-review <final-source-review.json>",
+        "record_schema_version": "epi-final-source-review-v1",
+    }
+
+
 def _build_wiki_ingest_brief(
     *,
     slug: str,
@@ -348,6 +377,7 @@ def _build_wiki_ingest_brief(
                 "role": "personalized vault-contract and wiki-skill rules",
             },
         ],
+        "final_source_review_contract": _final_source_review_contract(),
         "wiki_rule_source_model": _wiki_rule_source_model(),
         "ingest_policy": {
             "authority": "Resolve the target vault contract first; local skills are helpers, not sole authority.",
@@ -401,12 +431,7 @@ def _build_wiki_ingest_brief(
         },
         "source_bundle": {
             "raw_artifacts": [
-                "paper.pdf",
-                "metadata.json",
-                "mineru/paper.md",
-                "mineru/paper.tex",
-                "mineru/images/*",
-                "mineru/mineru-manifest.json",
+                *SOURCE_FIRST_ARTIFACTS,
                 "reader/evidence-map.json",
                 "reader/claim-support.json",
                 "reader/figures.md",
@@ -735,6 +760,8 @@ def stage_paper(vault_path: Path, slug: str, paper_root: Path) -> Path:
         "staged_synthesis": [str(synthesis_path)],
         "staged_reports": [str(reading_report_path)],
         "wiki_ingest_brief_path": str(wiki_ingest_brief_path),
+        "final_source_review_contract": wiki_ingest_brief["final_source_review_contract"],
+        "suggested_final_source_review_path": str(staging_root / "final-source-review.json"),
         "agent_handoff_paths": agent_handoff_paths,
         "suggested_route_targets": [reference_target, concept_target, synthesis_target, reading_report_target],
     }

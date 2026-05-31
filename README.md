@@ -45,7 +45,7 @@ If `doctor` reports `epi_config: warning`, run `config-status` and complete the 
 
 ## Plugins
 
-- `epi`: A general academic paper intelligence workflow. It searches, ranks, preserves, parses, reviews, and stages papers for agent-mediated Obsidian/LLM Wiki ingest.
+- `epi`: A general academic paper intelligence workflow. It searches, ranks, preserves, parses, reads, critic-checks, stages, reports, and hands papers to an agent-mediated Obsidian/LLM Wiki ingest flow.
 
 MinerU parsing is an internal EPI helper capability, not a separate marketplace plugin.
 

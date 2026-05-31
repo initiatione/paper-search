@@ -6,6 +6,45 @@ from pathlib import Path
 from epi.artifacts import write_json_atomic, write_text_atomic
 
 
+def _load_dict_json(path: Path) -> dict | None:
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def load_run_report(vault_path: Path, run_id: str) -> dict:
+    run_dir = vault_path.resolve() / "_runs" / run_id
+    if not run_dir.is_dir():
+        raise FileNotFoundError(f"missing EPI run directory: {run_dir}")
+
+    report_json_path = run_dir / "report.json"
+    report_md_path = run_dir / "report.md"
+    run_state_path = run_dir / "run-state.json"
+
+    report_payload = _load_dict_json(report_json_path)
+    run_state_payload = _load_dict_json(run_state_path) or {}
+    markdown = report_md_path.read_text(encoding="utf-8") if report_md_path.exists() else ""
+    if report_payload is None and not markdown:
+        raise FileNotFoundError(f"missing report artifacts for EPI run: {run_dir}")
+
+    return {
+        "run_id": run_id,
+        "run_dir": str(run_dir),
+        "artifacts": {
+            "report": str(report_md_path) if report_md_path.exists() else None,
+            "report_json": str(report_json_path) if report_json_path.exists() else None,
+            "run_state": str(run_state_path) if run_state_path.exists() else None,
+        },
+        "run_state": run_state_payload,
+        "report": report_payload or {},
+        "markdown": markdown,
+    }
+
+
 def _research_queue(ranked: list[dict]) -> dict[str, list[dict]]:
     queue = {
         "advance_candidates": [],

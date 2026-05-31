@@ -33,8 +33,11 @@ def test_structure_doc_covers_current_plugin_boundaries():
     assert "evaluation_loop.py" in text
     assert "evaluation-brief" in text
     assert "paper-gate" in text
+    assert "report" in text
     assert "wiki-ingest-handoff" in text
     assert "record-wiki-ingest" in text
+    assert "`report`" in text
+    assert "run report" in text
     assert "wiki_ingest_record.py" in text
     assert "agent-mediated" in text
     assert "claim-support" in text
@@ -74,6 +77,8 @@ def test_progress_doc_records_status_verification_and_next_steps():
     assert "Plugin Eval" in text
     assert "epi-improvement-brief-v1" in text
     assert "evaluation-brief" in text
+    assert "source_completeness" in text
+    assert "quality_loop_sources_complete" in text
     assert "MINERU_TOKEN" in text
     assert "--skip-existing" in text
     assert "MinerU reported done but produced no Markdown output" in text
@@ -142,12 +147,17 @@ def test_marketplace_and_readme_describe_profile_driven_generic_epi():
     manifest_text = json.dumps(manifest, ensure_ascii=False)
     assert "profile-driven academic paper discovery" in manifest_text
     assert "user's config plus the current request" in manifest_text
+    assert "reader/critic review" in manifest_text
+    assert "low-burden reading reports" in manifest_text
+    assert "wiki handoff" in manifest_text
+    assert "quality evolution" in manifest_text
     assert "Search and rank academic papers" in manifest["description"]
     assert "robotics" not in manifest["keywords"]
     assert "embodied-intelligence" not in manifest["keywords"]
     assert "control" not in manifest["keywords"]
 
     assert "A general academic paper intelligence workflow" in readme
+    assert "searches, ranks, preserves, parses, reads, critic-checks, stages, reports" in readme
     assert "profile-driven high-quality paper collection" in readme
     assert "C:\\Users\\liuchf" not in readme
     assert "D:\\paper-research-wiki" not in readme
@@ -157,4 +167,6 @@ def test_marketplace_and_readme_describe_profile_driven_generic_epi():
     assert 'dry-run --query "<your topic>"' in workflow
     assert "prepare-ranked --run-id <run-id> --max-papers 10 --skip-existing" in workflow
     assert "prepare-ranked --run-id <run-id> --max-papers 10 --skip-existing --vault <vault> --json" in workflow
+    assert "report --run-id <run-id> --vault <vault>" in workflow
+    assert "report --run-id <run-id> --vault <vault> --json" in workflow
     assert "robotics embodied intelligence control" not in workflow

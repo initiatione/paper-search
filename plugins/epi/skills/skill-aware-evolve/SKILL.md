@@ -9,6 +9,14 @@ Use run evidence, feedback, Plugin Eval, or benchmark reports to propose control
 
 If config is missing, record the issue and use `config-setup`. See `docs\config.md`.
 
+When run evidence is needed, prefer the public Report surface:
+
+```powershell
+python scripts\orchestrator.py report --run-id <run-id> --vault <vault> --json
+```
+
+This reads existing `_runs/<run-id>/report.json` and `report.md`; it does not rerun the workflow or apply changes. The internal module is `report_run.py`, not a separate `run-report` command.
+
 ## Acceptance Gates
 
 Human approval is required before activation. Accepted chain changes must update `docs\epi-linkage.md`.

@@ -10,14 +10,29 @@ SUPPORT_BY_SOURCE = {
         "support_grade": "direct-text",
         "epistemic_status": "extracted",
     },
+    "mineru/paper.tex": {
+        "support_status": "source-grounded",
+        "support_grade": "formula-or-notation",
+        "epistemic_status": "extracted",
+    },
     "mineru/images": {
         "support_status": "source-grounded",
         "support_grade": "visual-asset",
         "epistemic_status": "extracted",
     },
+    "paper.pdf": {
+        "support_status": "source-grounded",
+        "support_grade": "pdf-fallback",
+        "epistemic_status": "extracted",
+    },
     "metadata.json": {
         "support_status": "metadata-only",
         "support_grade": "metadata",
+        "epistemic_status": "metadata",
+    },
+    "mineru/mineru-manifest.json": {
+        "support_status": "metadata-only",
+        "support_grade": "parse-manifest",
         "epistemic_status": "metadata",
     },
     "inference": {
