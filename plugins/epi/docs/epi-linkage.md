@@ -179,7 +179,9 @@ run index 是状态面板，不是 research agenda。EPI 不暴露 `research-age
 
 EPI 自进化是 proposal-based，不直接修改插件代码、用户配置或 compiled wiki。设计借鉴 SkillOpt（有边界的目标资产优化、rejected edit buffer、非退化验证）和 EmbodiSkill（先区分技能缺陷与执行偏差）。
 
-输入：run evidence、human feedback、Plugin Eval、benchmark report、critic warning/failure pattern。输出：reflection type、evidence type、classification、target asset、rationale、proposed change、evidence、before metrics、acceptance gates、bounded change、risk level、approval requirement。
+输入：run evidence、human feedback、Plugin Eval、`epi-quality-gates` metric pack、benchmark report、critic warning/failure pattern。输出：reflection type、evidence type、classification、target asset、rationale、proposed change、evidence、before metrics、acceptance gates、bounded change、risk level、approval requirement。
+
+插件开发质量环必须闭合为：Plugin Eval -> `epi-quality-gates` -> benchmark -> compare before/after -> `evaluation-brief` improvement brief -> `propose-evolution`。`evaluation-brief` 是本环的机器可读桥接命令：它把 Plugin Eval、metric pack、benchmark 和 before/after metrics 合并成 `epi-improvement-brief-v1`，并生成 `proposed_evolution` payload。brief 默认写入 `.plugin-eval/improvement-briefs/`，属于本地开发产物，不随插件发布；真正改变 skill/template 仍必须走 `propose-evolution`、human approval 和 validation gates。
 
 classification：
 

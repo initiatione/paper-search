@@ -541,6 +541,43 @@ def test_propose_evolution_parser_accepts_skillopt_control_metadata():
     assert args.risk_level == "low"
 
 
+def test_evaluation_brief_parser_accepts_quality_loop_inputs():
+    args = build_parser().parse_args(
+        [
+            "evaluation-brief",
+            "--target-asset",
+            "templates/ranking.example.yaml",
+            "--rationale",
+            "Compare before/after quality signals before proposing a bounded change.",
+            "--proposed-change-json",
+            "{\"weights\":{\"topic_relevance\":0.41}}",
+            "--before-metrics-json",
+            "{\"plugin_eval_score\":82}",
+            "--after-metrics-json",
+            "{\"plugin_eval_score\":84}",
+            "--plugin-eval-json",
+            ".plugin-eval/plugin-eval.json",
+            "--metric-pack-json",
+            ".plugin-eval/epi-quality-gates.json",
+            "--benchmark-json",
+            ".plugin-eval/benchmark.json",
+            "--evidence",
+            "docs/evaluation.md#development-quality-loop",
+            "--brief-id",
+            "brief-001",
+            "--out-dir",
+            ".plugin-eval/improvement-briefs",
+            "--json",
+        ]
+    )
+
+    assert args.command == "evaluation-brief"
+    assert args.brief_id == "brief-001"
+    assert args.metric_pack_json.name == "epi-quality-gates.json"
+    assert args.evidence == ["docs/evaluation.md#development-quality-loop"]
+    assert args.json is True
+
+
 def test_activate_evolution_parser_accepts_validation_result_json():
     args = build_parser().parse_args(
         [

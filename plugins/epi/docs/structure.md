@@ -45,7 +45,7 @@ python scripts\orchestrator.py <command>
 - Reader/Critic/Gate：推进命令内部生成 reader 和 critic；只读检查用 `paper-gate`。
 - Staging 与 Wiki handoff：`wiki-ingest-handoff` 渲染 agent-mediated handoff；`promote-to-wiki` 仅保留 legacy compiled-draft 兼容。
 - 索引与查询：`runs-query`、`research-queue`、`wiki-query`。
-- 反馈与进化：`record-feedback`、`propose-evolution`、`activate-evolution`、`evolution-query`。
+- 反馈、评估与进化：`record-feedback`、`evaluation-brief`、`propose-evolution`、`activate-evolution`、`evolution-query`。`evaluation-brief` 把 Plugin Eval、`epi-quality-gates`、benchmark 和 before/after metrics 合并成本地 improvement brief，再交给 `propose-evolution`。
 - 外部集成：`zotero-sync`，以及 MinerU 解析相关命令。
 
 ## Python 模块职责
@@ -78,6 +78,7 @@ scripts/build/epi/
   run_index.py
   wiki_query.py
   skill_aware_evolve.py
+  evaluation_loop.py
 ```
 
 - `cli.py` 只负责参数解析、JSON/Markdown 输出和调度到内部模块。
@@ -100,6 +101,7 @@ scripts/build/epi/
 - `run_index.py` 负责 `_runs/index.json`、dashboard 和 `research-queue.json`，并在 ready queue 里嵌入当前 paper-gate 摘要。
 - `wiki_query.py` 只查询 legacy manifest/index 视角，不能代表目标 vault 的全部知识图谱。
 - `skill_aware_evolve.py` 负责 proposal-based 自进化，默认不直接修改插件代码、用户配置或 compiled wiki。
+- `evaluation_loop.py` 负责插件开发质量环：合并 Plugin Eval、`epi-quality-gates`、benchmark、before/after metrics，写出 `epi-improvement-brief-v1` JSON/Markdown 和 `proposed_evolution` payload。默认输出目录是 `.plugin-eval/improvement-briefs/`，属于本地开发产物。
 
 ## Skills 结构
 
@@ -185,6 +187,7 @@ python -m pytest tests\epi -q
 python -m pytest tests\epi tests\epi\test_wrapper_entrypoints.py -q
 python <plugin-creator-validate-script> <plugin-root>
 node <plugin-eval.js> analyze <plugin-root> --format markdown
+python scripts\orchestrator.py evaluation-brief --target-asset <asset> --rationale "<text>" --proposed-change-json "<json>" --before-metrics-json "<json>" --after-metrics-json "<json>"
 ```
 
 安装副本在 `%USERPROFILE%\.codex\plugins\cache\paper-search\epi\<version>`。源码改动必须先提交并通过 GitHub/marketplace 升级流程进入安装副本；不要把安装 cache 当成开发源。

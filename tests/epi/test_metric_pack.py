@@ -13,7 +13,9 @@ def test_epi_metric_pack_checks_core_workflow_contracts(tmp_path):
         "The orchestrator writes run-state.json. "
         "No critic pass, no compiled wiki write. "
         "The critic gate must pass before promote-to-wiki. "
-        "Raw artifacts include paper.pdf and metadata.json.",
+        "Raw artifacts include paper.pdf and metadata.json. "
+        "Plugin Eval runs with the epi-quality-gates metric pack, then evaluation-brief creates "
+        "the improvement brief for propose-evolution.",
         encoding="utf-8",
     )
     script = (
@@ -38,3 +40,5 @@ def test_epi_metric_pack_checks_core_workflow_contracts(tmp_path):
     assert checks["epi-critic-gate-contract"]["status"] == "pass"
     assert checks["epi-no-critic-no-wiki-write"]["status"] == "pass"
     assert checks["epi-raw-artifact-retention"]["status"] == "pass"
+    assert checks["epi-development-quality-loop"]["status"] == "pass"
+    assert payload["metrics"][0]["value"] == 1

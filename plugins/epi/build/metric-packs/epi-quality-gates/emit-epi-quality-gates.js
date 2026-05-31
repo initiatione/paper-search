@@ -52,6 +52,12 @@ const hasRunState = corpus.includes("run-state.json");
 const hasCriticGate = corpus.includes("critic") && (corpus.includes("gate") || corpus.includes("promote-to-wiki"));
 const hasNoCriticNoWrite = corpus.includes("no critic pass, no compiled wiki write");
 const hasRawRetention = corpus.includes("paper.pdf") && corpus.includes("metadata.json");
+const hasDevelopmentQualityLoop = (
+  corpus.includes("plugin eval") &&
+  corpus.includes("epi-quality-gates") &&
+  corpus.includes("evaluation-brief") &&
+  corpus.includes("propose-evolution")
+);
 
 const checks = [
   check(
@@ -81,6 +87,13 @@ const checks = [
     hasRawRetention,
     hasRawRetention ? ["Found paper.pdf and metadata.json artifact contract text."] : ["Missing raw PDF or metadata artifact contract text."],
     ["Document and test retention of paper.pdf and metadata.json under the raw paper artifact layout."]
+  ),
+  check(
+    "epi-development-quality-loop",
+    "EPI plugin development must expose Plugin Eval, epi-quality-gates, evaluation-brief, and propose-evolution as a closed quality loop.",
+    hasDevelopmentQualityLoop,
+    hasDevelopmentQualityLoop ? ["Found development quality loop contract text."] : ["Missing development quality loop contract text."],
+    ["Document the Plugin Eval -> epi-quality-gates -> benchmark -> compare before/after -> evaluation-brief -> propose-evolution loop."]
   )
 ];
 

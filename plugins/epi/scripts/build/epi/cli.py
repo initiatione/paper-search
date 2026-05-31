@@ -213,6 +213,22 @@ def build_parser() -> argparse.ArgumentParser:
     feedback.add_argument("--message", required=True)
     feedback.add_argument("--source", default="human")
 
+    evaluation_brief = subparsers.add_parser("evaluation-brief")
+    evaluation_brief.add_argument("--target-asset", required=True)
+    evaluation_brief.add_argument("--rationale", required=True)
+    evaluation_brief.add_argument("--proposed-change-json", required=True)
+    evaluation_brief.add_argument("--before-metrics-json", default=None)
+    evaluation_brief.add_argument("--after-metrics-json", default=None)
+    evaluation_brief.add_argument("--plugin-eval-json", type=Path, default=None)
+    evaluation_brief.add_argument("--metric-pack-json", type=Path, default=None)
+    evaluation_brief.add_argument("--benchmark-json", type=Path, default=None)
+    evaluation_brief.add_argument("--evidence", action="append", default=[])
+    evaluation_brief.add_argument("--reflection-type", default="OPTIMIZATION")
+    evaluation_brief.add_argument("--evidence-type", default="plugin_eval_warning")
+    evaluation_brief.add_argument("--brief-id", default=None)
+    evaluation_brief.add_argument("--out-dir", type=Path, default=Path(".plugin-eval") / "improvement-briefs")
+    evaluation_brief.add_argument("--json", action="store_true")
+
     propose = subparsers.add_parser("propose-evolution")
     _add_common_vault(propose)
     propose.add_argument("--reflection-type", required=True)
@@ -694,6 +710,35 @@ def _handle_record_feedback(args: argparse.Namespace) -> int:
     return 0
 
 
+def _json_object_arg(value: str | None) -> dict:
+    return json.loads(value) if value else {}
+
+
+def _handle_evaluation_brief(args: argparse.Namespace) -> int:
+    brief = workflows.build_improvement_brief(
+        target_asset=args.target_asset,
+        rationale=args.rationale,
+        proposed_change=json.loads(args.proposed_change_json),
+        before_metrics=_json_object_arg(args.before_metrics_json),
+        after_metrics=_json_object_arg(args.after_metrics_json),
+        plugin_eval_path=args.plugin_eval_json,
+        metric_pack_path=args.metric_pack_json,
+        benchmark_path=args.benchmark_json,
+        evidence=args.evidence,
+        reflection_type=args.reflection_type,
+        evidence_type=args.evidence_type,
+        brief_id=args.brief_id,
+    )
+    paths = workflows.write_improvement_brief(args.out_dir, brief)
+    if args.json:
+        print(json.dumps({"brief": brief, "paths": paths}, ensure_ascii=False, indent=2))
+    else:
+        print(workflows.render_improvement_brief(brief))
+        print(f"brief_json={paths['json']}")
+        print(f"brief_markdown={paths['markdown']}")
+    return 0
+
+
 def _handle_propose_evolution(args: argparse.Namespace) -> int:
     before_metrics = json.loads(args.before_metrics_json) if args.before_metrics_json else None
     acceptance_gates = json.loads(args.acceptance_gates_json) if args.acceptance_gates_json else None
@@ -914,6 +959,7 @@ HANDLERS: dict[str, Handler] = {
     "recritic": _handle_recritic,
     "zotero-sync": _handle_zotero_sync,
     "record-feedback": _handle_record_feedback,
+    "evaluation-brief": _handle_evaluation_brief,
     "propose-evolution": _handle_propose_evolution,
     "activate-evolution": _handle_activate_evolution,
     "evolution-query": _handle_evolution_query,

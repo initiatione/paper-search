@@ -9,6 +9,7 @@ from epi.acquire_papers import acquire_paper, acquire_paper_from_url
 from epi.artifacts import file_sha256, json_sha256, raw_paper_root, utc_now, write_json_atomic, write_text_atomic
 from epi.config import load_config
 from epi.feedback import record_feedback
+from epi.evaluation_loop import build_improvement_brief, render_improvement_brief, write_improvement_brief
 from epi.filter_candidates import default_discovery_exclusion_terms, filter_candidates, filter_candidates_with_report
 from epi.generate_reader import generate_reader_outputs
 from epi.normalize_candidates import normalize_candidates

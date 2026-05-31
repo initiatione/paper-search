@@ -30,6 +30,8 @@ def test_structure_doc_covers_current_plugin_boundaries():
     assert "skills/" in text
     assert "config-setup" in text
     assert "paper type classification" in text
+    assert "evaluation_loop.py" in text
+    assert "evaluation-brief" in text
     assert "paper-gate" in text
     assert "wiki-ingest-handoff" in text
     assert "agent-mediated" in text
@@ -43,12 +45,14 @@ def test_progress_doc_records_status_verification_and_next_steps():
     text = _read("progress.md")
 
     assert "# EPI 插件进度说明" in text
-    assert "更新时间：2026-05-31" in text
+    assert "更新时间：2026-06-01" in text
     assert "高质量论文收集和整理" in text
     assert "config-setup" in text
     assert "paper-quality-critic" in text
     assert "wiki-ingest-handoff" in text
-    assert "275 passed in 32.10s" in text
+    assert "279 passed in 37.63s" in text
+    assert "36 passed in 5.42s" in text
+    assert "pass rate `1`" in text
     assert "82/100" in text
     assert "waiting_for_human_gate" in text
     assert "ready_for_agent=false" in text
@@ -64,6 +68,8 @@ def test_progress_doc_records_status_verification_and_next_steps():
     assert "用户画像/config 驱动" in text
     assert "发布前必须重跑" in text
     assert "Plugin Eval" in text
+    assert "epi-improvement-brief-v1" in text
+    assert "evaluation-brief" in text
     assert "MINERU_TOKEN" in text
     assert "--skip-existing" in text
     assert "MinerU reported done but produced no Markdown output" in text
