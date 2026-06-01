@@ -27,9 +27,9 @@ def test_epi_linkage_doc_defines_scope_pipeline_and_sync_rule():
     assert "operator" in text
     assert "passed=true" in text
     assert "propose-config-update" in text
-    assert "Reading Trust Status" in text
+    assert "证据强度与可信状态" in text
     assert "wiki-ingest-brief.json" in text
-    assert "Wiki Ingest Brief" in text
+    assert "Wiki 沉淀价值" in text
     assert "wiki-ingest agent" in text
     assert "Claude" in text
     assert "Codex" in text

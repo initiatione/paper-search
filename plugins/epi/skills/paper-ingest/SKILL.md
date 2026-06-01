@@ -56,7 +56,7 @@ python scripts\orchestrator.py research-queue --bucket needs_reader_repair --vau
 python scripts\orchestrator.py research-queue --bucket reproducibility_caveats --actions --json --vault <vault>
 ```
 
-After critic pass, staging prepares evidence drafts, `wiki-ingest-brief.json`, and `reports/<slug>-reading-report.md`. The report should emphasize theory insight, experiment design, Reading Trust Status, evidence strength, suggested wiki routes, and reproducibility caveats.
+After critic pass, staging prepares evidence drafts, `wiki-ingest-brief.json`, and `briefs/reading-report.md`. The staged report is the human approval report: Chinese-first, source-aware, and compact, with identity metadata, Chinese-English terms, method idea, validation setup, evidence strength, caveats, wiki deposition value, and one deposition recommendation.
 
 The workflow image's Report step is read-only: use `report --run-id` to display an existing `_epi/runs/<run-id>/report.md` or `report.json`. The internal module is `report_run.py`; do not invent a `run-report` command.
 

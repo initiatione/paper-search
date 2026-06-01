@@ -20,7 +20,7 @@ Before writing or reviewing final pages, load:
 - `wiki-ingest-brief.json`.
 - `paper.pdf`, `metadata.json`, `mineru/paper.md`, `mineru/paper.tex`, `mineru/images/*`, `mineru/mineru-manifest.json`.
 - `reader/evidence-map.json` and `reader/claim-support.json`.
-- `critic/*.json` and `reports/<slug>-reading-report.md`.
+- `critic/*.json` and `briefs/reading-report.md`.
 - Target vault `AGENTS.md` and `_meta/*` contract files.
 
 ## Claim Statuses

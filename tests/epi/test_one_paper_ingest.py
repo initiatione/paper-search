@@ -125,23 +125,27 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
     reading_report_text = reading_report_path.read_text(encoding="utf-8")
     assert "page_type: reading_report" in reading_report_text
     assert "formal_page: false" in reading_report_text
-    assert "## Quick Take" in reading_report_text
-    assert "## Reading Trust Status" in reading_report_text
-    assert "- Status: accepted-with-caveats" in reading_report_text
-    assert "- Warning reviewers: paper-quality-critic" in reading_report_text
-    assert "Read `Quick Take`, `Reading Trust Status`, `Quality Gates`, and `Wiki Skill Handoff` first." in reading_report_text
-    assert "## What To Read If You Only Have 5 Minutes" in reading_report_text
-    assert "## Wiki Ingest Brief" in reading_report_text
-    assert "- Ingest brief: `wiki-ingest-brief.json`" in reading_report_text
-    assert "- Trust status: accepted-with-caveats" in reading_report_text
-    assert "- Final wiki pages: created by wiki skill batch distillation, not fixed by EPI staging." in reading_report_text
-    assert "## Theory And Experiment Ideas" in reading_report_text
-    assert "## Evidence Map" in reading_report_text
-    assert "## Wiki Skill Handoff" in reading_report_text
-    assert "## Quality Gates" in reading_report_text
-    assert "## Reproducibility Caveats" in reading_report_text
-    assert reading_report_text.index("## Theory And Experiment Ideas") < reading_report_text.index(
-        "## Reproducibility Caveats"
+    assert "# Embodied Navigation Control for Mobile Robots 阅读报告" in reading_report_text
+    assert "## 快速判断" in reading_report_text
+    assert "## 论文身份" in reading_report_text
+    assert "## 术语中英对照" in reading_report_text
+    assert "移动机器人（Mobile Robot）" in reading_report_text
+    assert "控制（Control）" in reading_report_text
+    assert "## 理论与方法" in reading_report_text
+    assert "## 实验/验证方式" in reading_report_text
+    assert "## 证据强度与可信状态" in reading_report_text
+    assert "- 可信状态：accepted-with-caveats" in reading_report_text
+    assert "- 警告审稿器：paper-quality-critic" in reading_report_text
+    assert "## Wiki 沉淀价值" in reading_report_text
+    assert "- EPI 只写 `_epi/` 内部材料；正式图谱页由 wiki skill 批量沉淀生成。" in reading_report_text
+    assert "## 沉淀建议" in reading_report_text
+    assert any(marker in reading_report_text for marker in ["建议沉淀", "谨慎沉淀", "暂不沉淀"])
+    assert "## Quick Take" not in reading_report_text
+    assert "## Wiki Skill Handoff" not in reading_report_text
+    assert "Inference:" not in reading_report_text
+    assert "A UTONOMOUS" not in reading_report_text
+    assert reading_report_text.index("## 理论与方法") < reading_report_text.index(
+        "## 主要 Caveat"
     )
     assert "## Reproduction Plans" not in reading_report_text
     wiki_ingest_brief_path = staging_root / "wiki-ingest-brief.json"
