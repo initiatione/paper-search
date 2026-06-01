@@ -69,8 +69,20 @@ def _seed_paper_gate_fixture(vault, slug, *, critic_outcome="pass", staged=True,
                         {"name": "kepano/obsidian-skills"},
                         {"name": "initiatione/obsidian-wiki-dev"},
                     ],
-                    "wiki_rule_source_model": {
-                        "resolution_order": [
+            "wiki_rule_source_model": {
+                "execution_agent_policy": {
+                    "allowed_executors": [
+                        "Claude",
+                        "Codex",
+                        "other wiki-capable agents",
+                    ],
+                    "brand_neutrality": (
+                        "Any wiki-capable agent may execute final writes if it follows the target vault "
+                        "contract, source-first review, human approval, and final-source-review gates."
+                    ),
+                    "local_skills_role": "helpers, not authority",
+                },
+                "resolution_order": [
                             {"source": "target vault AGENTS.md", "role": "vault owner contract"},
                             {"source": "_meta/schema.md", "role": "routing and schema"},
                             {"source": "Ar9av/obsidian-wiki", "role": "wiki framework"},
@@ -227,6 +239,23 @@ def test_paper_gate_blocks_agent_handoff_without_wiki_rule_source_model(tmp_path
     assert checks["wiki-ingest-brief"]["conclusion"] == "failure"
     assert "wiki_rule_source_model is missing" in checks["wiki-ingest-brief"]["output"]["summary"]
     assert "human-approval" not in checks
+
+
+def test_paper_gate_blocks_agent_handoff_without_execution_agent_policy(tmp_path):
+    vault = tmp_path / "vault"
+    slug = "fixture-paper"
+    _seed_paper_gate_fixture(vault, slug, agent_handoff=True)
+    brief_path = vault / "_staging" / "papers" / slug / "wiki-ingest-brief.json"
+    brief = json.loads(brief_path.read_text(encoding="utf-8"))
+    del brief["wiki_rule_source_model"]["execution_agent_policy"]
+    brief_path.write_text(json.dumps(brief), encoding="utf-8")
+
+    gate = build_paper_gate(vault, slug)
+
+    assert gate["status"] == "blocked"
+    checks = {run["name"]: run for run in gate["check_suite"]["check_runs"]}
+    assert checks["wiki-ingest-brief"]["conclusion"] == "failure"
+    assert "wiki execution agent policy is missing" in checks["wiki-ingest-brief"]["output"]["summary"]
 
 
 def test_paper_gate_blocks_agent_handoff_without_source_first_artifacts(tmp_path):

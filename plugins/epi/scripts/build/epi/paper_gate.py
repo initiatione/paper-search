@@ -174,6 +174,21 @@ def _wiki_ingest_brief_check(plan: dict[str, Any]) -> dict[str, Any]:
     elif not resolution_order:
         issues.append("wiki rule source resolution_order is missing")
     else:
+        execution_agent_policy = (
+            rule_source_model.get("execution_agent_policy")
+            if isinstance(rule_source_model.get("execution_agent_policy"), dict)
+            else {}
+        )
+        allowed_executor_text = "\n".join(
+            str(item) for item in execution_agent_policy.get("allowed_executors", [])
+        )
+        brand_neutrality_text = str(execution_agent_policy.get("brand_neutrality") or "")
+        if not execution_agent_policy:
+            issues.append("wiki execution agent policy is missing")
+        elif "Claude" not in allowed_executor_text or "Codex" not in allowed_executor_text:
+            issues.append("wiki execution agent policy must allow Claude and Codex")
+        elif "target vault contract" not in brand_neutrality_text:
+            issues.append("wiki execution agent policy must require the target vault contract")
         required_rule_sources = [
             "target vault AGENTS.md",
             "_meta/schema.md",

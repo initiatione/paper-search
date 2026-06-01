@@ -50,7 +50,13 @@ def _agent_checklist(
     plan: dict[str, Any],
     brief: dict[str, Any],
 ) -> list[str]:
-    read_before = brief.get("wiki_rule_source_model", {}).get("must_read_before_final_write") or CONTRACT_FILES
+    rule_source_model = brief.get("wiki_rule_source_model", {}) if isinstance(brief.get("wiki_rule_source_model"), dict) else {}
+    execution_agent_policy = (
+        rule_source_model.get("execution_agent_policy")
+        if isinstance(rule_source_model.get("execution_agent_policy"), dict)
+        else {}
+    )
+    read_before = rule_source_model.get("must_read_before_final_write") or CONTRACT_FILES
     handoff_paths = plan.get("agent_handoff_paths") or []
     source_policy = brief.get("ingest_policy", {}).get("source_first_policy")
     source_bundle = brief.get("source_bundle") or {}
@@ -65,6 +71,7 @@ def _agent_checklist(
     )
     final_source_review_path = final_source_review_contract.get("suggested_output_path") or "final-source-review.json"
     checklist = [
+        "Execution agent is neutral: Claude, Codex, or another wiki-capable agent may perform the final write if it follows the same handoff, approval, provenance, and vault-contract gates.",
         "Read target vault contract files before any final wiki write: " + ", ".join(str(item) for item in read_before),
         "Read the EPI evidence handoff: "
         + ", ".join(str(path) for path in handoff_paths)
@@ -98,6 +105,9 @@ def _agent_checklist(
         "Respect vault-local staged writes, link format, language policy, taxonomy, and frontmatter schema.",
         "Do not write final pages from EPI suggested routes directly.",
     ]
+    brand_neutrality = execution_agent_policy.get("brand_neutrality")
+    if brand_neutrality:
+        checklist.insert(1, "Executor policy: " + str(brand_neutrality))
     human_approval_run = next(
         (
             run
@@ -192,6 +202,11 @@ def build_wiki_ingest_handoff(vault_path: Path, slug: str) -> dict[str, Any]:
         "contract_files": _contract_file_status(vault_path),
         "framework_references": framework_references,
         "wiki_rule_source_model": rule_source_model,
+        "execution_agent_policy": (
+            rule_source_model.get("execution_agent_policy")
+            if isinstance(rule_source_model.get("execution_agent_policy"), dict)
+            else {}
+        ),
         "suggested_routes_only": bool(ingest_policy.get("suggested_routes_only")),
         "suggested_routes": brief.get("suggested_routes") or [],
         "entrypoints": brief.get("entrypoints") or {},
@@ -228,6 +243,15 @@ def render_wiki_ingest_handoff(handoff: dict[str, Any]) -> str:
         source = item.get("source")
         role = item.get("role")
         lines.append(f"- {source}: {role}")
+    execution_policy = handoff.get("execution_agent_policy") or {}
+    lines.extend(["", "## Execution Agent Policy", ""])
+    if execution_policy:
+        allowed = ", ".join(str(item) for item in execution_policy.get("allowed_executors") or [])
+        lines.append(f"- allowed_executors: {allowed}")
+        lines.append(f"- brand_neutrality: {execution_policy.get('brand_neutrality')}")
+        lines.append(f"- local_skills_role: {execution_policy.get('local_skills_role')}")
+    else:
+        lines.append("- missing")
     lines.extend(["", "## Framework References", ""])
     for item in handoff.get("framework_references") or []:
         lines.append(f"- {item.get('name')}")

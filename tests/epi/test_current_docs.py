@@ -211,6 +211,7 @@ def test_marketplace_and_readme_describe_profile_driven_generic_epi():
     manifest = json.loads((PLUGIN_ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     workflow = _read("workflow.md")
+    overview = _read("overview.zh.md")
 
     manifest_text = json.dumps(manifest, ensure_ascii=False)
     assert "profile-driven academic paper discovery" in manifest_text
@@ -232,9 +233,13 @@ def test_marketplace_and_readme_describe_profile_driven_generic_epi():
     assert "not a separate marketplace plugin" in readme
 
     assert "EPI 是通用论文插件，不默认任何学科方向" in workflow
+    assert "Claude" in workflow
+    assert "Codex" in workflow
     assert 'dry-run --query "<your topic>"' in workflow
     assert "prepare-ranked --run-id <run-id> --max-papers 10 --skip-existing" in workflow
     assert "prepare-ranked --run-id <run-id> --max-papers 10 --skip-existing --vault <vault> --json" in workflow
     assert "report --run-id <run-id> --vault <vault>" in workflow
     assert "report --run-id <run-id> --vault <vault> --json" in workflow
     assert "robotics embodied intelligence control" not in workflow
+    assert "Claude" in overview
+    assert "Codex" in overview

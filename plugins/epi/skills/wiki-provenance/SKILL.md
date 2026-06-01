@@ -5,7 +5,7 @@ description: "Use when final EPI paper knowledge is written to an Obsidian or LL
 
 # Wiki Provenance
 
-Use this for the final knowledge deposition boundary. EPI reader and critic artifacts reduce reading cost, but final wiki claims must remain traceable back to source paper evidence.
+Use this for the final knowledge deposition boundary. EPI reader and critic artifacts reduce reading cost, but final wiki claims must remain traceable back to source paper evidence, whether the final writer is Claude, Codex, or another wiki-capable agent.
 
 ## Core Rule
 

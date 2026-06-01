@@ -16,8 +16,8 @@ EPI 是一个 Codex 本地插件，用于把“持续关注某个研究方向”
 ```text
 主题/问题 -> 增量检索 -> 排序与去重 -> PDF 采集 -> MinerU 解析
 -> source-first reader -> critic gate -> staging evidence package
--> human approval -> wiki ingest agent -> final-source-review
--> record-wiki-ingest -> 后续检索/综合/演化
+-> human approval -> wiki ingest agent (Claude/Codex/other)
+-> final-source-review -> record-wiki-ingest -> 后续检索/综合/演化
 ```
 
 它不替用户完成完整科研项目，也不固定某一学科方向。研究方向、正负关键词、venue prior、最终 wiki 结构和语言风格都来自用户配置、当前请求和目标 vault contract。
@@ -259,7 +259,7 @@ python scripts\orchestrator.py record-human-approval --slug <slug> --approved-by
 
 ### 7. Final Wiki Ingest 与 Provenance
 
-最终 Obsidian/LLM Wiki 页面由 wiki ingest agent 写，不由 EPI 的固定 promotion 脚本决定路径。agent 必须先读取目标 vault contract：
+最终 Obsidian/LLM Wiki 页面由 wiki ingest agent 写，不由 EPI 的固定 promotion 脚本决定路径。执行器可以是 Claude、Codex 或其他 wiki-capable agent，但必须先读取目标 vault contract：
 
 ```text
 <vault>/AGENTS.md

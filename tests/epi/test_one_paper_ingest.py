@@ -169,6 +169,9 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
     assert final_source_review_contract["suggested_output_path"] == "final-source-review.json"
     assert final_source_review_contract["record_schema_version"] == "epi-final-source-review-v1"
     assert "mineru/paper.tex" in final_source_review_contract["required_artifacts"]
+    execution_agent_policy = wiki_ingest_brief["wiki_rule_source_model"]["execution_agent_policy"]
+    assert execution_agent_policy["allowed_executors"][:2] == ["Claude", "Codex"]
+    assert "target vault contract" in execution_agent_policy["brand_neutrality"]
     rule_sources = [
         item["source"]
         for item in wiki_ingest_brief["wiki_rule_source_model"]["resolution_order"]
@@ -188,6 +191,8 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
         "Markdown vault files as the source of truth" in requirement
         for requirement in wiki_ingest_brief["wiki_rule_source_model"]["write_contract_requirements"]
     )
+    assert "Claude" in wiki_ingest_brief["ingest_policy"]["executor_policy"]
+    assert "Codex" in wiki_ingest_brief["ingest_policy"]["executor_policy"]
     assert wiki_ingest_brief["entrypoints"]["reading_report"] == f"reports/{slug}-reading-report.md"
     assert [target["page_type"] for target in wiki_ingest_brief["suggested_routes"]] == [
         "reference",

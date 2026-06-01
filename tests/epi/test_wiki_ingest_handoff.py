@@ -79,6 +79,18 @@ def _seed_agent_handoff(vault, slug="fixture-paper"):
                 "record_schema_version": "epi-final-source-review-v1",
             },
             "wiki_rule_source_model": {
+                "execution_agent_policy": {
+                    "allowed_executors": [
+                        "Claude",
+                        "Codex",
+                        "other wiki-capable agents",
+                    ],
+                    "brand_neutrality": (
+                        "Any wiki-capable agent may execute final writes if it follows the target vault "
+                        "contract, source-first review, human approval, and final-source-review gates."
+                    ),
+                    "local_skills_role": "helpers, not authority",
+                },
                 "resolution_order": [
                     {"source": "current user instruction", "role": "session goal"},
                     {"source": "target vault AGENTS.md", "role": "owner contract"},
@@ -197,13 +209,16 @@ def test_build_wiki_ingest_handoff_resolves_contract_and_agent_checklist(tmp_pat
     assert handoff["suggested_routes_only"] is True
     assert handoff["final_source_review_contract"]["required"] is True
     assert handoff["final_source_review_contract"]["suggested_output_path"] == "final-source-review.json"
-    assert "source-first rule" in handoff["agent_checklist"][2]
+    assert handoff["execution_agent_policy"]["allowed_executors"][:2] == ["Claude", "Codex"]
+    assert "target vault contract" in handoff["execution_agent_policy"]["brand_neutrality"]
+    assert handoff["agent_checklist"][0].startswith("Execution agent is neutral")
+    assert any(item.startswith("Read target vault contract") for item in handoff["agent_checklist"])
+    assert any("source-first rule" in item for item in handoff["agent_checklist"])
     assert any("mineru/paper.md" in item for item in handoff["agent_checklist"])
     assert any("mineru/images/*" in item for item in handoff["agent_checklist"])
     assert any("source paper artifacts" in item for item in handoff["agent_checklist"])
     assert any("figures, tables, and images" in item for item in handoff["agent_checklist"])
     assert any("final-source-review.json" in item for item in handoff["agent_checklist"])
-    assert handoff["agent_checklist"][0].startswith("Read target vault contract files")
     assert any("Search existing wiki pages" in item for item in handoff["agent_checklist"])
     assert any("Do not write final pages" in item for item in handoff["agent_checklist"])
 
@@ -238,6 +253,8 @@ def test_render_wiki_ingest_handoff_is_actionable_without_writing(tmp_path):
     assert "next_action: run-wiki-ingest-agent" in output
     assert "ready_for_agent: false" in output
     assert "ready_after_human_approval: true" in output
+    assert "## Execution Agent Policy" in output
+    assert "allowed_executors: Claude, Codex, other wiki-capable agents" in output
     assert "local skills: helpers-not-authority" in output
     assert "- AGENTS.md: present" in output
     assert "- _meta/directory-structure.md: missing" in output

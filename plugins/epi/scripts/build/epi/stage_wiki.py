@@ -236,8 +236,22 @@ def _wiki_rule_source_model() -> dict:
     return {
         "principle": (
             "Obsidian/LLM Wiki construction and write rules are resolved from the target vault "
-            "contract and framework references; local installed skills are execution helpers."
+            "contract and framework references; local installed skills are execution helpers. "
+            "The final wiki executor is agent-neutral and may be Claude, Codex, or any other "
+            "wiki-capable agent that follows the same contract."
         ),
+        "execution_agent_policy": {
+            "allowed_executors": [
+                "Claude",
+                "Codex",
+                "other wiki-capable agents",
+            ],
+            "brand_neutrality": (
+                "Any wiki-capable agent may execute final writes if it follows the target vault "
+                "contract, source-first review, human approval, and final-source-review gates."
+            ),
+            "local_skills_role": "helpers, not authority",
+        },
         "resolution_order": [
             {
                 "priority": 1,
@@ -383,6 +397,7 @@ def _build_wiki_ingest_brief(
             "authority": "Resolve the target vault contract first; local skills are helpers, not sole authority.",
             "final_page_authority": "Final wiki pages are created by the wiki-ingest agent, not fixed by EPI staging.",
             "write_model": "Agent-mediated distillation and merge from the EPI evidence bundle.",
+            "executor_policy": "Claude, Codex, or any other wiki-capable agent may perform the final write if they respect the same contract.",
             "merge_policy": "Search existing pages first; update or merge before creating duplicates.",
             "staged_writes_policy": "Respect the target vault staged-write convention when present.",
             "provenance_policy": "Keep extracted, inferred, and ambiguous claims distinguishable.",

@@ -102,6 +102,18 @@ def _seed_agent_handoff(vault, slug="fixture-paper"):
                 "record_schema_version": "epi-final-source-review-v1",
             },
             "wiki_rule_source_model": {
+                "execution_agent_policy": {
+                    "allowed_executors": [
+                        "Claude",
+                        "Codex",
+                        "other wiki-capable agents",
+                    ],
+                    "brand_neutrality": (
+                        "Any wiki-capable agent may execute final writes if it follows the target vault "
+                        "contract, source-first review, human approval, and final-source-review gates."
+                    ),
+                    "local_skills_role": "helpers, not authority",
+                },
                 "resolution_order": [
                     {"source": "target vault AGENTS.md", "role": "owner contract"},
                     {"source": "_meta/schema.md", "role": "routing"},

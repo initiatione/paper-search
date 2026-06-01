@@ -37,7 +37,7 @@ EPI 不能把 Obsidian Wiki 写入规则简化成“调用本机 `llm-wiki` / `w
 7. `kepano/obsidian-skills`：Obsidian 语法、properties/frontmatter、wikilinks、embeds、callouts、bases/canvas 等格式约定。
 8. 本机 `llm-wiki` / `wiki-ingest` / `obsidian-markdown`：按上述规则执行的本地 helper/adapters，不覆盖目标 vault contract。
 
-因此 `wiki-ingest-brief.json` 必须包含 `wiki_rule_source_model`，记录 `resolution_order`、`must_read_before_final_write` 和 `write_contract_requirements`。`paper-gate` 要把这个字段纳入 `wiki-ingest-brief` 检查，避免 EPI 退化成固定脚本或单一 skill 默认规则。
+因此 `wiki-ingest-brief.json` 必须包含 `wiki_rule_source_model`，记录 `resolution_order`、`must_read_before_final_write`、`write_contract_requirements` 和 `execution_agent_policy`。`execution_agent_policy` 必须明确 Claude、Codex 或其他 wiki-capable agent 都可以作为最终执行器，只要遵守同一套 target vault contract、source-first review、人类批准和 final-source-review gate。`paper-gate` 要把这些字段纳入 `wiki-ingest-brief` 检查，避免 EPI 退化成固定脚本、单一 skill 默认规则或单一 agent 默认规则。
 
 ## 主链路
 
@@ -157,7 +157,7 @@ staging 生成证据包和非权威草稿：
 
 当前默认路径是 agent-mediated wiki ingest handoff：`promotion-plan.json` 记录 `handoff_type=agent-mediated-wiki-ingest`、`wiki_write_model=agent-mediated-vault-contract`、`final_page_authority=target-vault-contract-and-wiki-ingest-agent`、`wiki_ingest_brief_path`、`agent_handoff_paths`、`final_source_review_contract` 和 `suggested_final_source_review_path`。EPI 不用固定脚本决定最终 Obsidian Wiki 页面路径；`references/`、`concepts/`、`synthesis/`、`reports/` 只是不具约束力的 suggested draft routes。
 
-入口：`wiki-ingest-handoff --slug <slug> [--json]`。它是只读 handoff 渲染器，不写 `_runs`、raw、staging 或 compiled wiki。输出内容包括：当前 `paper-gate` 摘要、`promotion-plan.json` / `wiki-ingest-brief.json` / `human-approval.json` 路径、目标 vault contract 文件是否存在、`wiki_rule_source_model` 的优先级、framework references、suggested routes、trust status、final-source-review 合同和 agent checklist。`research-queue --bucket ready_to_promote --actions` 对 agent-mediated plan 必须给出该命令，用户或 agent 先阅读 handoff，再记录前置 human approval，之后才按目标 vault contract 执行最终 wiki ingest。
+入口：`wiki-ingest-handoff --slug <slug> [--json]`。它是只读 handoff 渲染器，不写 `_runs`、raw、staging 或 compiled wiki。输出内容包括：当前 `paper-gate` 摘要、`promotion-plan.json` / `wiki-ingest-brief.json` / `human-approval.json` 路径、目标 vault contract 文件是否存在、`wiki_rule_source_model` 的优先级、framework references、suggested routes、trust status、final-source-review 合同、执行器中立策略和 agent checklist。`research-queue --bucket ready_to_promote --actions` 对 agent-mediated plan 必须给出该命令，用户或 agent 先阅读 handoff，再记录前置 human approval，之后才按目标 vault contract 执行最终 wiki ingest。
 
 入口：`record-human-approval --slug <slug> --approved-by <name> --scope run-wiki-ingest-agent [--json]`。它是 agent-mediated wiki ingest 的前置人类批准记录器，只在当前 `paper-gate` 无 failure checks 且唯一 action-required 为 `human-approval` 时写 `_staging/papers/<slug>/human-approval.json`，schema 为 `epi-human-approval-v1`。它不得写最终 wiki 页面，也不得替代 final wiki agent。
 

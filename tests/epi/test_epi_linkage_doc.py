@@ -31,6 +31,8 @@ def test_epi_linkage_doc_defines_scope_pipeline_and_sync_rule():
     assert "wiki-ingest-brief.json" in text
     assert "Wiki Ingest Brief" in text
     assert "wiki-ingest agent" in text
+    assert "Claude" in text
+    assert "Codex" in text
     assert "Ar9av/obsidian-wiki" in text
     assert "kepano/obsidian-skills" in text
     assert "obsidian-wiki-dev" in text
