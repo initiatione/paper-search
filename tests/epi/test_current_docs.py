@@ -214,6 +214,23 @@ def test_paper_discovery_chat_output_requires_priority_abstracts_and_metrics():
     assert "禁止返回未排序的标题清单" in linkage
 
 
+def test_human_approval_requires_single_readable_approval_report():
+    paper_ingest = (PLUGIN_ROOT / "skills" / "paper-ingest" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    linkage = _read("epi-linkage.md")
+    workflow = _read("workflow.md")
+
+    for text in [paper_ingest, linkage, workflow]:
+        assert "approval report" in text or "人工确认报告" in text
+        assert "single" in text or "唯一" in text or "一份" in text
+        assert "Chinese-English" in text or "中英对照" in text
+        assert "建议沉淀" in text
+        assert "谨慎沉淀" in text
+        assert "暂不沉淀" in text
+        assert "raw JSON" in text
+
+
 def test_plugin_project_does_not_embed_local_machine_paths():
     forbidden = [
         "C:\\Users\\liuchf",

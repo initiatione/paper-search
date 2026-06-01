@@ -17,6 +17,10 @@ Reader and critic outputs are navigation aids; they never replace the source pap
 
 Parse-quality review should treat `paper.md`, `paper.tex`, `images/*`, `mineru-manifest.json`, and `parse-record.json` as one evidence bundle when parse succeeded.
 
+## Approval Report Rules
+
+Before human approval for wiki ingest, expose a single approval report, not raw JSON. The report should be Chinese-first and short enough to read quickly while preserving enough paper information for a real decision: title, authors/year/venue/DOI or arXiv, PDF and metric status, theory/method idea, experiment or validation setup, evidence strength, caveats, and wiki deposition value. Use Chinese-English terms on first mention and one final recommendation per paper: `建议沉淀`, `谨慎沉淀`, or `暂不沉淀`.
+
 ## Claim Cards
 
 For each important paper, preserve compact claim/evidence cards:

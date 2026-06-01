@@ -60,6 +60,12 @@ After critic pass, staging prepares evidence drafts, `wiki-ingest-brief.json`, a
 
 The workflow image's Report step is read-only: use `report --run-id` to display an existing `_epi/runs/<run-id>/report.md` or `report.json`. The internal module is `report_run.py`; do not invent a `run-report` command.
 
+## Human Approval Report
+
+Before running `record-human-approval`, present exactly one concise human-readable approval report to the user. Use the staged reading report as the approval report when it is complete enough; otherwise repair staging or regenerate the report first. Do not ask the user to approve from raw JSON, gate output, path lists, or critic sidecars.
+
+The approval report must be Chinese-first and dense but short. For a batch, use one single report with one compact card per paper. Each card should cover identity metadata, theory/method idea, experiment or validation setup, evidence strength, main caveats, and wiki deposition value. Use Chinese-English terminology on first mention, such as `模型预测控制（Model Predictive Control, MPC）`. End each card with one deposition recommendation: `建议沉淀`, `谨慎沉淀`, or `暂不沉淀`.
+
 ## Source-First Wiki Handoff
 
 `reader/` and critic outputs reduce reading cost; they are not the source of truth for final wiki writing. Before final wiki ingest, load `references/source-first-reading.md`, run `wiki-ingest-handoff`, and verify the handoff requires:
@@ -73,7 +79,7 @@ If the handoff lacks these fields, repair staging or rerun the relevant EPI step
 
 ## Wiki Boundary
 
-Final Obsidian/LLM Wiki pages are agent-mediated under the target vault contract. The final wiki executor may be Claude, Codex, or another wiki-capable agent. Before final writing, run `wiki-ingest-handoff`, resolve `AGENTS.md` and `_meta/*`, use the framework references named in `docs\epi-linkage.md`, keep local wiki skills as adapters, and require `wiki_rule_source_model`. Then record pre-write approval with `record-human-approval --scope run-wiki-ingest-agent`; do not let the wiki ingest agent write final or staged vault pages until the handoff reports `ready_for_agent=true`.
+Final Obsidian/LLM Wiki pages are agent-mediated under the target vault contract. The final wiki executor may be Claude, Codex, or another wiki-capable agent. Before final writing, run `wiki-ingest-handoff`, resolve `AGENTS.md` and `_meta/*`, use the framework references named in `docs\epi-linkage.md`, keep local wiki skills as adapters, and require `wiki_rule_source_model`. Then show the approval report and record pre-write approval with `record-human-approval --scope run-wiki-ingest-agent`; do not let the wiki ingest agent write final or staged vault pages until the handoff reports `ready_for_agent=true`.
 
 When the user has read the lightweight report and calls `@EPI` again to continue wiki writing, run `research-queue --bucket ready_to_promote --actions --json` or the known slug's `wiki-ingest-trigger --slug <slug> --json`. The trigger writes `_epi/staging/papers/<slug>/wiki-agent-trigger.json` only after approval and gives the current Claude, Codex, or other wiki-capable agent the source-first instruction bundle. It does not spawn a hidden background agent and does not write final pages by itself.
 
