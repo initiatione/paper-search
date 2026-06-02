@@ -42,6 +42,45 @@ def _load_json(path):
         return None
 
 
+def _quality_tier_summary(report):
+    ranked = report.get("ranked") or report.get("accepted") or []
+    if not isinstance(ranked, list) or not ranked:
+        return None
+    counts = {}
+    for paper in ranked:
+        if not isinstance(paper, dict):
+            continue
+        tier = paper.get("quality_tier")
+        if tier:
+            counts[tier] = counts.get(tier, 0) + 1
+    if not counts:
+        return None
+    return {"tier_counts": counts, "total": sum(counts.values())}
+
+
+def _benchmark_contract_summary(report):
+    ranked = report.get("ranked") or report.get("accepted") or []
+    if not isinstance(ranked, list):
+        return None
+    valid_count = 0
+    invalid_count = 0
+    for paper in ranked:
+        if not isinstance(paper, dict):
+            continue
+        gate = paper.get("quality_gate")
+        if not isinstance(gate, dict):
+            continue
+        evidence = gate.get("evidence") or []
+        if "benchmark_signal" in evidence:
+            valid_count += 1
+        blocking = gate.get("blocking_reasons") or []
+        if "weak_benchmark_signal" in (gate.get("cautions") or []):
+            invalid_count += 1
+    if not valid_count and not invalid_count:
+        return None
+    return {"valid": valid_count, "invalid": invalid_count}
+
+
 def _normalize_run_entry(run_dir):
     run_state = _load_json(run_dir / "run-state.json")
     if not isinstance(run_state, dict):
@@ -79,6 +118,12 @@ def _normalize_run_entry(run_dir):
     revision_delta = report.get("revision_delta")
     if isinstance(revision_delta, dict):
         entry["revision_delta"] = revision_delta
+    quality_tiers = _quality_tier_summary(report)
+    if quality_tiers:
+        entry["quality_tier_summary"] = quality_tiers
+    benchmark_contract = _benchmark_contract_summary(report)
+    if benchmark_contract:
+        entry["benchmark_contract_summary"] = benchmark_contract
     return entry
 
 
@@ -871,6 +916,33 @@ def _render_filtered_dashboard(title, entries, empty_text):
     return "\n".join(lines)
 
 
+def _build_quality_tier_index(entries):
+    by_tier = {}
+    for entry in entries:
+        summary = entry.get("quality_tier_summary")
+        if not isinstance(summary, dict):
+            continue
+        tier_counts = summary.get("tier_counts") or {}
+        for tier in tier_counts:
+            by_tier.setdefault(tier, []).append(entry.get("run_id"))
+    return by_tier
+
+
+def _build_benchmark_contract_index(entries):
+    valid_runs = []
+    invalid_runs = []
+    for entry in entries:
+        summary = entry.get("benchmark_contract_summary")
+        if not isinstance(summary, dict):
+            continue
+        run_id = entry.get("run_id")
+        if summary.get("valid", 0) > 0:
+            valid_runs.append(run_id)
+        if summary.get("invalid", 0) > 0:
+            invalid_runs.append(run_id)
+    return {"valid_runs": valid_runs, "invalid_runs": invalid_runs}
+
+
 def refresh_run_index(vault_path):
     runs_root = _runs_root(vault_path)
     runs_root.mkdir(parents=True, exist_ok=True)
@@ -889,12 +961,16 @@ def refresh_run_index(vault_path):
     summary = _build_summary(entries)
     grouped = _build_grouped_summaries(entries)
     research_queue = _build_research_queue(entries, vault_path)
+    quality_tier_index = _build_quality_tier_index(entries)
+    benchmark_contract_index = _build_benchmark_contract_index(entries)
     index_payload = {
         "summary": summary,
         "research_queue": research_queue,
         "latest_failures": grouped["latest_failures"],
         "latest_human_gate_pending": grouped["latest_human_gate_pending"],
         "latest_success_by_workflow": grouped["latest_success_by_workflow"],
+        "by_quality_tier": quality_tier_index,
+        "by_benchmark_contract": benchmark_contract_index,
         "runs": entries,
     }
     _write_json(runs_root / "index.json", index_payload)
@@ -1206,6 +1282,8 @@ def query_runs(
     human_gate=False,
     workflow=None,
     latest_success=None,
+    quality_tier=None,
+    benchmark_valid=None,
     limit=10,
 ):
     index_payload = load_run_index(vault_path)
@@ -1229,10 +1307,75 @@ def query_runs(
             matches = [entry for entry in matches if entry.get("workflow_type") == workflow]
             title = f"{title} ({workflow})"
 
+        if quality_tier:
+            matches = [
+                entry for entry in matches
+                if quality_tier in (
+                    (entry.get("quality_tier_summary") or {}).get("tier_counts") or {}
+                )
+            ]
+            title = f"{title} (quality_tier={quality_tier})"
+
+        if benchmark_valid is not None:
+            if benchmark_valid:
+                matches = [
+                    entry for entry in matches
+                    if (entry.get("benchmark_contract_summary") or {}).get("valid", 0) > 0
+                ]
+                title = f"{title} (benchmark_valid=true)"
+            else:
+                matches = [
+                    entry for entry in matches
+                    if (entry.get("benchmark_contract_summary") or {}).get("invalid", 0) > 0
+                ]
+                title = f"{title} (benchmark_valid=false)"
+
         matches = matches[:limit]
 
     return {
         "title": title,
+        "runs": matches,
+    }
+
+
+def query_by_quality_tier(vault_path, *, tier=None, limit=10):
+    index_payload = load_run_index(vault_path)
+    tier_index = index_payload.get("by_quality_tier") or {}
+    if tier:
+        run_ids = set(tier_index.get(tier) or [])
+        matches = [
+            entry for entry in index_payload.get("runs", [])
+            if entry.get("run_id") in run_ids
+        ][:limit]
+        return {
+            "title": f"EPI Runs By Quality Tier - {tier}",
+            "tier": tier,
+            "run_ids": sorted(run_ids),
+            "runs": matches,
+        }
+    return {
+        "title": "EPI Quality Tier Index",
+        "tiers": {
+            tier_name: sorted(run_ids)
+            for tier_name, run_ids in sorted(tier_index.items())
+        },
+    }
+
+
+def query_by_benchmark_contract(vault_path, *, valid=True, limit=10):
+    index_payload = load_run_index(vault_path)
+    bc_index = index_payload.get("by_benchmark_contract") or {}
+    key = "valid_runs" if valid else "invalid_runs"
+    run_ids = set(bc_index.get(key) or [])
+    matches = [
+        entry for entry in index_payload.get("runs", [])
+        if entry.get("run_id") in run_ids
+    ][:limit]
+    label = "valid" if valid else "invalid"
+    return {
+        "title": f"EPI Runs By Benchmark Contract - {label}",
+        "valid": valid,
+        "run_ids": sorted(run_ids),
         "runs": matches,
     }
 
