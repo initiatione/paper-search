@@ -5,7 +5,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from epi.acquire_papers import acquire_paper, acquire_paper_from_url
+from epi.acquire_papers import _metadata_from_candidate, acquire_paper, acquire_paper_from_url
 from epi.artifacts import (
     existing_run_dir,
     file_sha256,
@@ -46,7 +46,13 @@ from epi.run_critic import run_critics
 from epi.run_mineru_parse import materialize_mineru_fixture, run_mineru_command
 from epi.skill_aware_evolve import activate_evolution, propose_evolution, query_evolution, render_evolution_query
 from epi.source_artifacts import canonical_mineru_markdown_relative_path, resolve_mineru_markdown_path
-from epi.stage_wiki import stage_paper
+from epi.stage_wiki import (
+    AUDITED_INGEST_MODE,
+    FAST_INGEST_MODE,
+    REVIEWED_INGEST_MODE,
+    normalize_ingest_mode,
+    stage_paper,
+)
 from epi.wiki_ingest_approval import create_human_approval_record, human_approval_record_path
 from epi.wiki_ingest_handoff import build_wiki_ingest_handoff, render_wiki_ingest_handoff
 from epi.wiki_ingest_record import create_wiki_ingest_record
@@ -60,6 +66,14 @@ _LOCAL_TOOL_VERSION = "epi-local"
 
 def _write_json(path: Path, payload: object) -> None:
     write_json_atomic(path, payload)
+
+
+def _ensure_candidate_metadata(paper_root: Path, candidate: dict) -> None:
+    metadata_path = paper_root / "metadata.json"
+    if metadata_path.exists():
+        return
+    paper_root.mkdir(parents=True, exist_ok=True)
+    _write_json(metadata_path, _metadata_from_candidate(candidate))
 
 
 def _refresh_run_index(vault_path: Path) -> None:
@@ -1223,8 +1237,10 @@ def run_one_paper_ingest(
     mineru_markdown_path: Path,
     mineru_tex_path: Path | None = None,
     mineru_images_dir: Path | None = None,
+    workflow_mode: str = FAST_INGEST_MODE,
 ) -> dict:
     vault_path = vault_path.resolve()
+    workflow_mode = normalize_ingest_mode(workflow_mode)
     initialize_paper_wiki(vault_path)
     slug = candidate["slug"]
     paper_root = raw_paper_root(vault_path, slug)
@@ -1236,20 +1252,25 @@ def run_one_paper_ingest(
         tex_path=mineru_tex_path,
         images_dir=mineru_images_dir,
     )
-    reader_record = generate_reader_outputs(paper_root)
-    critic_report = run_critics(paper_root)
-    staging_root = stage_paper(vault_path, slug, paper_root)
+    reader_record = None
+    critic_report = None
+    if workflow_mode in {REVIEWED_INGEST_MODE, AUDITED_INGEST_MODE}:
+        reader_record = generate_reader_outputs(paper_root)
+    if workflow_mode == AUDITED_INGEST_MODE:
+        critic_report = run_critics(paper_root)
+    staging_root = stage_paper(vault_path, slug, paper_root, workflow_mode=workflow_mode)
 
     run_manifest = {
         "stage": "one-paper-ingest",
         "state": "staged",
         "paper_slug": slug,
+        "workflow_mode": workflow_mode,
         "dry_run": False,
         "compiled_wiki_write": False,
         "acquire_record": acquire_record,
         "parse_record": parse_record,
         "reader_record": reader_record,
-        "critic_outcome": critic_report["outcome"],
+        "critic_outcome": critic_report["outcome"] if critic_report else "not-run",
         "paper_root": str(paper_root),
         "staging_root": str(staging_root),
     }
@@ -1295,6 +1316,7 @@ def _paper_run_state(
     next_action: str | None,
     stage_record: dict | None = None,
     human_gate_required: bool = False,
+    workflow_mode: str | None = None,
 ) -> dict:
     payload = {
         "paper_slug": slug,
@@ -1305,6 +1327,8 @@ def _paper_run_state(
         "compiled_wiki_write": False,
         "human_gate_required": human_gate_required,
     }
+    if workflow_mode is not None:
+        payload["workflow_mode"] = workflow_mode
     if stage_record is not None:
         payload["stage_record"] = stage_record
     return payload
@@ -1315,8 +1339,10 @@ def advance_paper_once(
     candidate: dict,
     mineru_command: str | list[str] | None = None,
     mineru_timeout: int | None = None,
+    workflow_mode: str = FAST_INGEST_MODE,
 ) -> dict:
     vault_path = vault_path.resolve()
+    workflow_mode = normalize_ingest_mode(workflow_mode)
     initialize_paper_wiki(vault_path)
     slug = candidate["slug"]
     paper_root = raw_paper_root(vault_path, slug)
@@ -1338,6 +1364,7 @@ def advance_paper_once(
                 last_action="acquire",
                 next_action=next_action,
                 stage_record=record,
+                workflow_mode=workflow_mode,
             ),
         )
 
@@ -1346,7 +1373,11 @@ def advance_paper_once(
             vault_path, slug, mineru_command=mineru_command, mineru_timeout=mineru_timeout
         )
         state = "parsed" if record["status"] == "success" else "parse_failed"
-        next_action = "read" if record["status"] == "success" else None
+        next_action = (
+            "staging"
+            if record["status"] == "success" and workflow_mode == FAST_INGEST_MODE
+            else "read" if record["status"] == "success" else None
+        )
         return _write_paper_run_state(
             paper_root,
             _paper_run_state(
@@ -1356,10 +1387,11 @@ def advance_paper_once(
                 last_action="parse",
                 next_action=next_action,
                 stage_record=record,
+                workflow_mode=workflow_mode,
             ),
         )
 
-    if not reader_md.exists():
+    if workflow_mode in {REVIEWED_INGEST_MODE, AUDITED_INGEST_MODE} and not reader_md.exists():
         record = generate_reader_outputs(paper_root)
         return _write_paper_run_state(
             paper_root,
@@ -1368,12 +1400,13 @@ def advance_paper_once(
                 slug=slug,
                 state="read",
                 last_action="read",
-                next_action="critic",
+                next_action="critic" if workflow_mode == AUDITED_INGEST_MODE else "staging",
                 stage_record=record,
+                workflow_mode=workflow_mode,
             ),
         )
 
-    if not critic_report_path.exists():
+    if workflow_mode == AUDITED_INGEST_MODE and not critic_report_path.exists():
         record = run_critics(paper_root)
         state = "critic_passed" if record["outcome"] == "pass" else "critic_failed"
         next_action = "staging" if record["outcome"] == "pass" else record.get("next_action")
@@ -1386,11 +1419,12 @@ def advance_paper_once(
                 last_action="critic",
                 next_action=next_action,
                 stage_record=record,
+                workflow_mode=workflow_mode,
             ),
         )
 
-    critic_report = json.loads(critic_report_path.read_text(encoding="utf-8"))
-    if critic_report.get("outcome") != "pass":
+    critic_report = json.loads(critic_report_path.read_text(encoding="utf-8")) if critic_report_path.exists() else {}
+    if critic_report and critic_report.get("outcome") != "pass":
         return _write_paper_run_state(
             paper_root,
             _paper_run_state(
@@ -1400,14 +1434,16 @@ def advance_paper_once(
                 last_action="awaiting-critic-resolution",
                 next_action=critic_report.get("next_action"),
                 stage_record=critic_report,
+                workflow_mode=workflow_mode,
             ),
         )
 
     if not promotion_plan.exists():
-        staging_root = stage_paper(vault_path, slug, paper_root)
+        staging_root = stage_paper(vault_path, slug, paper_root, workflow_mode=workflow_mode)
         record = {
             "stage": "staging",
             "status": "success",
+            "workflow_mode": workflow_mode,
             "staging_root": str(staging_root),
             "promotion_plan": str(promotion_plan),
         }
@@ -1421,6 +1457,7 @@ def advance_paper_once(
                 next_action="run-wiki-ingest-agent",
                 stage_record=record,
                 human_gate_required=True,
+                workflow_mode=workflow_mode,
             ),
         )
 
@@ -1433,6 +1470,7 @@ def advance_paper_once(
             last_action="awaiting-wiki-ingest",
             next_action="run-wiki-ingest-agent",
             human_gate_required=True,
+            workflow_mode=workflow_mode,
         ),
     )
 
@@ -1506,8 +1544,10 @@ def advance_paper_batch(
     skipped_ranked_candidates: list[dict] | None = None,
     rank_decision_filter: list[str] | None = None,
     mineru_timeout: int | None = None,
+    workflow_mode: str = FAST_INGEST_MODE,
 ) -> dict:
     vault_path = vault_path.resolve()
+    workflow_mode = normalize_ingest_mode(workflow_mode)
     initialize_paper_wiki(vault_path)
     if max_papers is not None and max_papers < 0:
         raise ValueError("max_papers must be greater than or equal to 0")
@@ -1518,7 +1558,13 @@ def advance_paper_batch(
     run_id, run_dir = _new_run_dir(vault_path, "batch-advance")
     started_at = utc_now()
     results = [
-        advance_paper_once(vault_path, candidate, mineru_command=mineru_command, mineru_timeout=mineru_timeout)
+        advance_paper_once(
+            vault_path,
+            candidate,
+            mineru_command=mineru_command,
+            mineru_timeout=mineru_timeout,
+            workflow_mode=workflow_mode,
+        )
         for candidate in selected_candidates
     ]
     failed = any(result["state"].endswith("_failed") for result in results)
@@ -1644,6 +1690,7 @@ def advance_paper_batch(
         "workflow_type": workflow_type,
         "state": batch_state,
         "status": status,
+        "workflow_mode": workflow_mode,
         "vault_path": str(vault_path),
         "candidate_count": source_candidate_count,
         "processed_count": len(results),
@@ -1767,8 +1814,10 @@ def advance_paper_batch_from_run(
     max_papers: int | None = None,
     include_review_candidates: bool = False,
     mineru_timeout: int | None = None,
+    workflow_mode: str = FAST_INGEST_MODE,
 ) -> dict:
     vault_path = vault_path.resolve()
+    workflow_mode = normalize_ingest_mode(workflow_mode)
     rank_path = existing_run_dir(vault_path, run_id) / "rank.json"
     if not rank_path.exists():
         raise FileNotFoundError(f"missing ranked candidates: {rank_path}")
@@ -1789,6 +1838,7 @@ def advance_paper_batch_from_run(
         skipped_ranked_candidates=skipped_ranked_candidates,
         rank_decision_filter=rank_decision_filter,
         mineru_timeout=mineru_timeout,
+        workflow_mode=workflow_mode,
     )
 
 
@@ -1798,14 +1848,15 @@ def _prepare_candidate_until_parsed(
     *,
     mineru_command: str | list[str] | None = None,
     mineru_timeout: int | None = None,
+    workflow_mode: str = FAST_INGEST_MODE,
 ) -> dict:
+    workflow_mode = normalize_ingest_mode(workflow_mode)
     slug = candidate["slug"]
     paper_root = raw_paper_root(vault_path, slug)
     paper_pdf = paper_root / "paper.pdf"
-    mineru_dir = paper_root / "mineru"
-    mineru_tex = mineru_dir / "paper.tex"
-    mineru_manifest = mineru_dir / "mineru-manifest.json"
-    mineru_images = mineru_dir / "images"
+    reader_md = paper_root / "reader" / "reader.md"
+    critic_report_path = paper_root / "critic" / "critic-report.json"
+    promotion_plan = staging_paper_root(vault_path, slug) / "promotion-plan.json"
 
     if not paper_pdf.exists():
         acquire_record = acquire_paper_from_candidate(vault_path, candidate)
@@ -1819,25 +1870,84 @@ def _prepare_candidate_until_parsed(
                     last_action="acquire",
                     next_action=None,
                     stage_record=acquire_record,
+                    workflow_mode=workflow_mode,
                 ),
             )
 
-    parse_complete = _has_complete_mineru_parse(paper_root)
-    if not parse_complete:
+    _ensure_candidate_metadata(paper_root, candidate)
+
+    if not _has_complete_mineru_parse(paper_root):
         parse_record = parse_paper_with_mineru(
             vault_path, slug, mineru_command=mineru_command, mineru_timeout=mineru_timeout
         )
-        state = "parsed" if parse_record["status"] == "success" else "parse_failed"
-        next_action = "read" if parse_record["status"] == "success" else None
+        if parse_record["status"] != "success":
+            return _write_paper_run_state(
+                paper_root,
+                _paper_run_state(
+                    paper_root=paper_root,
+                    slug=slug,
+                    state="parse_failed",
+                    last_action="parse",
+                    next_action=None,
+                    stage_record=parse_record,
+                    workflow_mode=workflow_mode,
+                ),
+            )
+
+    if workflow_mode in {REVIEWED_INGEST_MODE, AUDITED_INGEST_MODE} and not reader_md.exists():
+        generate_reader_outputs(paper_root)
+
+    if workflow_mode == AUDITED_INGEST_MODE and not critic_report_path.exists():
+        critic_record = run_critics(paper_root)
+        if critic_record["outcome"] != "pass":
+            return _write_paper_run_state(
+                paper_root,
+                _paper_run_state(
+                    paper_root=paper_root,
+                    slug=slug,
+                    state="critic_failed",
+                    last_action="critic",
+                    next_action=critic_record.get("next_action"),
+                    stage_record=critic_record,
+                    workflow_mode=workflow_mode,
+                ),
+            )
+
+    critic_report = json.loads(critic_report_path.read_text(encoding="utf-8")) if critic_report_path.exists() else {}
+    if critic_report and critic_report.get("outcome") != "pass":
         return _write_paper_run_state(
             paper_root,
             _paper_run_state(
                 paper_root=paper_root,
                 slug=slug,
-                state=state,
-                last_action="parse",
-                next_action=next_action,
-                stage_record=parse_record,
+                state="critic_failed",
+                last_action="awaiting-critic-resolution",
+                next_action=critic_report.get("next_action"),
+                stage_record=critic_report,
+                workflow_mode=workflow_mode,
+            ),
+        )
+
+    if not promotion_plan.exists():
+        staging_root = stage_paper(vault_path, slug, paper_root, workflow_mode=workflow_mode)
+        record = {
+            "stage": "staging",
+            "status": "success",
+            "workflow_mode": workflow_mode,
+            "staging_root": str(staging_root),
+            "promotion_plan": str(promotion_plan),
+        }
+        return _write_paper_run_state(
+            paper_root,
+            _paper_run_state(
+                paper_root=paper_root,
+                slug=slug,
+                state="staged",
+                last_action="staging",
+                next_action="run-wiki-ingest-agent",
+                stage_record=record,
+                human_gate_required=True,
+                workflow_mode=workflow_mode,
             ),
         )
 
@@ -1846,10 +1956,11 @@ def _prepare_candidate_until_parsed(
         _paper_run_state(
             paper_root=paper_root,
             slug=slug,
-            state="parsed",
-            last_action="already-parsed",
-            next_action="read",
-            human_gate_required=False,
+            state="staged",
+            last_action="already-staged",
+            next_action="run-wiki-ingest-agent",
+            human_gate_required=True,
+            workflow_mode=workflow_mode,
         ),
     )
 
@@ -1889,10 +2000,29 @@ def _has_complete_mineru_parse(paper_root: Path) -> bool:
     return _parse_record_status(paper_root) == "success"
 
 
-def _prepare_candidate_failure_state(vault_path: Path, candidate: dict, exc: Exception) -> dict:
+def _has_prepared_source_staging(vault_path: Path, slug: str, workflow_mode: str) -> bool:
+    paper_root = raw_paper_root(vault_path, slug)
+    if not _has_complete_mineru_parse(paper_root):
+        return False
+    plan_path = staging_paper_root(vault_path, slug) / "promotion-plan.json"
+    try:
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return False
+    return isinstance(plan, dict) and plan.get("workflow_mode") == workflow_mode
+
+
+def _prepare_candidate_failure_state(
+    vault_path: Path,
+    candidate: dict,
+    exc: Exception,
+    *,
+    workflow_mode: str = FAST_INGEST_MODE,
+) -> dict:
     slug = candidate["slug"]
     paper_root = raw_paper_root(vault_path, slug)
     paper_root.mkdir(parents=True, exist_ok=True)
+    workflow_mode = normalize_ingest_mode(workflow_mode)
     record = {
         "stage": "prepare",
         "status": "failed",
@@ -1911,6 +2041,7 @@ def _prepare_candidate_failure_state(vault_path: Path, candidate: dict, exc: Exc
             last_action="prepare",
             next_action=None,
             stage_record=record,
+            workflow_mode=workflow_mode,
         ),
     )
 
@@ -1923,8 +2054,10 @@ def prepare_ranked_papers_from_run(
     include_review_candidates: bool = False,
     skip_existing: bool = False,
     mineru_timeout: int | None = None,
+    workflow_mode: str = FAST_INGEST_MODE,
 ) -> dict:
     vault_path = vault_path.resolve()
+    workflow_mode = normalize_ingest_mode(workflow_mode)
     initialize_paper_wiki(vault_path)
     rank_path = existing_run_dir(vault_path, run_id) / "rank.json"
     if not rank_path.exists():
@@ -1940,12 +2073,12 @@ def prepare_ranked_papers_from_run(
         remaining_candidates = []
         for candidate in selected_candidates:
             slug = candidate.get("slug")
-            if slug and _has_complete_mineru_parse(raw_paper_root(vault_path, slug)):
+            if slug and _has_prepared_source_staging(vault_path, slug, workflow_mode):
                 skipped_existing_candidates.append(
                     {
                         "slug": slug,
                         "title": candidate.get("title", slug),
-                        "reason": "already_parsed",
+                        "reason": "already_source_staged",
                     }
                 )
                 continue
@@ -1958,12 +2091,17 @@ def prepare_ranked_papers_from_run(
     for candidate in selected_candidates:
         try:
             result = _prepare_candidate_until_parsed(
-                vault_path, candidate, mineru_command=mineru_command, mineru_timeout=mineru_timeout
+                vault_path,
+                candidate,
+                mineru_command=mineru_command,
+                mineru_timeout=mineru_timeout,
+                workflow_mode=workflow_mode,
             )
         except Exception as exc:
-            result = _prepare_candidate_failure_state(vault_path, candidate, exc)
+            result = _prepare_candidate_failure_state(vault_path, candidate, exc, workflow_mode=workflow_mode)
         results.append(result)
     failed = any(result["state"].endswith("_failed") for result in results)
+    awaiting_wiki_ingest = any(result.get("next_action") == "run-wiki-ingest-agent" for result in results)
     titles_by_slug = {
         candidate["slug"]: candidate.get("title", candidate["slug"])
         for candidate in selected_candidates
@@ -1985,7 +2123,7 @@ def prepare_ranked_papers_from_run(
             "state": result["state"],
             "last_action": result.get("last_action"),
             "next_action": result.get("next_action"),
-            "human_gate_required": False,
+            "human_gate_required": result.get("human_gate_required", False),
         }
         for result in results
     ]
@@ -2006,7 +2144,8 @@ def prepare_ranked_papers_from_run(
         "run_id": batch_run_id,
         "workflow_type": "prepare-ranked",
         "state": "prepared" if not failed else "prepare_failed",
-        "status": "success" if not failed else "failed",
+        "status": "waiting_for_human_gate" if awaiting_wiki_ingest and not failed else "success" if not failed else "failed",
+        "workflow_mode": workflow_mode,
         "vault_path": str(vault_path),
         "candidate_count": source_candidate_count,
         "processed_count": len(results),
@@ -2019,12 +2158,17 @@ def prepare_ranked_papers_from_run(
         "rank_decision_filter": rank_decision_filter,
         "skip_existing": skip_existing,
         "compiled_wiki_write": False,
-        "human_gate_required": False,
-        "stops_after": "parse",
+        "human_gate_required": awaiting_wiki_ingest,
+        "stops_after": "source-staging",
         "started_at": started_at,
         "finished_at": utc_now(),
         "exit_status": 1 if failed else 0,
-        "tool_versions": _tool_versions("orchestrator", "prepare_ranked_papers_from_run", "run_mineru_parse"),
+        "tool_versions": _tool_versions(
+            "orchestrator",
+            "prepare_ranked_papers_from_run",
+            "run_mineru_parse",
+            "stage_wiki",
+        ),
         "results": results,
         "next_actions": next_actions,
         "input_artifact_hashes": {
@@ -2055,7 +2199,8 @@ def prepare_ranked_papers_from_run(
             "max_papers": max_papers,
             "skip_existing": skip_existing,
             "skipped_existing_count": len(skipped_existing_candidates),
-            "stops_after": "parse",
+            "stops_after": "source-staging",
+            "workflow_mode": workflow_mode,
         },
         wiki_pages_written=[],
         zotero_results={"status": "not_run", "records": []},
@@ -2074,7 +2219,8 @@ def prepare_ranked_papers_from_run(
     report_payload["next_actions"] = next_actions
     report_payload["wiki_pages_written"] = []
     report_payload["source_run_id"] = run_id
-    report_payload["stops_after"] = "parse"
+    report_payload["workflow_mode"] = workflow_mode
+    report_payload["stops_after"] = "source-staging"
     _write_json(report_json_path, report_payload)
     lifecycle = _auto_manage_run_lifecycle(vault_path)
     if lifecycle.get("deleted_count"):

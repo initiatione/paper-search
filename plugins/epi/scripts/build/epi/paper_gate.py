@@ -453,49 +453,46 @@ def build_paper_gate(vault_path: Path, slug: str) -> dict[str, Any]:
     metadata = _read_json(paper_root / "metadata.json") or {}
     check_runs: list[dict[str, Any]] = []
 
+    plan_path = staging_root / "promotion-plan.json"
+    plan = _read_json(plan_path)
+    critic_required = bool(plan.get("critic_required")) if plan else True
     critic_path = paper_root / "critic" / "critic-report.json"
     critic_report = _read_json(critic_path)
     if not critic_report:
         check_runs.append(
             _check_run(
                 "critic-report",
-                "failure",
-                "Missing critic report; no compiled wiki write is allowed.",
-                details={"path": str(critic_path)},
+                "failure" if critic_required else "success",
+                (
+                    "Critic report is required but missing."
+                    if critic_required
+                    else "Critic report not required for this workflow mode."
+                ),
+                details={"path": str(critic_path), "required": critic_required},
             )
         )
-        return _paper_gate_payload(
-            slug=slug,
-            title=metadata.get("title") or slug,
-            status="blocked",
-            next_action="run-critic",
-            check_runs=check_runs,
-            paper_root=paper_root,
-            staging_root=staging_root,
+    else:
+        check_runs.append(
+            _check_run("critic-report", "success", "Critic report exists.", details={"path": str(critic_path)})
         )
+    critic_outcome = critic_report.get("outcome") if critic_report else "not-run"
+    if critic_report or critic_required:
+        check_runs.append(
+            _check_run(
+                "critic-outcome",
+                "success" if critic_report and critic_outcome == "pass" else "failure",
+                f"Critic outcome is {critic_outcome or 'unknown'}.",
+            )
+        )
+        check_runs.append(
+            _check_run(
+                "hard-rule",
+                "success" if critic_report.get("hard_rule") == HARD_RULE else "failure",
+                "Hard rule is preserved." if critic_report.get("hard_rule") == HARD_RULE else "Hard rule metadata is missing or changed.",
+            )
+        )
+        check_runs.append(_critic_quorum_check(paper_root, critic_report))
 
-    check_runs.append(
-        _check_run("critic-report", "success", "Critic report exists.", details={"path": str(critic_path)})
-    )
-    critic_outcome = critic_report.get("outcome")
-    check_runs.append(
-        _check_run(
-            "critic-outcome",
-            "success" if critic_outcome == "pass" else "failure",
-            f"Critic outcome is {critic_outcome or 'unknown'}.",
-        )
-    )
-    check_runs.append(
-        _check_run(
-            "hard-rule",
-            "success" if critic_report.get("hard_rule") == HARD_RULE else "failure",
-            "Hard rule is preserved." if critic_report.get("hard_rule") == HARD_RULE else "Hard rule metadata is missing or changed.",
-        )
-    )
-    check_runs.append(_critic_quorum_check(paper_root, critic_report))
-
-    plan_path = staging_root / "promotion-plan.json"
-    plan = _read_json(plan_path)
     if plan:
         check_runs.append(
             _check_run("promotion-plan", "success", "Promotion plan exists.", details={"path": str(plan_path)})
@@ -520,7 +517,7 @@ def build_paper_gate(vault_path: Path, slug: str) -> dict[str, Any]:
             _check_run(
                 "promotion-plan",
                 "action_required",
-                "Promotion plan is missing; stage the paper after critic pass.",
+                "Promotion plan is missing; stage the paper before wiki ingest.",
                 details={"path": str(plan_path)},
             )
         )
@@ -528,7 +525,7 @@ def build_paper_gate(vault_path: Path, slug: str) -> dict[str, Any]:
     promotion_check = _completion_record_check(paper_root)
     if promotion_check is not None:
         check_runs.append(promotion_check)
-    elif critic_outcome == "pass" and plan and _suite_conclusion(check_runs) == "success":
+    elif (critic_outcome == "pass" or not critic_required) and plan and _suite_conclusion(check_runs) == "success":
         prewrite_approval_check = (
             _prewrite_human_approval_check(vault_path, slug)
             if _is_agent_handoff_plan(plan)
@@ -570,7 +567,7 @@ def _next_action(
         if details.get("record_type") == "wiki-ingest-record":
             return "review-recorded-wiki-pages"
         return "review-promoted-pages"
-    if critic_report.get("outcome") != "pass":
+    if critic_report and critic_report.get("outcome") != "pass":
         return str(critic_report.get("next_action") or "revise-reader")
     if not plan:
         return "stage-paper"

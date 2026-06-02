@@ -219,7 +219,7 @@ def test_advance_paper_batch_reports_research_decisions_after_critic(tmp_path):
     candidate = _candidate("decision-paper", "Decision Paper", "https://example.org/decision.pdf")
     _seed_critic_ready_paper(vault, candidate)
 
-    batch = advance_paper_batch(vault, [candidate])
+    batch = advance_paper_batch(vault, [candidate], workflow_mode="audited-ingest")
 
     run_dir = vault / "_epi" / "runs" / batch["run_id"]
     report_json = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
@@ -252,7 +252,7 @@ def test_advance_paper_batch_reports_reproducibility_caveats_after_critic(tmp_pa
     candidate = _candidate("repro-plan-paper", "Repro Plan Paper", "https://example.org/repro.pdf")
     _seed_critic_ready_paper(vault, candidate, sources=["code", "dataset", "robot"])
 
-    batch = advance_paper_batch(vault, [candidate])
+    batch = advance_paper_batch(vault, [candidate], workflow_mode="audited-ingest")
 
     run_dir = vault / "_epi" / "runs" / batch["run_id"]
     report_json = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
@@ -337,7 +337,7 @@ def test_advance_paper_batch_from_run_uses_ranked_candidates_without_manual_copy
     assert (vault / "_epi" / "raw" / "papers" / "ranked-alpha" / "paper.pdf").is_file()
 
 
-def test_prepare_ranked_papers_from_run_acquires_and_parses_then_stops(tmp_path):
+def test_prepare_ranked_papers_from_run_acquires_parses_and_source_stages(tmp_path):
     server_root = tmp_path / "server"
     server_root.mkdir()
     (server_root / "ranked.pdf").write_bytes(b"%PDF-1.4\nranked fixture\n")
@@ -355,21 +355,31 @@ def test_prepare_ranked_papers_from_run_acquires_and_parses_then_stops(tmp_path)
         batch = prepare_ranked_papers_from_run(vault, run_id, mineru_command=mineru_command)
 
     assert batch["workflow_type"] == "prepare-ranked"
+    assert batch["workflow_mode"] == "fast-ingest"
+    assert batch["status"] == "waiting_for_human_gate"
+    assert batch["human_gate_required"] is True
+    assert batch["stops_after"] == "source-staging"
     assert batch["processed_count"] == 1
     assert batch["results"][0]["paper_slug"] == "prepared-alpha"
-    assert batch["results"][0]["state"] == "parsed"
-    assert batch["results"][0]["last_action"] == "parse"
-    assert batch["results"][0]["next_action"] == "read"
-    assert batch["next_actions"] == ["read"]
+    assert batch["results"][0]["state"] == "staged"
+    assert batch["results"][0]["last_action"] == "staging"
+    assert batch["results"][0]["next_action"] == "run-wiki-ingest-agent"
+    assert batch["next_actions"] == ["run-wiki-ingest-agent"]
     paper_root = vault / "_epi" / "raw" / "papers" / "prepared-alpha"
+    staging_root = vault / "_epi" / "staging" / "papers" / "prepared-alpha"
     assert (paper_root / "paper.pdf").is_file()
     assert (paper_root / "mineru" / "prepared-alpha.md").is_file()
     assert not (paper_root / "mineru" / "paper.md").exists()
     assert not (paper_root / "reader" / "reader.md").exists()
     assert not (paper_root / "critic" / "critic-report.json").exists()
-    assert json.loads((vault / "_epi" / "runs" / batch["run_id"] / "batch-advance-record.json").read_text(encoding="utf-8"))[
-        "workflow_type"
-    ] == "prepare-ranked"
+    assert (staging_root / "promotion-plan.json").is_file()
+    assert (staging_root / "wiki-ingest-brief.json").is_file()
+    assert (staging_root / "briefs" / "reading-report.md").is_file()
+    batch_record = json.loads(
+        (vault / "_epi" / "runs" / batch["run_id"] / "batch-advance-record.json").read_text(encoding="utf-8")
+    )
+    assert batch_record["workflow_type"] == "prepare-ranked"
+    assert batch_record["stops_after"] == "source-staging"
 
 
 def test_prepare_ranked_papers_repairs_incomplete_existing_parse_outputs(tmp_path):
@@ -391,11 +401,12 @@ def test_prepare_ranked_papers_repairs_incomplete_existing_parse_outputs(tmp_pat
     batch = prepare_ranked_papers_from_run(vault, run_id, mineru_command=mineru_command)
 
     result = batch["results"][0]
-    assert result["state"] == "parsed"
-    assert result["last_action"] == "parse"
+    assert result["state"] == "staged"
+    assert result["last_action"] == "staging"
     assert result["stage_record"]["status"] == "success"
     assert (mineru_dir / "paper.tex").stat().st_size > 0
     assert not (paper_root / "reader" / "reader.md").exists()
+    assert (vault / "_epi" / "staging" / "papers" / "incomplete-parse" / "promotion-plan.json").is_file()
 
 
 def test_prepare_ranked_papers_records_failed_candidate_and_continues(tmp_path, monkeypatch):
@@ -421,7 +432,7 @@ def test_prepare_ranked_papers_records_failed_candidate_and_continues(tmp_path, 
 
         from epi.orchestrator import _prepare_candidate_until_parsed as original_prepare_candidate
 
-        def _prepare_candidate(vault_path, candidate, *, mineru_command=None, mineru_timeout=None):
+        def _prepare_candidate(vault_path, candidate, *, mineru_command=None, mineru_timeout=None, workflow_mode=None):
             if candidate["slug"] == "download-timeout":
                 raise TimeoutError("simulated download timeout")
 
@@ -430,6 +441,7 @@ def test_prepare_ranked_papers_records_failed_candidate_and_continues(tmp_path, 
                 candidate,
                 mineru_command=mineru_command,
                 mineru_timeout=mineru_timeout,
+                workflow_mode=workflow_mode,
             )
 
         monkeypatch.setattr("epi.orchestrator._prepare_candidate_until_parsed", _prepare_candidate)
@@ -449,7 +461,7 @@ def test_prepare_ranked_papers_records_failed_candidate_and_continues(tmp_path, 
     assert batch["results"][0]["last_action"] == "prepare"
     assert batch["results"][0]["stage_record"]["status"] == "failed"
     assert "simulated download timeout" in batch["results"][0]["stage_record"]["error"]
-    assert batch["results"][1]["state"] == "parsed"
+    assert batch["results"][1]["state"] == "staged"
     assert (vault / "_epi" / "raw" / "papers" / "after-timeout" / "mineru" / "after-timeout.md").is_file()
     assert not (vault / "_epi" / "raw" / "papers" / "after-timeout" / "mineru" / "paper.md").exists()
 
@@ -459,8 +471,8 @@ def test_prepare_ranked_papers_records_failed_candidate_and_continues(tmp_path, 
     ]
     assert report_json["paper_states"][1] == {
         "paper_slug": "after-timeout",
-        "state": "parsed",
-        "next_action": "read",
+        "state": "staged",
+        "next_action": "run-wiki-ingest-agent",
     }
 
 
@@ -487,6 +499,12 @@ def test_prepare_ranked_papers_can_skip_existing_parsed_candidates_when_resuming
     (existing_root / "parse-record.json").write_text(
         json.dumps({"stage": "parse", "status": "success"}), encoding="utf-8"
     )
+    existing_staging = vault / "_epi" / "staging" / "papers" / "already-parsed"
+    existing_staging.mkdir(parents=True)
+    (existing_staging / "promotion-plan.json").write_text(
+        json.dumps({"paper_slug": "already-parsed", "workflow_mode": "fast-ingest"}),
+        encoding="utf-8",
+    )
 
     with _LocalServer(server_root) as base_url:
         new_candidate = _candidate("resume-new", "Resume New", f"{base_url}/new.pdf")
@@ -507,10 +525,10 @@ def test_prepare_ranked_papers_can_skip_existing_parsed_candidates_when_resuming
     assert batch["processed_count"] == 1
     assert batch["skip_existing"] is True
     assert batch["skipped_existing_candidates"] == [
-        {"slug": "already-parsed", "title": "Already Parsed", "reason": "already_parsed"}
+        {"slug": "already-parsed", "title": "Already Parsed", "reason": "already_source_staged"}
     ]
     assert batch["results"][0]["paper_slug"] == "resume-new"
-    assert batch["results"][0]["state"] == "parsed"
+    assert batch["results"][0]["state"] == "staged"
     assert (vault / "_epi" / "raw" / "papers" / "resume-new" / "mineru" / "resume-new.md").is_file()
     assert not (vault / "_epi" / "raw" / "papers" / "resume-new" / "mineru" / "paper.md").exists()
 
@@ -557,7 +575,7 @@ def test_prepare_ranked_papers_reparses_when_parse_record_missing_or_unsuccessfu
     assert batch["skipped_existing_candidates"] == []
     assert batch["processed_count"] == 1
     assert batch["results"][0]["paper_slug"] == "stale-parse"
-    assert batch["results"][0]["state"] == "parsed"
+    assert batch["results"][0]["state"] == "staged"
     assert json.loads((stale_root / "parse-record.json").read_text(encoding="utf-8"))["status"] == "success"
 
 

@@ -1,11 +1,11 @@
 ---
 name: paper-discovery
-description: "Use when discovering high-quality EPI papers via one-off search/rank dry-runs, review exclusion, acquisition, or MinerU steps 1-3."
+description: "Use when discovering high-quality EPI papers via one-off search/rank dry-runs, review exclusion, acquisition, MinerU parsing, or default fast source-staging preparation."
 ---
 
 # Academic Paper Discovery
 
-Use for EPI discovery and the steps 1-3 path: route the research mode, search, normalize/filter/classify/rank, acquire, and MinerU parse. Stop at raw artifacts unless the user asks for reader/critic/staging/wiki handoff.
+Use for EPI discovery and the default fast path: route the research mode, search, normalize/filter/classify/rank, acquire, MinerU parse, then prepare a source-first candidate report and wiki-ingest handoff. Do not run reader or critic unless the user asks for reviewed/audited ingest or the source bundle has quality problems.
 
 The full EPI chain stays documented in `docs\epi-linkage.md`. Detailed discovery policy lives in `references/`.
 
@@ -78,7 +78,7 @@ Use `--no-query-plan` only when debugging or when the profile-derived plan drift
 python scripts\orchestrator.py dry-run --query "<exact narrow topic>" --no-query-plan --max-results 10 --sources arxiv,semantic,openalex,crossref --plugin-root <plugin-root> --vault <vault>
 ```
 
-`prepare-ranked` writes raw artifacts only and stops after parse.
+`prepare-ranked` writes source artifacts plus source-staging handoff and stops before final wiki writing. Default mode is `fast-ingest`; use `--mode reviewed-ingest` only when reader navigation is needed, and `--mode audited-ingest` only for key/reproducibility/contradiction/review cases.
 
 ```powershell
 python scripts\orchestrator.py prepare-ranked --run-id <run-id> --max-papers 10 --skip-existing --include-review-candidates --vault <vault>
@@ -86,10 +86,10 @@ python scripts\orchestrator.py prepare-ranked --run-id <run-id> --max-papers 10 
 python scripts\orchestrator.py prepare-ranked --run-id <run-id> --max-papers 1 --vault <vault>
 ```
 
-Use `--max-papers 10 --skip-existing` for real runs; `--max-papers 1` is a smoke test. Use `--json` for automation. `review-candidate` means lower ranking confidence, not necessarily review/survey.
+Use `--max-papers 10 --skip-existing` for real runs; `--max-papers 1` is a smoke test. Use `--json` for automation and expect `stops_after=source-staging`. `review-candidate` means lower ranking confidence, not necessarily review/survey.
 
 ## Evidence Check
 
-Before reporting success, inspect `search-record.json`, `rank.json`, `_epi\runs\<run-id>\report.md`, `_epi\runs\<run-id>\report.json`, `acquire-record.json`, `parse-record.json`, `paper.pdf`, `mineru\<slug>.md`, `mineru\paper.tex`, `mineru\images`, and `mineru\mineru-manifest.json`. Track `paper_type`, `classification_confidence`, `ranking_confidence`, and per-paper `acquire_failed`, `parse_failed`, or `prepare_failed`.
+Before reporting success, inspect `search-record.json`, `rank.json`, `_epi\runs\<run-id>\report.md`, `_epi\runs\<run-id>\report.json`, `acquire-record.json`, `parse-record.json`, `paper.pdf`, `mineru\<slug>.md`, `mineru\paper.tex`, `mineru\images`, `mineru\mineru-manifest.json`, `_epi\staging\papers\<slug>\wiki-ingest-brief.json`, and `_epi\staging\papers\<slug>\briefs\reading-report.md`. Track `paper_type`, `classification_confidence`, `ranking_confidence`, and per-paper `acquire_failed`, `parse_failed`, or `prepare_failed`.
 
-Safety: `dry-run` writes only `_epi/runs/<run-id>/`; `prepare-ranked` writes only `_epi\raw\papers\<slug>\...`; neither path enters reader, critic, staging, or wiki writing.
+Safety: `dry-run` writes only `_epi/runs/<run-id>/`; default `prepare-ranked` writes `_epi\raw\papers\<slug>\...` plus lightweight `_epi\staging\papers\<slug>\...` source-staging handoff files. It does not run reader, critic, or final wiki writing in `fast-ingest`.

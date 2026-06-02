@@ -75,6 +75,7 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
         pdf_path=pdf,
         mineru_markdown_path=mineru_md,
         mineru_tex_path=mineru_tex,
+        workflow_mode="audited-ingest",
     )
 
     paper_root = result["paper_root"]
@@ -101,6 +102,7 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
 
     reader_record = result["run_manifest"]["reader_record"]
     parse_record = result["run_manifest"]["parse_record"]
+    assert result["run_manifest"]["workflow_mode"] == "audited-ingest"
     assert parse_record["started_at"]
     assert parse_record["finished_at"]
     assert parse_record["exit_status"] == 0
@@ -252,6 +254,8 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
     assert [target["artifact_type"] for target in wiki_ingest_brief["handoff_artifacts"]] == [
         "source_reader",
         "reading_report",
+        "optional_reader_aids",
+        "optional_critic_aids",
     ]
     assert {target["route_status"] for target in wiki_ingest_brief["handoff_artifacts"]} == {
         "internal-evidence-only"
@@ -266,12 +270,13 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
         "mineru/paper.tex",
         "mineru/images/*",
         "mineru/mineru-manifest.json",
-        "reader/evidence-map.json",
-        "reader/claim-support.json",
-        "reader/figures.md",
-        "critic/critic-report.json",
-        "critic/research-decision.json",
     ]
+    optional_aids = wiki_ingest_brief["source_bundle"]["optional_evidence_aids"]
+    assert "reader/evidence-map.json" in optional_aids
+    assert "reader/claim-support.json" in optional_aids
+    assert "reader/figures.md" in optional_aids
+    assert "critic/critic-report.json" in optional_aids
+    assert "critic/research-decision.json" in optional_aids
     assert wiki_ingest_brief["source_bundle"]["primary_source_reading_order"][:5] == [
         "metadata.json",
         canonical_mineru_md,
@@ -291,6 +296,9 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
         "senior-domain-researcher",
     ]
     promotion_plan = json.loads((staging_root / "promotion-plan.json").read_text(encoding="utf-8"))
+    assert promotion_plan["workflow_mode"] == "audited-ingest"
+    assert promotion_plan["reader_required"] is True
+    assert promotion_plan["critic_required"] is True
     assert promotion_plan["critic_outcome"] == "pass"
     assert promotion_plan["handoff_type"] == "agent-mediated-wiki-ingest"
     assert promotion_plan["wiki_write_model"] == "wiki-skill-batch-distillation"

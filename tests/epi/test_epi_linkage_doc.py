@@ -15,7 +15,10 @@ def test_epi_linkage_doc_defines_scope_pipeline_and_sync_rule():
     assert "不是从 0 到完成投稿的自动科研工作台" in text
     assert "每次修改或优化 EPI 插件" in text
     assert "必须同步更新本文档" in text
-    assert "无 critic pass，不写入 compiled wiki" in text
+    assert "默认 fast-ingest" in text
+    assert "reviewed-ingest" in text
+    assert "audited-ingest" in text
+    assert "stops_after=source-staging" in text
     assert "SkillOpt" in text
     assert "EmbodiSkill" in text
     assert "execution_lapse" in text

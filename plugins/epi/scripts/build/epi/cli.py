@@ -23,6 +23,7 @@ from epi.report_run import load_run_report
 from epi.runtime_config import apply_runtime_config
 from epi.run_index import RESEARCH_QUEUE_BUCKETS
 from epi.source_artifacts import resolve_mineru_markdown_path, resolved_mineru_markdown_relative_path
+from epi.stage_wiki import FAST_INGEST_MODE, INGEST_MODES
 from epi.wiki_reset import reset_wiki_vault
 
 
@@ -46,6 +47,10 @@ def _load_json(path: Path) -> object:
 
 def _add_common_vault(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--vault", type=Path, default=_default_vault())
+
+
+def _add_ingest_mode(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--mode", choices=sorted(INGEST_MODES), default=FAST_INGEST_MODE)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -141,6 +146,7 @@ def build_parser() -> argparse.ArgumentParser:
     ingest_one.add_argument("--mineru-tex", type=Path, default=None)
     ingest_one.add_argument("--mineru-images", type=Path, default=None)
     _add_common_vault(ingest_one)
+    _add_ingest_mode(ingest_one)
 
     acquire = subparsers.add_parser("acquire-paper")
     acquire.add_argument("--candidate", type=Path, required=True)
@@ -151,6 +157,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_vault(advance)
     advance.add_argument("--mineru-command", default=None)
     advance.add_argument("--mineru-timeout", type=int, default=None)
+    _add_ingest_mode(advance)
 
     advance_batch = subparsers.add_parser("advance-batch")
     advance_batch.add_argument("--candidates", type=Path, required=True)
@@ -158,6 +165,7 @@ def build_parser() -> argparse.ArgumentParser:
     advance_batch.add_argument("--max-papers", type=int, default=None)
     advance_batch.add_argument("--mineru-command", default=None)
     advance_batch.add_argument("--mineru-timeout", type=int, default=None)
+    _add_ingest_mode(advance_batch)
 
     advance_ranked = subparsers.add_parser("advance-ranked")
     advance_ranked.add_argument("--run-id", required=True)
@@ -166,6 +174,7 @@ def build_parser() -> argparse.ArgumentParser:
     advance_ranked.add_argument("--mineru-command", default=None)
     advance_ranked.add_argument("--mineru-timeout", type=int, default=None)
     advance_ranked.add_argument("--include-review-candidates", action="store_true")
+    _add_ingest_mode(advance_ranked)
 
     prepare_ranked = subparsers.add_parser("prepare-ranked")
     prepare_ranked.add_argument("--run-id", required=True)
@@ -175,6 +184,7 @@ def build_parser() -> argparse.ArgumentParser:
     prepare_ranked.add_argument("--mineru-timeout", type=int, default=None)
     prepare_ranked.add_argument("--include-review-candidates", action="store_true")
     prepare_ranked.add_argument("--skip-existing", action="store_true")
+    _add_ingest_mode(prepare_ranked)
     prepare_ranked.add_argument("--json", action="store_true")
 
     parse_paper = subparsers.add_parser("parse-paper")
@@ -464,6 +474,7 @@ def _handle_ingest_one(args: argparse.Namespace) -> int:
         mineru_markdown_path=args.mineru_md,
         mineru_tex_path=args.mineru_tex,
         mineru_images_dir=args.mineru_images,
+        workflow_mode=args.mode,
     )
     print(f"paper_root={result['paper_root']}")
     print(f"staging_root={result['staging_root']}")
@@ -484,9 +495,11 @@ def _handle_advance_paper(args: argparse.Namespace) -> int:
         _load_json(args.candidate),
         mineru_command=args.mineru_command,
         mineru_timeout=args.mineru_timeout,
+        workflow_mode=args.mode,
     )
     print(f"paper_state={state['state']}")
     print(f"last_action={state['last_action']}")
+    print(f"workflow_mode={state.get('workflow_mode', args.mode)}")
     if state.get("next_action"):
         print(f"next_action={state['next_action']}")
     return 0 if not state["state"].endswith("_failed") else 1
@@ -499,9 +512,11 @@ def _handle_advance_batch(args: argparse.Namespace) -> int:
         mineru_command=args.mineru_command,
         max_papers=args.max_papers,
         mineru_timeout=args.mineru_timeout,
+        workflow_mode=args.mode,
     )
     print(f"run_dir={runs_root(args.vault) / batch['run_id']}")
     print(f"batch_state={batch['state']}")
+    print(f"workflow_mode={batch.get('workflow_mode', args.mode)}")
     print(f"processed_count={batch['processed_count']}")
     return 0 if batch["state"] != "batch_failed" else 1
 
@@ -514,9 +529,11 @@ def _handle_advance_ranked(args: argparse.Namespace) -> int:
         max_papers=args.max_papers,
         include_review_candidates=args.include_review_candidates,
         mineru_timeout=args.mineru_timeout,
+        workflow_mode=args.mode,
     )
     print(f"run_dir={runs_root(args.vault) / batch['run_id']}")
     print(f"batch_state={batch['state']}")
+    print(f"workflow_mode={batch.get('workflow_mode', args.mode)}")
     print(f"processed_count={batch['processed_count']}")
     return 0 if batch["state"] != "batch_failed" else 1
 
@@ -530,6 +547,7 @@ def _handle_prepare_ranked(args: argparse.Namespace) -> int:
         include_review_candidates=args.include_review_candidates,
         skip_existing=args.skip_existing,
         mineru_timeout=args.mineru_timeout,
+        workflow_mode=args.mode,
     )
     run_dir = runs_root(args.vault) / batch["run_id"]
     if args.json:
@@ -541,9 +559,10 @@ def _handle_prepare_ranked(args: argparse.Namespace) -> int:
                     "source_run_id": batch.get("source_run_id"),
                     "batch_state": batch["state"],
                     "status": batch.get("status"),
+                    "workflow_mode": batch.get("workflow_mode", args.mode),
                     "processed_count": batch["processed_count"],
                     "skipped_count": batch.get("skipped_count", 0),
-                    "stops_after": "parse",
+                    "stops_after": batch.get("stops_after", "source-staging"),
                     "artifacts": {
                         "batch_record": str(run_dir / "batch-advance-record.json"),
                         "report": str(run_dir / "report.md"),
@@ -558,8 +577,9 @@ def _handle_prepare_ranked(args: argparse.Namespace) -> int:
         return 0 if batch["state"] != "prepare_failed" else 1
     print(f"run_dir={runs_root(args.vault) / batch['run_id']}")
     print(f"batch_state={batch['state']}")
+    print(f"workflow_mode={batch.get('workflow_mode', args.mode)}")
     print(f"processed_count={batch['processed_count']}")
-    print("stops_after=parse")
+    print(f"stops_after={batch.get('stops_after', 'source-staging')}")
     return 0 if batch["state"] != "prepare_failed" else 1
 
 

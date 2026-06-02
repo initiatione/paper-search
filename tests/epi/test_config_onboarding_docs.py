@@ -134,12 +134,14 @@ def test_epi_skills_document_precise_one_to_three_prepare_ranked_path():
     assert "--skip-existing" in discovery
     assert "smoke test" in discovery
     assert "profile-derived" in discovery
-    assert "stops after" in discovery
+    assert "source-staging" in discovery
     assert "acquire-record.json" in discovery
     assert "parse-record.json" in discovery
     assert "--max-papers 10" in ingest
     assert "--skip-existing" in ingest
-    assert "Do not use `advance-paper`, `advance-ranked`, or `advance-batch`" in ingest
+    assert "fast-ingest" in ingest
+    assert "reviewed-ingest" in ingest
+    assert "audited-ingest" in ingest
     assert "Source-First Wiki Handoff" in ingest
     assert "report --run-id <run-id>" in ingest
     assert "mineru/<slug>.md" in ingest

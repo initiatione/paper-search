@@ -1,6 +1,6 @@
 ---
 name: paper-ingest
-description: "Use when ingesting selected EPI papers into raw artifacts, readers, critics, staging drafts, or handoff."
+description: "Use when ingesting selected EPI papers into source artifacts, optional readers/critics, source-staging reports, approval, or wiki-ingest handoff."
 ---
 
 # Paper Ingest
@@ -13,20 +13,28 @@ If config is missing, stop and use `config-setup`. See `docs\config.md`.
 
 Load `references/source-first-reading.md` when generating or checking reader outputs, critic inputs, staging bundles, or wiki-ingest handoffs. Keep reader summaries compact, but preserve source paper claims, formulas, figures, tables, image interpretations, caveats, and evidence pointers. Treat parse quality as a source bundle check: Markdown alone is not enough when `parse-record.json` says parse succeeded; inspect TeX, images, and the MinerU manifest too.
 
-For final wiki-page provenance, support labels, and claim-to-evidence round-trips, use `wiki-provenance` as the final deposition layer. This skill stays focused on raw -> reader -> critic -> staging -> handoff.
+For final wiki-page provenance, support labels, and claim-to-evidence round-trips, use `wiki-provenance` as the final deposition layer. This skill stays focused on source bundle preparation, optional reader/critic aids, source-staging reports, approval, and handoff.
 
 ## Choose Path
 
 | Intent | Command path |
 | --- | --- |
-| Steps 1-3 only: download + MinerU parse, stop at raw artifacts | `prepare-ranked` |
-| Continue into reader, critic, staging, approval, and handoff | `advance-*`, `paper-gate`, `wiki-ingest-handoff`, `record-human-approval` |
+| Default fast path: download + MinerU parse + Chinese approval report + source-first wiki handoff | `prepare-ranked` or `advance-* --mode fast-ingest` |
+| Important paper with navigation aids | `--mode reviewed-ingest` |
+| Key, reproducibility, contradiction, review, or project-decision paper | `--mode audited-ingest` |
+| Approval and final wiki handoff | `paper-gate`, `wiki-ingest-handoff`, `record-human-approval` |
 | Resume final wiki writing after approval or a later `@EPI` turn | `research-queue --bucket ready_to_promote --actions`, then `wiki-ingest-trigger` |
 | Final wiki provenance and claim labels | `wiki-provenance` |
 
-## Path A: Raw Artifacts Only
+## Ingest Modes
 
-Stops after `mineru\<slug>.md`, `mineru\paper.tex`, `mineru\images`, and `mineru\mineru-manifest.json`.
+- `fast-ingest` is the default. EPI acquires the paper, runs MinerU, saves source artifacts, writes `_epi/staging/papers/<slug>/wiki-ingest-brief.json`, and produces a short Chinese reading/approval report. It does not run reader or critic.
+- `reviewed-ingest` adds reader outputs when parse quality is poor, formulas/figures are complex, or the user asks for a detailed reading report.
+- `audited-ingest` adds critic outputs when the paper is critical for reproduction, a literature review, a project decision, or resolving contradictions.
+
+Reader and critic reduce reading cost; they are navigation and audit aids, not the authority for final wiki prose. The final wiki agent must ingest from source artifacts.
+
+## Path A: Default Fast Ingest
 
 ```powershell
 python scripts\orchestrator.py prepare-ranked --run-id <dry-run-id> --max-papers 10 --skip-existing --include-review-candidates --vault <vault>
@@ -34,17 +42,18 @@ python scripts\orchestrator.py prepare-ranked --run-id <dry-run-id> --max-papers
 python scripts\orchestrator.py prepare-ranked --run-id <dry-run-id> --max-papers 1 --vault <vault>
 ```
 
-Use `--max-papers 10 --skip-existing` for real testing; `--max-papers 1` is a smoke test. Use `--json` for run id, counts, stop point, and report paths. Inspect per-paper failures: `acquire_failed`, `parse_failed`, `prepare_failed`.
+Use `--max-papers 10 --skip-existing` for real testing; `--max-papers 1` is a smoke test. Use `--json` for run id, counts, `stops_after=source-staging`, and report paths. Inspect per-paper failures: `acquire_failed`, `parse_failed`, `prepare_failed`.
 
 Failed `acquire-record.json` includes `failure_class`, `retryable`, and `recovery_hint`; use them to decide whether to retry, switch source, or skip. For slow MinerU jobs, pass `--mineru-timeout <seconds>` or set `EPI_MINERU_TIMEOUT`; complete parse reuse requires `parse-record.json status=success`, not just a Markdown file.
 
-Do not use `advance-paper`, `advance-ranked`, or `advance-batch` when the user only asked for 1-3.
+`--skip-existing` skips only papers that already have complete source artifacts and a matching source-staging `promotion-plan.json`; parsed-only papers still need a report and handoff.
 
-## Path B: Reader, Critic, Staging
+## Path B: Reviewed Or Audited Ingest
 
 ```powershell
-python scripts\orchestrator.py advance-ranked --run-id <dry-run-id> --max-papers 3 --vault <vault>
-python scripts\orchestrator.py advance-batch --candidates <candidate-json> --max-papers 3 --vault <vault>
+python scripts\orchestrator.py advance-ranked --run-id <dry-run-id> --max-papers 3 --mode reviewed-ingest --vault <vault>
+python scripts\orchestrator.py advance-ranked --run-id <dry-run-id> --max-papers 3 --mode audited-ingest --vault <vault>
+python scripts\orchestrator.py advance-batch --candidates <candidate-json> --max-papers 3 --mode audited-ingest --vault <vault>
 python scripts\orchestrator.py paper-gate --slug <slug> --vault <vault>
 python scripts\orchestrator.py wiki-ingest-handoff --slug <slug> --vault <vault>
 python scripts\orchestrator.py record-human-approval --slug <slug> --approved-by <name> --scope run-wiki-ingest-agent --vault <vault>
@@ -56,7 +65,7 @@ python scripts\orchestrator.py research-queue --bucket needs_reader_repair --vau
 python scripts\orchestrator.py research-queue --bucket reproducibility_caveats --actions --json --vault <vault>
 ```
 
-After critic pass, staging prepares evidence drafts, `wiki-ingest-brief.json`, and `briefs/reading-report.md`. The staged report is the human approval report: Chinese-first, source-aware, and compact, with identity metadata, Chinese-English terms, method idea, validation setup, evidence strength, caveats, wiki deposition value, and one deposition recommendation.
+Staging prepares source handoff, `wiki-ingest-brief.json`, and `briefs/reading-report.md`. The staged report is the human approval report: Chinese-first, source-aware, and compact, with identity metadata, Chinese-English terms, method idea, validation setup, evidence strength, caveats, wiki deposition value, and one deposition recommendation.
 
 The workflow image's Report step is read-only: use `report --run-id` to display an existing `_epi/runs/<run-id>/report.md` or `report.json`. The internal module is `report_run.py`; do not invent a `run-report` command.
 
@@ -71,7 +80,7 @@ The approval report must be Chinese-first and dense but short. For a batch, use 
 `reader/` and critic outputs reduce reading cost; they are not the source of truth for final wiki writing. Before final wiki ingest, load `references/source-first-reading.md`, run `wiki-ingest-handoff`, and verify the handoff requires:
 
 - source artifacts: `paper.pdf`, `metadata.json`, `mineru/<slug>.md`, `mineru/paper.tex`, `mineru/images/*`, `mineru/mineru-manifest.json`
-- evidence aids: `reader/evidence-map.json`, `reader/claim-support.json`, `reader/figures.md`, `critic/*.json`
+- optional evidence aids when generated: `reader/evidence-map.json`, `reader/claim-support.json`, `reader/figures.md`, `critic/*.json`
 - formula/figure review: preserve central formulas, notation, derivation cues, figures, tables, image interpretations, parse uncertainty, and source provenance
 - final source review: require `final-source-review.json` with source artifact hashes, formula review, figure/image review, PDF fallback decision, and final page provenance
 
@@ -87,7 +96,7 @@ If the user asks for claim labels, provenance blocks, evidence-address preservat
 
 After the wiki ingest agent has written or staged the final Markdown pages, create `final-source-review.json`, then run `record-wiki-ingest --page ... --approved-by ... --source-review ...`. This command is record-only: it rechecks `paper-gate`, requires matching pre-write `human-approval.json`, validates final source review, verifies each final page is inside the vault and outside EPI internal folders, records sha256 hashes in raw/staging, and marks the paper `wiki_ingest_recorded`. It must not rewrite final pages or replace the target vault's ingest agent.
 
-Safety: raw/staging writes are allowed. Compiled wiki writes require critic pass, handoff, pre-write human approval, and final source review.
+Safety: raw/staging writes are allowed. Final wiki writes require handoff, pre-write human approval, source-first wiki ingest, and final source review. Critic pass is required for `audited-ingest` and for any paper that already has a critic report, but it is not required for default `fast-ingest`.
 
 ## Literature Wiki Contract
 

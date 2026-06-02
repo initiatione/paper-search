@@ -86,7 +86,10 @@ def _agent_checklist(
     source_bundle = brief.get("source_bundle") or {}
     raw_artifacts = source_bundle.get("raw_artifacts") or []
     primary_order = source_bundle.get("primary_source_reading_order") or []
-    claim_support_artifact = source_bundle.get("evidence", {}).get("claim_support_artifact")
+    evidence_bundle = source_bundle.get("evidence", {}) if isinstance(source_bundle.get("evidence"), dict) else {}
+    claim_support_artifact = evidence_bundle.get("claim_support_artifact")
+    evidence_map_artifact = evidence_bundle.get("exact_evidence_artifact")
+    optional_evidence_aids = source_bundle.get("optional_evidence_aids") or []
     formula_figure_review = source_bundle.get("formula_figure_review") or {}
     final_source_review_contract = (
         brief.get("final_source_review_contract")
@@ -116,8 +119,16 @@ def _agent_checklist(
         + ", ".join(str(item) for item in raw_artifacts or primary_order)
         + ".",
         "Source-first rule: " + str(source_policy or "reader outputs are navigation and quality signals, not substitutes for the source paper."),
-        "Use reader/evidence-map.json and reader/claim-support.json to separate source-grounded, metadata-only, and inferred claims."
-        + (f" Claim support artifact: {claim_support_artifact}." if claim_support_artifact else ""),
+        (
+            "Use reader evidence aids to separate source-grounded, metadata-only, and inferred claims: "
+            + ", ".join(str(item) for item in [evidence_map_artifact, claim_support_artifact] if item)
+            + "."
+            if evidence_map_artifact or claim_support_artifact
+            else "No reader claim map is required for this workflow mode; derive support status directly from paper.pdf, metadata, MinerU Markdown/TeX, images, and manifest."
+        ),
+        "Optional reader/critic aids actually present: "
+        + (", ".join(str(item) for item in optional_evidence_aids) if optional_evidence_aids else "none; this is source-only fast-ingest.")
+        + ".",
         "Review formulas, figures, tables, and images before distilling reusable claims: "
         + ", ".join(
             str(item)

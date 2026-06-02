@@ -352,7 +352,8 @@ def test_wiki_ingest_trigger_writes_agent_neutral_trigger_after_approval(tmp_pat
     assert "briefs" in trigger["paths"]["reading_report"]
     assert "reading-report.md" in trigger["paths"]["reading_report"]
     assert trigger["paths"]["wiki_ingest_brief"].endswith("wiki-ingest-brief.json")
-    assert any("evidence-map.json" in item for item in trigger["agent_checklist"])
+    assert any("No reader claim map is required" in item for item in trigger["agent_checklist"])
+    assert any("paper.pdf" in item and "MinerU" in item for item in trigger["agent_checklist"])
     assert not (vault / "references").exists()
 
 

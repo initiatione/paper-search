@@ -103,8 +103,56 @@ def test_advance_paper_once_routes_one_safe_stage_at_a_time(tmp_path):
             advance_paper_once(vault, candidate, mineru_command=mineru_command),
             advance_paper_once(vault, candidate, mineru_command=mineru_command),
             advance_paper_once(vault, candidate, mineru_command=mineru_command),
-            advance_paper_once(vault, candidate, mineru_command=mineru_command),
-            advance_paper_once(vault, candidate, mineru_command=mineru_command),
+        ]
+
+    assert [record["last_action"] for record in records] == [
+        "acquire",
+        "parse",
+        "staging",
+        "awaiting-wiki-ingest",
+    ]
+    assert [record["state"] for record in records] == [
+        "acquired",
+        "parsed",
+        "staged",
+        "staged",
+    ]
+    assert [record["workflow_mode"] for record in records] == ["fast-ingest"] * 4
+    assert records[-1]["next_action"] == "run-wiki-ingest-agent"
+    assert records[-1]["human_gate_required"] is True
+
+    paper_root = vault / "_epi" / "raw" / "papers" / "routed-paper"
+    assert (paper_root / "paper.pdf").is_file()
+    assert (paper_root / "mineru" / "routed-paper.md").is_file()
+    assert not (paper_root / "mineru" / "paper.md").exists()
+    assert not (paper_root / "reader" / "reader.md").exists()
+    assert not (paper_root / "critic" / "critic-report.json").exists()
+    promotion_plan = vault / "_epi" / "staging" / "papers" / "routed-paper" / "promotion-plan.json"
+    assert promotion_plan.is_file()
+    assert json.loads(promotion_plan.read_text(encoding="utf-8"))["critic_required"] is False
+    assert (vault / "_epi" / "staging" / "papers" / "routed-paper" / "briefs" / "reading-report.md").is_file()
+    assert not (vault / "references" / "routed-paper.md").exists()
+
+    run_state = json.loads((paper_root / "run-state.json").read_text(encoding="utf-8"))
+    assert run_state == records[-1]
+
+
+def test_advance_paper_once_audited_mode_runs_reader_and_critic(tmp_path):
+    server_root = tmp_path / "server"
+    server_root.mkdir()
+    (server_root / "paper.pdf").write_bytes(b"%PDF-1.4\nrouter fixture\n")
+    vault = tmp_path / "vault"
+    mineru_command = _write_success_mineru_command(tmp_path)
+
+    with _LocalServer(server_root) as base_url:
+        candidate = _candidate(f"{base_url}/paper.pdf")
+        records = [
+            advance_paper_once(vault, candidate, mineru_command=mineru_command, workflow_mode="audited-ingest"),
+            advance_paper_once(vault, candidate, mineru_command=mineru_command, workflow_mode="audited-ingest"),
+            advance_paper_once(vault, candidate, mineru_command=mineru_command, workflow_mode="audited-ingest"),
+            advance_paper_once(vault, candidate, mineru_command=mineru_command, workflow_mode="audited-ingest"),
+            advance_paper_once(vault, candidate, mineru_command=mineru_command, workflow_mode="audited-ingest"),
+            advance_paper_once(vault, candidate, mineru_command=mineru_command, workflow_mode="audited-ingest"),
         ]
 
     assert [record["last_action"] for record in records] == [
@@ -123,20 +171,13 @@ def test_advance_paper_once_routes_one_safe_stage_at_a_time(tmp_path):
         "staged",
         "staged",
     ]
-    assert records[-1]["next_action"] == "run-wiki-ingest-agent"
-    assert records[-1]["human_gate_required"] is True
+    assert [record["workflow_mode"] for record in records] == ["audited-ingest"] * 6
 
     paper_root = vault / "_epi" / "raw" / "papers" / "routed-paper"
-    assert (paper_root / "paper.pdf").is_file()
-    assert (paper_root / "mineru" / "routed-paper.md").is_file()
-    assert not (paper_root / "mineru" / "paper.md").exists()
+    promotion_plan = vault / "_epi" / "staging" / "papers" / "routed-paper" / "promotion-plan.json"
     assert (paper_root / "reader" / "reader.md").is_file()
     assert (paper_root / "critic" / "critic-report.json").is_file()
-    assert (vault / "_epi" / "staging" / "papers" / "routed-paper" / "promotion-plan.json").is_file()
-    assert not (vault / "references" / "routed-paper.md").exists()
-
-    run_state = json.loads((paper_root / "run-state.json").read_text(encoding="utf-8"))
-    assert run_state == records[-1]
+    assert json.loads(promotion_plan.read_text(encoding="utf-8"))["critic_required"] is True
 
 
 def test_advance_paper_once_reparses_incomplete_existing_parse_outputs(tmp_path):

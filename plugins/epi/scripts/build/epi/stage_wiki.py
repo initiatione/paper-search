@@ -16,9 +16,33 @@ from epi.wiki_contracts import (
     verified_page_requirements,
 )
 
+FAST_INGEST_MODE = "fast-ingest"
+REVIEWED_INGEST_MODE = "reviewed-ingest"
+AUDITED_INGEST_MODE = "audited-ingest"
+INGEST_MODES = {FAST_INGEST_MODE, REVIEWED_INGEST_MODE, AUDITED_INGEST_MODE}
+
 
 def _source_first_artifacts(slug: str) -> list[str]:
     return canonical_source_first_artifacts(slug)
+
+
+def normalize_ingest_mode(mode: str | None) -> str:
+    normalized = str(mode or FAST_INGEST_MODE).strip()
+    if normalized not in INGEST_MODES:
+        raise ValueError(
+            "ingest mode must be one of "
+            + ", ".join(sorted(INGEST_MODES))
+            + f"; got {normalized or 'empty'}"
+        )
+    return normalized
+
+
+def critic_required_for_mode(mode: str | None) -> bool:
+    return normalize_ingest_mode(mode) == AUDITED_INGEST_MODE
+
+
+def reader_required_for_mode(mode: str | None) -> bool:
+    return normalize_ingest_mode(mode) in {REVIEWED_INGEST_MODE, AUDITED_INGEST_MODE}
 
 
 def _source_markdown_artifact(slug: str) -> str:
@@ -73,6 +97,63 @@ def _load_evidence_map(paper_root: Path) -> dict:
     if not evidence_map_path.exists():
         return {}
     return json.loads(evidence_map_path.read_text(encoding="utf-8"))
+
+
+def _existing_artifacts(paper_root: Path, candidates: list[str]) -> list[str]:
+    artifacts: list[str] = []
+    for relative in candidates:
+        path = paper_root / relative
+        if path.exists():
+            artifacts.append(relative)
+    return artifacts
+
+
+def _reader_artifacts(paper_root: Path) -> list[str]:
+    return _existing_artifacts(
+        paper_root,
+        [
+            "reader/reader.md",
+            "reader/editorial-summary.md",
+            "reader/technical-reading.md",
+            "reader/research-notes.md",
+            "reader/figures.md",
+            "reader/reproducibility.md",
+            "reader/implementation-ideas.md",
+            "reader/evidence-map.json",
+            "reader/claim-support.json",
+        ],
+    )
+
+
+def _critic_artifacts(paper_root: Path) -> list[str]:
+    return _existing_artifacts(
+        paper_root,
+        [
+            "critic/critic-report.json",
+            "critic/critic-quorum.json",
+            "critic/research-decision.json",
+            "critic/reader-revision-plan.json",
+            "critic/reproduction-plan.json",
+        ],
+    )
+
+
+def _source_handoff_body(*, slug: str, title: str, workflow_mode: str, reader_text: str) -> str:
+    if reader_text.strip():
+        return reader_text
+    source_lines = [
+        "# Source-First Handoff",
+        "",
+        f"- Paper slug: {slug}",
+        f"- Title: {title}",
+        f"- Workflow mode: {workflow_mode}",
+        "- Reader/Critic: not run in fast-ingest mode.",
+        "- Required source artifacts for final wiki writing:",
+        *[f"  - {artifact}" for artifact in _source_first_artifacts(slug)],
+        "",
+        "Final wiki pages must be written by wiki-ingest from the source paper, MinerU Markdown/TeX, images, and manifest. This file is an internal navigator, not a final wiki page.",
+    ]
+    return "\n".join(source_lines)
 
 
 def _write_batch_handoff(
@@ -401,6 +482,17 @@ def _deposition_recommendation(research_decision: dict, reproduction_plan: dict)
 
 
 def _reading_trust_payload(research_decision: dict, reproduction_plan: dict) -> dict:
+    if not research_decision and not reproduction_plan:
+        return {
+            "status": "source-ready",
+            "read_mode": (
+                "默认 fast-ingest：本报告只用于候选批准；未运行 reader/critic，正式 Wiki 必须从原论文、"
+                "MinerU Markdown/TeX、图片和 manifest 重读后写入。"
+            ),
+            "blocking_lenses": [],
+            "warning_reviewers": [],
+            "reproducibility_caveat_count": 0,
+        }
     panel = research_decision.get("panel_summary") or {}
     blocking_lenses = panel.get("blocking_lenses") or []
     warning_reviewers = panel.get("warning_reviewers") or []
@@ -440,14 +532,18 @@ def _wiki_handoff_records(
     *,
     source_reader_target: str,
     reading_report_target: str,
+    workflow_mode: str,
+    reader_artifacts: list[str],
+    critic_artifacts: list[str],
 ) -> list[dict]:
-    return [
+    records = [
         {
             "artifact_type": "source_reader",
             "target": source_reader_target,
             "route_status": "internal-evidence-only",
-            "purpose": "EPI source-grounded reader artifact for the wiki skill to inspect.",
+            "purpose": "EPI source-first navigator for the wiki skill to inspect before opening the source artifacts.",
             "primary_reader": "all",
+            "workflow_mode": workflow_mode,
         },
         {
             "artifact_type": "reading_report",
@@ -455,8 +551,30 @@ def _wiki_handoff_records(
             "route_status": "internal-evidence-only",
             "purpose": "Low-reading-burden entrypoint for human review before wiki skill deposition.",
             "primary_reader": "peer-reviewer",
+            "workflow_mode": workflow_mode,
         },
     ]
+    if reader_artifacts:
+        records.append(
+            {
+                "artifact_type": "optional_reader_aids",
+                "targets": reader_artifacts,
+                "route_status": "internal-evidence-only",
+                "purpose": "Optional navigation aids; never a substitute for source paper reading.",
+                "workflow_mode": workflow_mode,
+            }
+        )
+    if critic_artifacts:
+        records.append(
+            {
+                "artifact_type": "optional_critic_aids",
+                "targets": critic_artifacts,
+                "route_status": "internal-evidence-only",
+                "purpose": "Optional audit aids for important, reproducibility, or dispute-sensitive papers.",
+                "workflow_mode": workflow_mode,
+            }
+        )
+    return records
 
 
 def _wiki_rule_source_model() -> dict:
@@ -572,32 +690,64 @@ def _build_wiki_ingest_brief(
     evidence_map: dict,
     research_decision: dict,
     reproduction_plan: dict,
+    workflow_mode: str = FAST_INGEST_MODE,
+    reader_artifacts: list[str] | None = None,
+    critic_artifacts: list[str] | None = None,
 ) -> dict:
+    workflow_mode = normalize_ingest_mode(workflow_mode)
+    reader_artifacts = reader_artifacts or []
+    critic_artifacts = critic_artifacts or []
     source_first_artifacts = _source_first_artifacts(slug)
     source_markdown = _source_markdown_artifact(slug)
+    optional_evidence_aids = [*reader_artifacts, *critic_artifacts]
     claims = evidence_map.get("claims") if isinstance(evidence_map.get("claims"), list) else []
     roles = evidence_map.get("reader_roles") if isinstance(evidence_map.get("reader_roles"), list) else []
     quick_take = (
         _first_bullet_after_heading(editorial_summary_text, "## Central Claim")
-        or "Start from the reading report, then open the reference page for details."
+        or "Start from the Chinese approval report, then open the source paper artifacts."
     )
     peer_note = (
         _first_bullet_after_heading(technical_reading_text, "## Method Decomposition")
-        or "Inspect method, benchmark, and evidence grounding before reusing claims."
+        or "Inspect the source method, formulas, benchmark, and evidence grounding before reusing claims."
     )
     domain_note = (
         _first_bullet_after_heading(research_notes_text, "## Fit To Research Direction")
-        or "Identify reusable concepts and cross-paper synthesis targets before the wiki skill writes final pages."
+        or "Identify reusable concepts and cross-paper synthesis targets from the source paper before final wiki writing."
     )
     experiment_note = (
         _first_bullet_after_heading(research_notes_text, "## Follow-up Experiments")
         or "Treat reproduction as a compact caveat and keep theory/experiment ideas central."
     )
+    entrypoints = {
+        "reading_report": reading_report_target,
+        "source_reader": source_reader_target,
+        "wiki_ingest_brief": "wiki-ingest-brief.json",
+    }
+    if "reader/evidence-map.json" in reader_artifacts:
+        entrypoints["evidence_map"] = "reader/evidence-map.json"
+    if "reader/claim-support.json" in reader_artifacts:
+        entrypoints["claim_support"] = "reader/claim-support.json"
+    candidate_topic_source = "reader/research-notes.md" if "reader/research-notes.md" in reader_artifacts else source_markdown
+    reading_path = [
+        reading_report_target,
+        *[
+            artifact
+            for artifact in [
+                "reader/editorial-summary.md",
+                "reader/technical-reading.md",
+                "reader/research-notes.md",
+                "reader/evidence-map.json",
+                "reader/claim-support.json",
+            ]
+            if artifact in reader_artifacts
+        ],
+    ]
     return {
         "schema_version": "epi-wiki-ingest-brief-v1",
         "handoff_type": "agent-mediated-wiki-ingest",
         "paper_slug": slug,
         "title": title,
+        "workflow_mode": workflow_mode,
         "trust_status": _reading_trust_payload(research_decision, reproduction_plan),
         "formal_page_families": formal_page_family_names(),
         "formal_page_family_records": formal_page_family_records(),
@@ -624,6 +774,7 @@ def _build_wiki_ingest_brief(
         "wiki_rule_source_model": _wiki_rule_source_model(),
         "ingest_policy": {
             "authority": "Resolve the target vault contract first; local skills are helpers, not sole authority.",
+            "workflow_mode": workflow_mode,
             "final_page_authority": "Final wiki pages are created by wiki skill batch distillation, not by EPI staging.",
             "write_model": "Wiki-skill batch distillation and merge from multiple EPI evidence bundles.",
             "epi_write_scope": "internal-underscore-artifacts-only",
@@ -644,9 +795,13 @@ def _build_wiki_ingest_brief(
             ),
             "source_of_truth": "Markdown vault plus EPI source bundle; QMD/search indexes are retrieval aids only.",
             "source_first_policy": (
-                f"Read {source_markdown}, mineru/paper.tex, mineru/images/*, and mineru/mineru-manifest.json "
-                "before final wiki writing; reader and critic outputs are navigation and quality signals, "
-                "not substitutes for the source paper."
+                f"Read the source paper artifacts ({source_markdown}, mineru/paper.tex, mineru/images/*, "
+                "and mineru/mineru-manifest.json) before final wiki writing; reader and critic outputs, "
+                "when present, are optional navigation and quality signals, not substitutes for the source paper."
+            ),
+            "reader_critic_policy": (
+                "fast-ingest does not run reader/critic; reviewed-ingest adds reader for navigation; "
+                "audited-ingest adds critic for key, reproducibility, contradiction, or explicit-review cases."
             ),
             "suggested_routes_only": False,
         },
@@ -665,21 +820,19 @@ def _build_wiki_ingest_brief(
             "tags": "Respect the vault taxonomy and aliases before inventing new tags.",
             "callouts": "Use callouts only when they improve reading, not as a fixed page template.",
         },
-        "entrypoints": {
-            "reading_report": reading_report_target,
-            "source_reader": source_reader_target,
-            "wiki_ingest_brief": "wiki-ingest-brief.json",
-            "evidence_map": "reader/evidence-map.json",
-        },
+        "entrypoints": entrypoints,
         "formal_routes_suggested": False,
         "suggested_routes": [],
         "handoff_artifacts": _wiki_handoff_records(
             source_reader_target=source_reader_target,
             reading_report_target=reading_report_target,
+            workflow_mode=workflow_mode,
+            reader_artifacts=reader_artifacts,
+            critic_artifacts=critic_artifacts,
         ),
         "candidate_topics": [
             {
-                "source": "reader/research-notes.md",
+                "source": candidate_topic_source,
                 "hint": domain_note,
                 "routing_policy": "wiki skill decides reusable concept pages after comparing multiple papers",
             }
@@ -712,72 +865,40 @@ def _build_wiki_ingest_brief(
             "theory_and_experiment": experiment_note,
         },
         "source_bundle": {
-            "raw_artifacts": [
-                *source_first_artifacts,
-                "reader/evidence-map.json",
-                "reader/claim-support.json",
-                "reader/figures.md",
-                "critic/critic-report.json",
-                "critic/research-decision.json",
-            ],
+            "raw_artifacts": source_first_artifacts,
             "primary_source_reading_order": [
                 "metadata.json",
                 source_markdown,
                 "mineru/paper.tex",
                 "mineru/images/*",
                 "mineru/mineru-manifest.json",
-                "reader/evidence-map.json",
-                "reader/claim-support.json",
-                "reader/figures.md",
-                "critic/critic-report.json",
-                "critic/research-decision.json",
             ],
+            "optional_evidence_aids": optional_evidence_aids,
             "formula_figure_review": {
                 "formulas": (
                     f"Review central formulas in {source_markdown} and mineru/paper.tex; preserve important "
                     "definitions, assumptions, derivation steps, and notation rather than reducing them to prose."
                 ),
                 "figures_tables_images": (
-                    "Interpret figures/tables/images from mineru/images/* and reader/figures.md; preserve what "
-                    "each visual shows, the task/metric/baseline context, and any uncertainty from the parse."
+                    "Interpret figures/tables/images from mineru/images/*; use reader/figures.md only when "
+                    "reviewed-ingest or audited-ingest produced it. Preserve what each visual shows, the "
+                    "task/metric/baseline context, and any uncertainty from the parse."
                 ),
                 "parse_uncertainty": (
                     "If formulas, tables, or figures appear missing, ambiguous, or parse-limited, inspect paper.pdf "
                     "before treating the content as absent."
                 ),
             },
-            "reader_artifacts": [
-                "reader/reader.md",
-                "reader/editorial-summary.md",
-                "reader/technical-reading.md",
-                "reader/research-notes.md",
-                "reader/figures.md",
-                "reader/reproducibility.md",
-                "reader/implementation-ideas.md",
-                "reader/claim-support.json",
-            ],
-            "critic_artifacts": [
-                "critic/critic-report.json",
-                "critic/critic-quorum.json",
-                "critic/research-decision.json",
-                "critic/reader-revision-plan.json",
-                "critic/reproduction-plan.json",
-            ],
+            "reader_artifacts": reader_artifacts,
+            "critic_artifacts": critic_artifacts,
             "evidence": {
                 "claim_count": len(claims),
                 "reader_roles": roles,
-                "exact_evidence_artifact": "reader/evidence-map.json",
-                "claim_support_artifact": "reader/claim-support.json",
+                "exact_evidence_artifact": "reader/evidence-map.json" if "reader/evidence-map.json" in reader_artifacts else None,
+                "claim_support_artifact": "reader/claim-support.json" if "reader/claim-support.json" in reader_artifacts else None,
             },
         },
-        "reading_path": [
-            reading_report_target,
-            "reader/editorial-summary.md",
-            "reader/technical-reading.md",
-            "reader/research-notes.md",
-            "reader/evidence-map.json",
-            "reader/claim-support.json",
-        ],
+        "reading_path": reading_path,
     }
 
 
@@ -785,8 +906,10 @@ def _wiki_ingest_brief_report_lines(wiki_ingest_brief: dict) -> list[str]:
     trust = wiki_ingest_brief.get("trust_status") or {}
     source_bundle = wiki_ingest_brief.get("source_bundle") or {}
     evidence = source_bundle.get("evidence") or {}
+    optional_aids = source_bundle.get("optional_evidence_aids") or []
     handoff_artifacts = wiki_ingest_brief.get("handoff_artifacts") or []
     artifact_summary = ", ".join(str(item.get("artifact_type")) for item in handoff_artifacts) or "None"
+    aid_text = ", ".join(str(item) for item in optional_aids) if optional_aids else "无；本次为 source-only fast-ingest"
     return [
         "## Wiki 沉淀价值",
         "",
@@ -794,8 +917,9 @@ def _wiki_ingest_brief_report_lines(wiki_ingest_brief: dict) -> list[str]:
         "- `wiki-ingest-brief.json` 是证据交接文件，不是正式 wiki 页面路线。",
         f"- 可信状态：{trust.get('status', '')}；内部 handoff artifacts：{artifact_summary}",
         f"- 已跟踪证据 claim：{evidence.get('claim_count', 0)}",
+        f"- 可选 reader/critic 辅助证据：{aid_text}",
         "- 正式路径、frontmatter、标签、链接、合并策略和 staged writes 均由目标 vault contract 与 wiki skill 决定。",
-        "- 进入正式写入前必须读取原论文、MinerU Markdown/TeX、图片、manifest、reader evidence map 和 critic 输出。",
+        "- 进入正式写入前必须读取原论文、MinerU Markdown/TeX、图片和 manifest；reader/critic 只有在本次模式实际生成时才作为辅助。",
     ]
 
 
@@ -803,6 +927,7 @@ def _reading_report_lines(
     *,
     slug: str,
     title: str,
+    workflow_mode: str,
     source_reader_target: str,
     reader_text: str,
     editorial_summary_text: str,
@@ -831,10 +956,49 @@ def _reading_report_lines(
     terms = _term_pairs_for_text(term_text)
     trust = _reading_trust_payload(research_decision, reproduction_plan)
     recommendation = _deposition_recommendation(research_decision, reproduction_plan)
+    reader_available = bool(reader_text.strip())
+    reader_method_line = (
+        f"- reader 技术线索：{_reader_take_or_note(method_take, 'reader 技术摘要未达到审批报告可读标准；正式写入时请回到原文方法章节和 evidence map。')}"
+        if reader_available
+        else "- source-first 复核重点：正式写入时从 MinerU Markdown/TeX、图片、manifest 和必要时的 PDF 回读方法、公式、图表和实验设置。"
+    )
+    fit_line = (
+        f"- 研究方向贴合度：{_reader_take_or_note(fit_take, '需要由 wiki skill 在批量沉淀时结合目标 vault taxonomy 判断。')}"
+        if reader_available
+        else "- 研究方向贴合度：本报告只给候选判断；正式沉淀时由 wiki skill 结合目标 vault taxonomy 和多篇论文批量判断。"
+    )
+    evidence_lines = [
+        f"- 可信状态：{trust['status']}",
+        f"- 阅读模式：{trust['read_mode']}",
+        f"- 阻断 lens：{', '.join(trust['blocking_lenses']) or 'None'}",
+        f"- 警告审稿器：{', '.join(trust['warning_reviewers']) or 'None'}",
+        f"- 复现 caveat：{trust['reproducibility_caveat_count']}",
+    ]
+    if reader_available:
+        evidence_lines.extend(
+            [
+                f"- 已跟踪证据 claim：{len(claims)}；reader roles：{', '.join(str(role) for role in roles) or 'None recorded'}",
+                "- 精确证据地址以 `reader/evidence-map.json` 和 `reader/claim-support.json` 为准。",
+            ]
+        )
+    else:
+        evidence_lines.append("- 默认快路径未生成 reader evidence map；正式页证据以原论文、MinerU Markdown/TeX、图片和 manifest 为准。")
+    if research_decision:
+        quality_lines = [
+            f"- critic 共识：{panel.get('consensus', research_decision.get('recommendation', ''))}",
+            f"- 阻断 lenses：{', '.join(panel.get('blocking_lenses') or []) or 'None'}",
+            f"- 警告 reviewers：{', '.join(panel.get('warning_reviewers') or []) or 'None'}",
+        ]
+    else:
+        quality_lines = [
+            f"- workflow mode：{workflow_mode}",
+            "- reader/critic：本次未作为默认必经步骤运行；只有解析质量差、关键复现/综述/决策、或用户显式要求时再补 reviewed/audited ingest。",
+        ]
     lines = [
         "---",
         f"paper_slug: {slug}",
         f"title: {json.dumps(title, ensure_ascii=False)}",
+        f"workflow_mode: {workflow_mode}",
         "stage: staging",
         "page_type: reading_report",
         "formal_page: false",
@@ -844,7 +1008,7 @@ def _reading_report_lines(
         "",
         f"# {title} 阅读报告",
         "",
-        f"Source reader：`{source_reader_target}`",
+        f"Source handoff：`{source_reader_target}`",
         "",
         "## 快速判断",
         "",
@@ -863,8 +1027,8 @@ def _reading_report_lines(
         "## 理论与方法",
         "",
         f"- {_method_idea(metadata, title)}",
-        f"- reader 技术线索：{_reader_take_or_note(method_take, 'reader 技术摘要未达到审批报告可读标准；正式写入时请回到原文方法章节和 evidence map。')}",
-        f"- 研究方向贴合度：{_reader_take_or_note(fit_take, '需要由 wiki skill 在批量沉淀时结合目标 vault taxonomy 判断。')}",
+        reader_method_line,
+        fit_line,
         "",
         "## 实验/验证方式",
         "",
@@ -873,13 +1037,7 @@ def _reading_report_lines(
         "",
         "## 证据强度与可信状态",
         "",
-        f"- 可信状态：{trust['status']}",
-        f"- 阅读模式：{trust['read_mode']}",
-        f"- 阻断 lens：{', '.join(trust['blocking_lenses']) or 'None'}",
-        f"- 警告审稿器：{', '.join(trust['warning_reviewers']) or 'None'}",
-        f"- 复现 caveat：{trust['reproducibility_caveat_count']}",
-        f"- 已跟踪证据 claim：{len(claims)}；reader roles：{', '.join(str(role) for role in roles) or 'None recorded'}",
-        "- 精确证据地址以 `reader/evidence-map.json` 和 `reader/claim-support.json` 为准。",
+        *evidence_lines,
         "",
         "## 主要 Caveat",
         "",
@@ -891,9 +1049,7 @@ def _reading_report_lines(
         "",
         "## 质量门禁",
         "",
-        f"- critic 共识：{panel.get('consensus', research_decision.get('recommendation', ''))}",
-        f"- 阻断 lenses：{', '.join(panel.get('blocking_lenses') or []) or 'None'}",
-        f"- 警告 reviewers：{', '.join(panel.get('warning_reviewers') or []) or 'None'}",
+        *quality_lines,
         "",
         "## 沉淀建议",
         "",
@@ -912,16 +1068,25 @@ def _reading_report_lines(
     return lines
 
 
-def stage_paper(vault_path: Path, slug: str, paper_root: Path) -> Path:
-    critic_report = json.loads((paper_root / "critic" / "critic-report.json").read_text(encoding="utf-8"))
-    outcome = critic_report.get("outcome")
-    if outcome != "pass":
+def stage_paper(vault_path: Path, slug: str, paper_root: Path, workflow_mode: str = FAST_INGEST_MODE) -> Path:
+    workflow_mode = normalize_ingest_mode(workflow_mode)
+    reader_required = reader_required_for_mode(workflow_mode)
+    critic_required = critic_required_for_mode(workflow_mode)
+    critic_report_path = paper_root / "critic" / "critic-report.json"
+    critic_report = json.loads(critic_report_path.read_text(encoding="utf-8")) if critic_report_path.exists() else {}
+    outcome = critic_report.get("outcome") if critic_report else "not-run"
+    if critic_required and not critic_report:
+        raise ValueError("critic report is required before audited-ingest staging")
+    if critic_report and outcome != "pass":
         raise ValueError(f"critic outcome must be pass before staging, got {outcome}")
 
     staging_root = staging_paper_root(vault_path, slug)
     evidence_dir = staging_root / "evidence"
     briefs_dir = staging_root / "briefs"
-    reader_text = (paper_root / "reader" / "reader.md").read_text(encoding="utf-8")
+    reader_path = paper_root / "reader" / "reader.md"
+    if reader_required and not reader_path.exists():
+        raise ValueError(f"reader output is required before {workflow_mode} staging")
+    reader_text = reader_path.read_text(encoding="utf-8") if reader_path.exists() else ""
     editorial_summary_path = paper_root / "reader" / "editorial-summary.md"
     technical_reading_path = paper_root / "reader" / "technical-reading.md"
     research_notes_path = paper_root / "reader" / "research-notes.md"
@@ -934,6 +1099,8 @@ def stage_paper(vault_path: Path, slug: str, paper_root: Path) -> Path:
     reproducibility_text = reproducibility_path.read_text(encoding="utf-8") if reproducibility_path.exists() else ""
     metadata = json.loads((paper_root / "metadata.json").read_text(encoding="utf-8"))
     title = metadata.get("title", "")
+    reader_artifacts = _reader_artifacts(paper_root)
+    critic_artifacts = _critic_artifacts(paper_root)
     source_reader_target = "evidence/source-reader.md"
     reading_report_target = "briefs/reading-report.md"
     source_reader_path = evidence_dir / "source-reader.md"
@@ -948,6 +1115,7 @@ def stage_paper(vault_path: Path, slug: str, paper_root: Path) -> Path:
     wiki_ingest_brief = _build_wiki_ingest_brief(
         slug=slug,
         title=title,
+        workflow_mode=workflow_mode,
         source_reader_target=source_reader_target,
         reading_report_target=reading_report_target,
         editorial_summary_text=editorial_summary_text,
@@ -956,18 +1124,27 @@ def stage_paper(vault_path: Path, slug: str, paper_root: Path) -> Path:
         evidence_map=evidence_map,
         research_decision=research_decision,
         reproduction_plan=reproduction_plan,
+        reader_artifacts=reader_artifacts,
+        critic_artifacts=critic_artifacts,
+    )
+    source_handoff_text = _source_handoff_body(
+        slug=slug,
+        title=title,
+        workflow_mode=workflow_mode,
+        reader_text=reader_text,
     )
     source_reader = [
         "---",
         f"paper_slug: {slug}",
         f"title: {json.dumps(title, ensure_ascii=False)}",
+        f"workflow_mode: {workflow_mode}",
         "stage: staging",
         "formal_page: false",
         "artifact_type: source_reader",
         *decision_frontmatter_lines,
         "---",
         "",
-        reader_text,
+        source_handoff_text,
     ]
     if research_decision_lines:
         source_reader.extend(["", *research_decision_lines, ""])
@@ -981,6 +1158,7 @@ def stage_paper(vault_path: Path, slug: str, paper_root: Path) -> Path:
             _reading_report_lines(
                 slug=slug,
                 title=title,
+                workflow_mode=workflow_mode,
                 source_reader_target=source_reader_target,
                 reader_text=reader_text,
                 editorial_summary_text=editorial_summary_text,
@@ -1016,6 +1194,10 @@ def stage_paper(vault_path: Path, slug: str, paper_root: Path) -> Path:
     plan = {
         "paper_slug": slug,
         "created_at": utc_now(),
+        "workflow_mode": workflow_mode,
+        "reader_required": reader_required,
+        "critic_required": critic_required,
+        "reader_critic_policy": wiki_ingest_brief["ingest_policy"]["reader_critic_policy"],
         "critic_outcome": outcome,
         "handoff_type": "agent-mediated-wiki-ingest",
         "wiki_write_model": "wiki-skill-batch-distillation",

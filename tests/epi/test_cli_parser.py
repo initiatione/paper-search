@@ -121,7 +121,7 @@ def test_advance_ranked_parser_accepts_include_review_candidates():
     assert args.include_review_candidates is True
 
 
-def test_prepare_ranked_parser_defaults_to_one_paper_and_stops_after_parse():
+def test_prepare_ranked_parser_defaults_to_one_paper_and_source_staging():
     args = build_parser().parse_args(
         [
             "prepare-ranked",
@@ -135,6 +135,7 @@ def test_prepare_ranked_parser_defaults_to_one_paper_and_stops_after_parse():
     assert args.max_papers == 1
     assert args.include_review_candidates is False
     assert args.skip_existing is False
+    assert args.mode == "fast-ingest"
 
 
 def test_prepare_ranked_parser_accepts_skip_existing_for_resumable_batches():
@@ -199,6 +200,7 @@ def test_prepare_ranked_cli_json_outputs_run_artifact_paths(tmp_path, monkeypatc
         include_review_candidates=False,
         skip_existing=False,
         mineru_timeout=None,
+        workflow_mode=None,
     ):
         captured.update(
             {
@@ -209,15 +211,18 @@ def test_prepare_ranked_cli_json_outputs_run_artifact_paths(tmp_path, monkeypatc
                 "include_review_candidates": include_review_candidates,
                 "skip_existing": skip_existing,
                 "mineru_timeout": mineru_timeout,
+                "workflow_mode": workflow_mode,
             }
         )
         return {
             "run_id": "prepare-ranked-001",
             "source_run_id": run_id,
             "state": "prepared",
-            "status": "prepared",
+            "status": "waiting_for_human_gate",
+            "workflow_mode": "fast-ingest",
             "processed_count": 2,
             "skipped_count": 1,
+            "stops_after": "source-staging",
         }
 
     monkeypatch.setattr(cli.workflows, "prepare_ranked_papers_from_run", fake_prepare_ranked_papers_from_run)
@@ -244,14 +249,17 @@ def test_prepare_ranked_cli_json_outputs_run_artifact_paths(tmp_path, monkeypatc
     assert payload["run_id"] == "prepare-ranked-001"
     assert payload["source_run_id"] == "run-001"
     assert payload["batch_state"] == "prepared"
+    assert payload["status"] == "waiting_for_human_gate"
+    assert payload["workflow_mode"] == "fast-ingest"
     assert payload["processed_count"] == 2
     assert payload["skipped_count"] == 1
-    assert payload["stops_after"] == "parse"
+    assert payload["stops_after"] == "source-staging"
     assert payload["run_dir"] == str(run_dir)
     assert payload["artifacts"]["batch_record"] == str(run_dir / "batch-advance-record.json")
     assert payload["artifacts"]["report_json"] == str(run_dir / "report.json")
     assert captured["skip_existing"] is True
     assert captured["include_review_candidates"] is True
+    assert captured["workflow_mode"] == "fast-ingest"
 
 
 def test_prepare_ranked_cli_passes_skip_existing_to_workflow(tmp_path, monkeypatch, capsys):
@@ -266,6 +274,7 @@ def test_prepare_ranked_cli_passes_skip_existing_to_workflow(tmp_path, monkeypat
         include_review_candidates=False,
         skip_existing=False,
         mineru_timeout=None,
+        workflow_mode=None,
     ):
         captured.update(
             {
@@ -276,9 +285,16 @@ def test_prepare_ranked_cli_passes_skip_existing_to_workflow(tmp_path, monkeypat
                 "include_review_candidates": include_review_candidates,
                 "skip_existing": skip_existing,
                 "mineru_timeout": mineru_timeout,
+                "workflow_mode": workflow_mode,
             }
         )
-        return {"run_id": "prepare-ranked-001", "state": "parsed", "processed_count": 0}
+        return {
+            "run_id": "prepare-ranked-001",
+            "state": "prepared",
+            "workflow_mode": "reviewed-ingest",
+            "processed_count": 0,
+            "stops_after": "source-staging",
+        }
 
     monkeypatch.setattr(cli.workflows, "prepare_ranked_papers_from_run", fake_prepare_ranked_papers_from_run)
 
@@ -293,6 +309,8 @@ def test_prepare_ranked_cli_passes_skip_existing_to_workflow(tmp_path, monkeypat
             "10",
             "--skip-existing",
             "--include-review-candidates",
+            "--mode",
+            "reviewed-ingest",
         ]
     )
 
@@ -305,8 +323,11 @@ def test_prepare_ranked_cli_passes_skip_existing_to_workflow(tmp_path, monkeypat
         "include_review_candidates": True,
         "skip_existing": True,
         "mineru_timeout": None,
+        "workflow_mode": "reviewed-ingest",
     }
-    assert "stops_after=parse" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "workflow_mode=reviewed-ingest" in output
+    assert "stops_after=source-staging" in output
 
 
 def test_advance_ranked_cli_does_not_forward_prepare_only_skip_existing(tmp_path, monkeypatch):
@@ -320,6 +341,7 @@ def test_advance_ranked_cli_does_not_forward_prepare_only_skip_existing(tmp_path
         max_papers=None,
         include_review_candidates=False,
         mineru_timeout=None,
+        workflow_mode=None,
     ):
         captured.update(
             {
@@ -329,6 +351,7 @@ def test_advance_ranked_cli_does_not_forward_prepare_only_skip_existing(tmp_path
                 "max_papers": max_papers,
                 "include_review_candidates": include_review_candidates,
                 "mineru_timeout": mineru_timeout,
+                "workflow_mode": workflow_mode,
             }
         )
         return {"run_id": "advance-ranked-001", "state": "batch_done", "processed_count": 0}
@@ -356,6 +379,7 @@ def test_advance_ranked_cli_does_not_forward_prepare_only_skip_existing(tmp_path
         "max_papers": 3,
         "include_review_candidates": True,
         "mineru_timeout": None,
+        "workflow_mode": "fast-ingest",
     }
 
 
