@@ -333,10 +333,10 @@ def _method_idea(metadata: dict, title: str) -> str:
         return "论文把能耗、任务收益和约束统一到经济模型预测控制（Economic Model Predictive Control, EMPC）框架中，用滚动优化支持 AUV 能源管理。"
     if ("lyapunov" in text or "lmpc" in text) and "fault" in text:
         return "论文围绕推进器故障下的 AUV 轨迹跟踪，结合在线故障识别与李雅普诺夫约束模型预测控制（Lyapunov-constrained MPC, LMPC）来降低模式切换时的不稳定波动。"
+    if "reinforcement learning" in text and ("docking" in text or "dock onto" in text):
+        return "论文使用强化学习（Reinforcement Learning, RL）学习 AUV 对接控制（Docking Control）策略，关注接近、姿态调整和终端对接行为。"
     if "q-learning" in text or "deterministic policy gradient" in text:
         return "论文把 Q 学习（Q-learning）信号和确定性策略梯度（Deterministic Policy Gradient, DPG）结合，用强化学习（Reinforcement Learning, RL）处理 AUV 跟踪控制策略学习。"
-    if "reinforcement learning" in text and "docking" in text:
-        return "论文使用强化学习（Reinforcement Learning, RL）学习 AUV 对接控制（Docking Control）策略，关注接近、姿态调整和终端对接行为。"
     if "model predictive control" in text or "mpc" in text:
         return "论文采用模型预测控制（Model Predictive Control, MPC）把动态约束、优化目标和滚动控制动作合在同一个控制框架内。"
     if "mobile robot" in text and "control" in text:
@@ -382,10 +382,10 @@ def _deposition_value(metadata: dict, title: str, evidence_map: dict) -> str:
         route = "AUV 能源管理、经济 MPC、任务收益-能耗权衡"
     elif "lyapunov" in text and "fault" in text:
         route = "AUV 容错控制、LMPC、推进器故障与稳定性约束"
+    elif "reinforcement learning" in text and ("docking" in text or "dock onto" in text):
+        route = "AUV 对接控制、RL 控制策略、仿真到实机风险"
     elif "q-learning" in text or "deterministic policy gradient" in text:
         route = "AUV 强化学习跟踪控制、Q-learning/DPG 方法对比"
-    elif "reinforcement learning" in text and "docking" in text:
-        route = "AUV 对接控制、RL 控制策略、仿真到实机风险"
     else:
         route = "控制方法、实验设置、可复现实验 caveat"
     return f"适合交给 wiki skill 批量沉淀到主题节点：{route}。当前 evidence map 跟踪 {claim_count} 条 claim，正式页必须从原论文、公式和图片重读后写入。"
