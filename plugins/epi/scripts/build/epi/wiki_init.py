@@ -11,7 +11,7 @@ from epi.wiki_contracts import formal_page_family_names, formal_page_family_path
 
 FORMAL_PAGE_DIRS = formal_page_family_names()
 FORMAL_PAGE_PATHS = formal_page_family_paths()
-KNOWLEDGE_GRAPH_DIRS = [*FORMAL_PAGE_DIRS, "entities", "projects", "skills", "journal"]
+KNOWLEDGE_GRAPH_DIRS = [*FORMAL_PAGE_DIRS]
 GRAPH_SEARCH = "path:/^index\\.md$/ OR " + " OR ".join(
     f"path:/^{directory}\\\\//" for directory in KNOWLEDGE_GRAPH_DIRS
 )
@@ -43,7 +43,7 @@ AGENTS_MD = """# EPI Paper Research Wiki
 
 This vault is for source-first academic paper ingest. Final wiki pages are agent-mediated and must be grounded in the source paper artifacts, not reader summaries alone.
 
-EPI writes only the internal `_epi/` repository. Formal graph pages are written by the wiki skill after batch deposition. Obsidian graph views should ignore `_epi/`; `_epi/raw/papers/<slug>/mineru/<slug>.md` remains source material for final writing, not a formal wiki page.
+EPI writes only the internal `_epi/` repository. Formal graph pages are written by the wiki skill after batch deposition into `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`. Obsidian graph views should ignore `_epi/`; `_epi/raw/papers/<slug>/mineru/paper.md` and `_epi/raw/papers/<slug>/mineru/<slug>.md` remain source material for final writing, not formal wiki pages.
 
 Required reading before final wiki writing:
 
@@ -54,7 +54,7 @@ Required reading before final wiki writing:
 - `_meta/directory-structure.md`
 - `_epi/README.md`
 - `_epi/staging/papers/<slug>/wiki-ingest-brief.json`
-- `mineru/<slug>.md`
+- `mineru/paper.md` or `mineru/<slug>.md`
 - `mineru/paper.tex`
 - `mineru/images/*`
 - `mineru/mineru-manifest.json`
@@ -65,7 +65,7 @@ AGENT_OPERATING_CONTRACT_MD = """# Agent Operating Contract
 
 - Keep Markdown vault files as the source of truth.
 - Treat `reader/` and critic outputs as navigation and quality signals, not substitutes for the source paper.
-- Review `mineru/<slug>.md`, `mineru/paper.tex`, `mineru/images/*`, and `mineru/mineru-manifest.json` before final wiki writing.
+- Review `mineru/paper.md` or `mineru/<slug>.md`, `mineru/paper.tex`, `mineru/images/*`, and `mineru/mineru-manifest.json` before final wiki writing.
 - Preserve central formulas, figures, tables, and image evidence when distilling claims.
 - Search existing pages before creating new ones.
 """
@@ -126,7 +126,7 @@ This vault treats the main Obsidian graph as a knowledge-layer view, not a workf
 ## Show in the main graph
 
 - `index.md`
-""" + "\n".join(f"- `{path}`" for path in [*FORMAL_PAGE_PATHS, "entities/", "projects/", "skills/", "journal/"]) + """
+""" + "\n".join(f"- `{path}`" for path in FORMAL_PAGE_PATHS) + """
 
 These are the durable, human-readable knowledge nodes. Source paper Markdown under `_epi/raw` is source material for final writing, not a formal graph page.
 
@@ -153,10 +153,6 @@ EPI reader outputs, critic reports, staging briefs, run dashboards, and raw pape
 REQUIRED_DIRS = [
     "_meta",
     *FORMAL_PAGE_DIRS,
-    "entities",
-    "skills",
-    "projects",
-    "journal",
     ".obsidian",
 ]
 
@@ -174,6 +170,7 @@ def _manifest_payload(existing: dict | None = None) -> dict:
             "git_auto_init": True,
             "git_initial_commit": False,
             "must_read_source_artifacts": [
+                "mineru/paper.md",
                 "mineru/<slug>.md",
                 "mineru/paper.tex",
                 "mineru/images/*",
@@ -190,7 +187,7 @@ def _manifest_payload(existing: dict | None = None) -> dict:
             "formal_pages_written_by": "wiki-skill-batch-distillation",
             "graph_ignore_internal_dirs": True,
             "raw_paper_markdown_role": "source-material-not-formal-page",
-            "wiki_dirs": [*FORMAL_PAGE_DIRS, "entities", "skills", "projects", "journal"],
+            "wiki_dirs": [*FORMAL_PAGE_DIRS],
             "operational_dirs": ["_epi"],
             "papers": existing.get("papers", []),
         }

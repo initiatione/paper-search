@@ -4,4 +4,4 @@ Discovery wraps an external `paper-search` command and records command, source, 
 
 MinerU parsing is an internal helper capability for EPI, not a separate marketplace plugin.
 
-EPI keeps raw artifacts under `_epi/raw` and evidence handoff bundles under `_epi/staging`. Final Obsidian/LLM Wiki pages are written by the wiki ingest agent according to the target vault contract; EPI's suggested `references`, `concepts`, `synthesis`, and `reports` routes are suggestions, not final-page authority.
+EPI keeps raw artifacts under `_epi/raw` and evidence handoff bundles under `_epi/staging`. Final Obsidian/LLM Wiki pages are written by the wiki ingest agent according to the target vault contract; the formal EPI page families are `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`. EPI can hand off evidence for these families, but it does not decide final page authority.

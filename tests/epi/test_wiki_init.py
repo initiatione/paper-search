@@ -36,10 +36,6 @@ def test_initialize_paper_wiki_creates_required_layout(tmp_path):
         "_epi/policies",
         "_meta",
         *EXPECTED_RESEARCH_WIKI_DIRS,
-        "entities",
-        "skills",
-        "projects",
-        "journal",
         ".obsidian",
     ]
     for relative_path in expected_dirs:
@@ -107,6 +103,10 @@ def test_initialize_paper_wiki_creates_required_layout(tmp_path):
     assert not (vault / "_raw").exists()
     assert not (vault / "_staging").exists()
     assert not (vault / "_runs").exists()
+    assert not (vault / "entities").exists()
+    assert not (vault / "skills").exists()
+    assert not (vault / "projects").exists()
+    assert not (vault / "journal").exists()
 
 
 def test_initialize_paper_wiki_repairs_legacy_contract_files_without_losing_manifest_papers(tmp_path):
