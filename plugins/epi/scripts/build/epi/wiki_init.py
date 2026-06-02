@@ -58,6 +58,20 @@ Required reading before final wiki writing:
 - `mineru/paper.tex`
 - `mineru/images/*`
 - `mineru/mineru-manifest.json`
+
+## Obsidian math rendering
+
+Formal wiki pages must use Obsidian-renderable LaTeX delimiters:
+
+- Inline math: `$x_k$`
+- Block math:
+  ```text
+  $$
+  V(\\xi_{k+1}) - V(\\xi_k) \\leq -\\epsilon \\|\\xi_k\\|^2
+  $$
+  ```
+
+Do not use fenced code blocks such as ```` ```math ```` or ```` ```tex ```` for formulas in formal wiki pages; Obsidian displays those as code blocks instead of rendering them as math.
 """
 
 
@@ -67,6 +81,7 @@ AGENT_OPERATING_CONTRACT_MD = """# Agent Operating Contract
 - Treat `reader/` and critic outputs as navigation and quality signals, not substitutes for the source paper.
 - Review `mineru/paper.md` or `mineru/<slug>.md`, `mineru/paper.tex`, `mineru/images/*`, and `mineru/mineru-manifest.json` before final wiki writing.
 - Preserve central formulas, figures, tables, and image evidence when distilling claims.
+- Render formulas with Obsidian math delimiters: inline `$...$`, block `$$...$$`. Never place final-page formulas in fenced `math`, `tex`, or `latex` code blocks.
 - Search existing pages before creating new ones.
 """
 
@@ -81,6 +96,19 @@ Source-first paper ingest schema:
 4. agent-mediated final wiki pages written outside EPI internals
 
 Final wiki content must preserve claims, formulas, figures/tables/images, and image evidence.
+
+## Formula Rendering Contract
+
+Final pages are Obsidian notes, so mathematical formulas must be written in Obsidian-compatible LaTeX:
+
+- Use inline math for short symbols and expressions, for example `$u_t$` or `$Q^\\pi(s,a)$`.
+- Use block math for displayed equations:
+  ```text
+  $$
+  R_k = \\sum_{i=k}^{T} \\gamma^{i-k} r(s_i,a_i)
+  $$
+  ```
+- Do not use fenced code blocks labelled `math`, `tex`, or `latex` for equations in formal wiki pages. Those are source/code blocks, not rendered math blocks in Obsidian.
 """
 
 
@@ -185,6 +213,11 @@ def _manifest_payload(existing: dict | None = None) -> dict:
             "epi_internal_root": "_epi",
             "epi_write_scope": "internal-_epi-repository-only",
             "formal_pages_written_by": "wiki-skill-batch-distillation",
+            "formula_rendering": {
+                "inline": "$...$",
+                "block": "$$...$$",
+                "forbidden_fenced_languages": ["math", "tex", "latex"],
+            },
             "graph_ignore_internal_dirs": True,
             "raw_paper_markdown_role": "source-material-not-formal-page",
             "wiki_dirs": [*FORMAL_PAGE_DIRS],
@@ -201,7 +234,17 @@ def _write_text_if_missing_or_legacy(path: Path, content: str, created: list[str
         created.append(relative_file)
         return
     existing = path.read_text(encoding="utf-8")
-    legacy_markers = ("_raw", "_staging", "_runs", "_quarantine", "_evolution", "mineru/<paper-title-or-short-title>.md")
+    legacy_markers = (
+        "_raw",
+        "_staging",
+        "_runs",
+        "_quarantine",
+        "_evolution",
+        "mineru/<paper-title-or-short-title>.md",
+        "Required reading before final wiki writing",
+        "Preserve central formulas",
+        "Final wiki content must preserve claims",
+    )
     if current_marker not in existing and any(marker in existing for marker in legacy_markers):
         path.write_text(content, encoding="utf-8")
         created.append(relative_file)
@@ -255,9 +298,9 @@ def initialize_paper_wiki(vault_path: Path) -> list[str]:
     created.extend(ensure_epi_repository(vault_path))
 
     contract_files = {
-        "AGENTS.md": (AGENTS_MD, "EPI writes only the internal `_epi/` repository"),
-        "_meta/agent-operating-contract.md": (AGENT_OPERATING_CONTRACT_MD, "Review `mineru/<slug>.md`, `mineru/paper.tex`"),
-        "_meta/schema.md": (SCHEMA_MD, "internal staging handoff for wiki skill batch deposition"),
+        "AGENTS.md": (AGENTS_MD, "Obsidian math rendering"),
+        "_meta/agent-operating-contract.md": (AGENT_OPERATING_CONTRACT_MD, "Render formulas with Obsidian math delimiters"),
+        "_meta/schema.md": (SCHEMA_MD, "Formula Rendering Contract"),
         "_meta/taxonomy.md": (TAXONOMY_MD, "EPI must not create formal pages"),
         "_meta/directory-structure.md": (DIRECTORY_STRUCTURE_MD, "_epi/raw/papers/<slug>/"),
         "_meta/graph-visibility.md": (GRAPH_VISIBILITY_MD, "Source paper Markdown under `_epi/raw`"),

@@ -50,6 +50,9 @@ def test_initialize_paper_wiki_creates_required_layout(tmp_path):
     assert "mineru/<slug>.md" in manifest["must_read_source_artifacts"]
     assert "mineru/images/*" in manifest["must_read_source_artifacts"]
     assert "wiki-ingest-brief.json" in manifest["handoff_artifacts"]
+    assert manifest["formula_rendering"]["inline"] == "$...$"
+    assert manifest["formula_rendering"]["block"] == "$$...$$"
+    assert manifest["formula_rendering"]["forbidden_fenced_languages"] == ["math", "tex", "latex"]
     assert manifest["epi_internal_root"] == "_epi"
     assert manifest["operational_dirs"] == ["_epi"]
     assert manifest["wiki_dirs"][:7] == EXPECTED_RESEARCH_WIKI_DIRS
@@ -63,8 +66,17 @@ def test_initialize_paper_wiki_creates_required_layout(tmp_path):
     assert (vault / "_meta" / "directory-structure.md").is_file()
     assert "Source-first paper ingest" in (vault / "AGENTS.md").read_text(encoding="utf-8")
     assert "_epi/raw/papers" in (vault / "_epi" / "README.md").read_text(encoding="utf-8")
-    assert "mineru/paper.tex" in (vault / "_meta" / "agent-operating-contract.md").read_text(encoding="utf-8")
-    assert "figures/tables/images" in (vault / "_meta" / "schema.md").read_text(encoding="utf-8")
+    agents = (vault / "AGENTS.md").read_text(encoding="utf-8")
+    operating_contract = (vault / "_meta" / "agent-operating-contract.md").read_text(encoding="utf-8")
+    schema = (vault / "_meta" / "schema.md").read_text(encoding="utf-8")
+    assert "Obsidian math rendering" in agents
+    assert "```math" in agents
+    assert "mineru/paper.tex" in operating_contract
+    assert "block `$$...$$`" in operating_contract
+    assert "fenced `math`, `tex`, or `latex`" in operating_contract
+    assert "figures/tables/images" in schema
+    assert "Formula Rendering Contract" in schema
+    assert "Do not use fenced code blocks labelled `math`, `tex`, or `latex`" in schema
     taxonomy = (vault / "_meta" / "taxonomy.md").read_text(encoding="utf-8")
     directory_structure = (vault / "_meta" / "directory-structure.md").read_text(encoding="utf-8")
     for wiki_dir in EXPECTED_RESEARCH_WIKI_DIRS:
