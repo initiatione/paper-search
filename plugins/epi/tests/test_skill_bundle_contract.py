@@ -8,6 +8,7 @@ SKILLS = ROOT / "skills"
 def test_skill_bundle_has_the_expected_entrypoints():
     expected = [
         "config-setup",
+        "epi-paper-deposition",
         "mineru-paper-parser",
         "paper-discovery",
         "paper-ingest",
@@ -28,3 +29,36 @@ def test_paper_discovery_keeps_policy_in_skill_and_references():
     assert "references/query-planner.md" in discovery
     assert "references/search-protocol.md" in discovery
     assert not (SKILLS / "paper-discovery" / "README.md").exists()
+
+
+def test_epi_paper_deposition_documents_required_wiki_adapter_stack():
+    deposition = (SKILLS / "epi-paper-deposition" / "SKILL.md").read_text(encoding="utf-8")
+
+    assert "wiki_deposition_task.json" in deposition
+    assert "epi-wiki-deposition" in deposition
+    for skill in [
+        "llm-wiki",
+        "wiki-ingest",
+        "wiki-context-pack",
+        "wiki-lint",
+        "wiki-stage-commit",
+        "wiki-status",
+        "wiki-query",
+        "wiki-provenance",
+        "tag-taxonomy",
+    ]:
+        assert skill in deposition
+    for field in [
+        "title",
+        "category",
+        "page_family",
+        "sources",
+        "summary",
+        "provenance",
+        "base_confidence",
+        "lifecycle",
+        "tier",
+    ]:
+        assert field in deposition
+    assert "draft` or `review-needed`" in deposition
+    assert "must not enter the formal graph" in deposition

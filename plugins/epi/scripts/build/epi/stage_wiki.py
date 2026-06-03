@@ -6,14 +6,19 @@ from pathlib import Path
 from epi.artifacts import staging_paper_root, utc_now, wiki_batch_pending_root, write_json_atomic, write_text_atomic
 from epi.source_artifacts import canonical_source_first_artifacts
 from epi.wiki_contracts import (
+    deposition_skill_compatibility_aliases,
     final_source_review_must_record,
+    formal_frontmatter_schema,
     formal_page_family_names,
     formal_page_family_paths,
     formal_page_family_records,
     page_lifecycle_states,
+    quality_enhancement_wiki_skills,
     required_wiki_skills,
     research_review_fields,
+    optional_wiki_skills,
     verified_page_requirements,
+    wiki_deposition_quality_gates,
 )
 
 FAST_INGEST_MODE = "fast-ingest"
@@ -163,6 +168,7 @@ def _write_batch_handoff(
     title: str,
     staging_root: Path,
     wiki_ingest_brief_path: Path,
+    wiki_deposition_task_path: Path,
     reading_report_path: Path,
     source_reader_path: Path,
     wiki_ingest_brief: dict,
@@ -182,14 +188,22 @@ def _write_batch_handoff(
             "epi_write_scope": "internal-underscore-artifacts-only",
             "formal_routes_suggested": False,
             "required_wiki_skills": required_wiki_skills(),
+            "quality_enhancement_wiki_skills": quality_enhancement_wiki_skills(),
+            "optional_wiki_skills": optional_wiki_skills(),
             "formal_page_families": formal_page_family_names(),
+            "formal_frontmatter_schema": formal_frontmatter_schema(),
+            "quality_gates": wiki_deposition_quality_gates(),
             "research_review_fields": research_review_fields(),
             "page_lifecycle_states": page_lifecycle_states(),
             "paper_slugs": [],
             "papers": [],
         }
     existing["required_wiki_skills"] = required_wiki_skills()
+    existing["quality_enhancement_wiki_skills"] = quality_enhancement_wiki_skills()
+    existing["optional_wiki_skills"] = optional_wiki_skills()
     existing["formal_page_families"] = formal_page_family_names()
+    existing["formal_frontmatter_schema"] = formal_frontmatter_schema()
+    existing["quality_gates"] = wiki_deposition_quality_gates()
     existing["research_review_fields"] = research_review_fields()
     existing["page_lifecycle_states"] = page_lifecycle_states()
     papers = [
@@ -203,6 +217,7 @@ def _write_batch_handoff(
             "title": title,
             "staging_root": str(staging_root),
             "wiki_ingest_brief": str(wiki_ingest_brief_path),
+            "wiki_deposition_task": str(wiki_deposition_task_path),
             "reading_report": str(reading_report_path),
             "source_reader": str(source_reader_path),
             "source_bundle": wiki_ingest_brief.get("source_bundle", {}),
@@ -215,7 +230,8 @@ def _write_batch_handoff(
     existing["paper_slugs"] = [str(item["paper_slug"]) for item in papers]
     existing["papers"] = papers
     existing["wiki_skill_instruction"] = (
-        "Load epi-wiki-deposition, wiki-ingest, wiki-provenance, and tag-taxonomy. Distill formal "
+        "Load epi-paper-deposition, llm-wiki, wiki-ingest, wiki-context-pack, wiki-lint, "
+        "wiki-stage-commit, wiki-provenance, and tag-taxonomy. Distill formal "
         "pages across references/, concepts/, derivations/, experiments/, synthesis/, reports/, and "
         "opportunities/ from the source papers, formulas, figures, images, and compact EPI evidence "
         "aids. Do not promote EPI staging reports or per-paper audit pages as formal wiki pages."
@@ -678,6 +694,94 @@ def _final_source_review_contract(slug: str) -> dict:
     }
 
 
+def _paper_deposition_paths(
+    *,
+    slug: str,
+    paper_root: Path,
+    staging_root: Path,
+    wiki_ingest_brief_path: Path,
+    reading_report_path: Path,
+    source_reader_path: Path,
+    reader_artifacts: list[str],
+    critic_artifacts: list[str],
+) -> dict[str, object]:
+    source_markdown = _source_markdown_artifact(slug)
+    return {
+        "slug": slug,
+        "metadata": str(paper_root / "metadata.json"),
+        "paper_pdf": str(paper_root / "paper.pdf"),
+        "paper_md": str(paper_root / source_markdown),
+        "paper_tex": str(paper_root / "mineru" / "paper.tex"),
+        "images": str(paper_root / "mineru" / "images"),
+        "mineru_manifest": str(paper_root / "mineru" / "mineru-manifest.json"),
+        "formula_index": str(paper_root / "formula-index.json"),
+        "figure_index": str(paper_root / "figure-index.json"),
+        "table_index": str(paper_root / "table-index.json"),
+        "brief": str(wiki_ingest_brief_path),
+        "reading_report": str(reading_report_path),
+        "source_reader": str(source_reader_path),
+        "staging_root": str(staging_root),
+        "reader_artifacts": [str(paper_root / artifact) for artifact in reader_artifacts],
+        "critic_artifacts": [str(paper_root / artifact) for artifact in critic_artifacts],
+    }
+
+
+def _build_wiki_deposition_task(
+    *,
+    vault_path: Path,
+    slug: str,
+    title: str,
+    workflow_mode: str,
+    paper_root: Path,
+    staging_root: Path,
+    wiki_ingest_brief_path: Path,
+    reading_report_path: Path,
+    source_reader_path: Path,
+    reader_artifacts: list[str],
+    critic_artifacts: list[str],
+    wiki_ingest_brief: dict,
+) -> dict:
+    return {
+        "schema_version": "epi-wiki-deposition-task-v1",
+        "task_type": "wiki_deposition",
+        "vault_schema": "epi-paper-research",
+        "created_at": utc_now(),
+        "vault_path": str(vault_path),
+        "workflow_mode": workflow_mode,
+        "handoff_boundary": {
+            "epi_core_role": "source-bundle-and-audit-only",
+            "formal_writer_role": "obsidian-wiki-skill-layer",
+            "epi_must_not_write_formal_pages": True,
+            "internal_roots": ["_epi/"],
+        },
+        "page_families": formal_page_family_names(),
+        "page_family_records": formal_page_family_records(),
+        "required_skills": required_wiki_skills(),
+        "compatibility_aliases": deposition_skill_compatibility_aliases(),
+        "quality_enhancement_skills": quality_enhancement_wiki_skills(),
+        "optional_skills": optional_wiki_skills(),
+        "formal_frontmatter_schema": formal_frontmatter_schema(),
+        "quality_gates": wiki_deposition_quality_gates(),
+        "wiki_rule_source_model": wiki_ingest_brief.get("wiki_rule_source_model", {}),
+        "final_source_review_contract": wiki_ingest_brief.get("final_source_review_contract", {}),
+        "papers": [
+            {
+                "title": title,
+                **_paper_deposition_paths(
+                    slug=slug,
+                    paper_root=paper_root,
+                    staging_root=staging_root,
+                    wiki_ingest_brief_path=wiki_ingest_brief_path,
+                    reading_report_path=reading_report_path,
+                    source_reader_path=source_reader_path,
+                    reader_artifacts=reader_artifacts,
+                    critic_artifacts=critic_artifacts,
+                ),
+            }
+        ],
+    }
+
+
 def _build_wiki_ingest_brief(
     *,
     slug: str,
@@ -693,6 +797,7 @@ def _build_wiki_ingest_brief(
     workflow_mode: str = FAST_INGEST_MODE,
     reader_artifacts: list[str] | None = None,
     critic_artifacts: list[str] | None = None,
+    wiki_deposition_task_path: str | None = None,
 ) -> dict:
     workflow_mode = normalize_ingest_mode(workflow_mode)
     reader_artifacts = reader_artifacts or []
@@ -722,6 +827,7 @@ def _build_wiki_ingest_brief(
         "reading_report": reading_report_target,
         "source_reader": source_reader_target,
         "wiki_ingest_brief": "wiki-ingest-brief.json",
+        "wiki_deposition_task": "wiki_deposition_task.json",
     }
     if "reader/evidence-map.json" in reader_artifacts:
         entrypoints["evidence_map"] = "reader/evidence-map.json"
@@ -751,8 +857,17 @@ def _build_wiki_ingest_brief(
         "trust_status": _reading_trust_payload(research_decision, reproduction_plan),
         "formal_page_families": formal_page_family_names(),
         "formal_page_family_records": formal_page_family_records(),
+        "formal_frontmatter_schema": formal_frontmatter_schema(),
+        "wiki_deposition_quality_gates": wiki_deposition_quality_gates(),
         "research_review_fields": research_review_fields(),
         "page_lifecycle_states": page_lifecycle_states(),
+        "wiki_deposition_task": {
+            "schema_version": "epi-wiki-deposition-task-v1",
+            "task_path": str(wiki_deposition_task_path or "wiki_deposition_task.json"),
+            "required_skills": required_wiki_skills(),
+            "compatibility_aliases": deposition_skill_compatibility_aliases(),
+            "quality_gates": wiki_deposition_quality_gates(),
+        },
         "wiki_framework_references": [
             {
                 "name": "Ar9av/obsidian-wiki",
@@ -815,7 +930,10 @@ def _build_wiki_ingest_brief(
             "generic wiki skill guidance",
         ],
         "obsidian_format_hints": {
-            "frontmatter": "Use vault-required properties such as title, summary, tags, sources, aliases, and updated.",
+            "frontmatter": (
+                "Use formal page properties title, category, page_family, tags, aliases, sources, "
+                "summary, provenance, base_confidence, lifecycle, lifecycle_changed, tier, created, and updated."
+            ),
             "links": "Prefer vault-configured wikilinks for internal notes; use Markdown links for external URLs.",
             "tags": "Respect the vault taxonomy and aliases before inventing new tags.",
             "callouts": "Use callouts only when they improve reading, not as a fixed page template.",
@@ -846,9 +964,16 @@ def _build_wiki_ingest_brief(
         "wiki_skill_handoff": {
             "required": True,
             "batch_required": True,
-            "minimum_role": "The current agent must load epi-wiki-deposition, wiki-ingest, wiki-provenance, and tag-taxonomy before writing final pages.",
+            "minimum_role": (
+                "The current agent must load epi-paper-deposition, llm-wiki, wiki-ingest, "
+                "wiki-context-pack, wiki-lint, wiki-stage-commit, wiki-provenance, and tag-taxonomy "
+                "before writing or staging final pages."
+            ),
             "required_skills": required_wiki_skills(),
+            "compatibility_aliases": deposition_skill_compatibility_aliases(),
             "formal_page_families": formal_page_family_names(),
+            "formal_frontmatter_schema": formal_frontmatter_schema(),
+            "quality_gates": wiki_deposition_quality_gates(),
             "research_review_fields": research_review_fields(),
             "page_lifecycle_states": page_lifecycle_states(),
             "formal_page_rule": (
@@ -1106,6 +1231,7 @@ def stage_paper(vault_path: Path, slug: str, paper_root: Path, workflow_mode: st
     source_reader_path = evidence_dir / "source-reader.md"
     reading_report_path = briefs_dir / "reading-report.md"
     wiki_ingest_brief_path = staging_root / "wiki-ingest-brief.json"
+    wiki_deposition_task_path = staging_root / "wiki_deposition_task.json"
     research_decision, research_decision_path = _load_research_decision(paper_root, critic_report)
     reproduction_plan, reproduction_plan_path = _load_reproduction_plan(paper_root, critic_report)
     evidence_map = _load_evidence_map(paper_root)
@@ -1118,6 +1244,7 @@ def stage_paper(vault_path: Path, slug: str, paper_root: Path, workflow_mode: st
         workflow_mode=workflow_mode,
         source_reader_target=source_reader_target,
         reading_report_target=reading_report_target,
+        wiki_deposition_task_path=str(wiki_deposition_task_path),
         editorial_summary_text=editorial_summary_text,
         technical_reading_text=technical_reading_text,
         research_notes_text=research_notes_text,
@@ -1126,6 +1253,20 @@ def stage_paper(vault_path: Path, slug: str, paper_root: Path, workflow_mode: st
         reproduction_plan=reproduction_plan,
         reader_artifacts=reader_artifacts,
         critic_artifacts=critic_artifacts,
+    )
+    wiki_deposition_task = _build_wiki_deposition_task(
+        vault_path=vault_path,
+        slug=slug,
+        title=title,
+        workflow_mode=workflow_mode,
+        paper_root=paper_root,
+        staging_root=staging_root,
+        wiki_ingest_brief_path=wiki_ingest_brief_path,
+        reading_report_path=reading_report_path,
+        source_reader_path=source_reader_path,
+        reader_artifacts=reader_artifacts,
+        critic_artifacts=critic_artifacts,
+        wiki_ingest_brief=wiki_ingest_brief,
     )
     source_handoff_text = _source_handoff_body(
         slug=slug,
@@ -1151,6 +1292,7 @@ def stage_paper(vault_path: Path, slug: str, paper_root: Path, workflow_mode: st
     if promotion_review_lines:
         source_reader.extend(["", *promotion_review_lines, ""])
     write_text_atomic(source_reader_path, "\n".join(source_reader))
+    write_json_atomic(wiki_deposition_task_path, wiki_deposition_task)
     write_json_atomic(wiki_ingest_brief_path, wiki_ingest_brief)
     write_text_atomic(
         reading_report_path,
@@ -1181,12 +1323,14 @@ def stage_paper(vault_path: Path, slug: str, paper_root: Path, workflow_mode: st
         title=title,
         staging_root=staging_root,
         wiki_ingest_brief_path=wiki_ingest_brief_path,
+        wiki_deposition_task_path=wiki_deposition_task_path,
         reading_report_path=reading_report_path,
         source_reader_path=source_reader_path,
         wiki_ingest_brief=wiki_ingest_brief,
     )
     agent_handoff_paths = [
         str(wiki_ingest_brief_path),
+        str(wiki_deposition_task_path),
         str(batch_handoff_path),
         str(reading_report_path),
         str(source_reader_path),
@@ -1212,8 +1356,11 @@ def stage_paper(vault_path: Path, slug: str, paper_root: Path, workflow_mode: st
         "staged_evidence": [str(source_reader_path)],
         "staged_reports": [str(reading_report_path)],
         "wiki_ingest_brief_path": str(wiki_ingest_brief_path),
+        "wiki_deposition_task_path": str(wiki_deposition_task_path),
         "wiki_batch_ingest_brief_path": str(batch_handoff_path),
         "final_source_review_contract": wiki_ingest_brief["final_source_review_contract"],
+        "formal_frontmatter_schema": formal_frontmatter_schema(),
+        "wiki_deposition_quality_gates": wiki_deposition_quality_gates(),
         "suggested_final_source_review_path": str(staging_root / "final-source-review.json"),
         "agent_handoff_paths": agent_handoff_paths,
         "suggested_route_targets": [],

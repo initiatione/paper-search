@@ -434,7 +434,11 @@ python scripts\orchestrator.py record-wiki-ingest --slug <slug> --page <final-pa
 
 ## 文献 Wiki 七类页面契约
 
-EPI 的最终目标不是把论文摘要塞进单页，而是把科研判断沉淀进 7 类正式页面：`references/` 单篇证据页，`concepts/` 方法/理论/术语页，`derivations/` 推导与理论复建页，`experiments/` 复现与实现判断页，`synthesis/` 跨论文综合页，`reports/` 低负担阅读入口页，`opportunities/` 创新机会页。
+EPI 的目标不是把论文摘要塞进单页，也不是自己充当通用 wiki 作者，而是把论文发现、下载、MinerU 解析、source bundle、审批报告、`wiki_deposition_task.json` 和 record 做成稳定证据引擎。正式知识沉淀继续保留 7 类研究页面：`references/` 单篇证据页，`concepts/` 方法/理论/术语页，`derivations/` 推导与理论复建页，`experiments/` 复现与实现判断页，`synthesis/` 跨论文综合页，`reports/` 低负担阅读入口页，`opportunities/` 创新机会页。
 
-正式写入需要 `epi-wiki-deposition`、`wiki-ingest`、`wiki-provenance`、`tag-taxonomy`。`final-source-review.json` 需要覆盖 `theory_reconstruction`、`formula_derivation`、`figure_table_evidence`、`novelty_type`、`implementability`、`reproducibility_risk`、`research_gap`、`cost_level`，并把页面状态推进到 `draft -> source-reviewed -> under-review -> verified`。`verified` 要求 source reread、formula/figure review、证据路径完整和 source review 完整；创新性判断必须区分 author-claimed novelty 和 EPI-confirmed novelty。
+正式写入的官方 adapter 是 `epi-paper-deposition`；旧名 `epi-wiki-deposition` 只作为兼容 alias。adapter 必须显式使用/遵守 `llm-wiki`、`wiki-ingest`、`wiki-context-pack`、`wiki-lint`、`wiki-stage-commit`、`wiki-status`、`wiki-query`、`wiki-provenance`、`tag-taxonomy`。EPI Core 不直接写正式页，只生成 `_epi/` 内部证据、approval、trigger 和 record。
+
+正式页 frontmatter 至少包含 `title`、`category`、`page_family`、`tags`、`aliases`、`sources`、`summary`、`provenance`、`base_confidence`、`lifecycle`、`lifecycle_changed`、`tier`、`created`、`updated`。`category` 与 `page_family` 必须匹配所在七类目录；初始 `lifecycle` 只能是 `draft` 或 `review-needed`，不能默认写成 `source-reviewed` 或 `verified`。record 前的质量 gate 要检查 Obsidian wikilinks、source bundle 路径、provenance.extracted/inferred/ambiguous、禁止 `_epi/` 进入正式图谱、禁止 fenced `math`/`tex`/`latex` 公式块、`derivations/` 的变量定义和推导链、`references/` 的模型/公式/实验/限制，以及 `synthesis/` 的 cross-paper comparison matrix。
+
+`final-source-review.json` 仍需要覆盖 `theory_reconstruction`、`formula_derivation`、`figure_table_evidence`、`novelty_type`、`implementability`、`reproducibility_risk`、`research_gap`、`cost_level`。它记录 source reread、formula/figure review、证据路径和 source review 完整性；创新性判断必须区分 author-claimed novelty 和 EPI-confirmed novelty。
 

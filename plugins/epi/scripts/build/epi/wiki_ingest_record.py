@@ -8,7 +8,14 @@ from epi.artifacts import file_sha256, raw_paper_root, staging_paper_root, utc_n
 from epi.paper_gate import build_paper_gate
 from epi.source_artifacts import is_mineru_markdown_artifact, source_first_artifacts
 from epi.wiki_ingest_approval import human_approval_record_path, validate_human_approval_record
-from epi.wiki_contracts import page_lifecycle_states, required_wiki_skills, research_review_fields
+from epi.wiki_contracts import (
+    formal_frontmatter_schema,
+    formal_page_family_names,
+    page_lifecycle_states,
+    required_wiki_skills,
+    research_review_fields,
+    wiki_deposition_quality_gates,
+)
 
 
 _INTERNAL_VAULT_ROOTS = {"_epi", "_raw", "_staging", "_runs", "_quarantine", ".git", ".obsidian"}
@@ -103,11 +110,145 @@ def _resolve_page(vault_path: Path, page: str) -> dict[str, Any]:
 
 def _slug_pseudo_route_patterns(slug: str) -> set[str]:
     return {
-        f"references/{slug}.md",
         f"concepts/{slug}-concept.md",
         f"synthesis/{slug}-synthesis.md",
         f"reports/{slug}-reading-report.md",
     }
+
+
+def _frontmatter_block(text: str) -> tuple[dict[str, Any], str] | None:
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None
+    try:
+        end_index = next(index for index, line in enumerate(lines[1:], start=1) if line.strip() == "---")
+    except StopIteration:
+        return None
+    frontmatter: dict[str, Any] = {}
+    current_map_key: str | None = None
+    for raw_line in lines[1:end_index]:
+        if not raw_line.strip() or raw_line.lstrip().startswith("#"):
+            continue
+        if raw_line.startswith("  ") and current_map_key:
+            nested = raw_line.strip()
+            if ":" in nested:
+                key, value = nested.split(":", 1)
+                nested_map = frontmatter.get(current_map_key)
+                if not isinstance(nested_map, dict):
+                    nested_map = {}
+                    frontmatter[current_map_key] = nested_map
+                if isinstance(nested_map, dict):
+                    nested_map[key.strip()] = value.strip()
+            continue
+        if ":" not in raw_line or raw_line[0].isspace():
+            continue
+        key, value = raw_line.split(":", 1)
+        key = key.strip()
+        value = value.strip()
+        frontmatter[key] = value
+        current_map_key = key if not value else None
+    body = "\n".join(lines[end_index + 1 :])
+    return frontmatter, body
+
+
+def _frontmatter_value_is_empty(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, dict):
+        return False
+    text = str(value).strip()
+    return text in {"", "[]", "{}", "null", "None"}
+
+
+def _validate_formal_frontmatter(relative_path: str, text: str) -> list[str]:
+    parsed = _frontmatter_block(text)
+    if parsed is None:
+        return ["formal page frontmatter is missing"]
+    frontmatter, _body = parsed
+    schema = formal_frontmatter_schema()
+    required_fields = [str(field) for field in schema.get("required_fields") or []]
+    missing = [field for field in required_fields if field not in frontmatter]
+    issues: list[str] = []
+    if missing:
+        issues.append("formal page frontmatter is missing required fields: " + ", ".join(missing))
+    non_empty_required = [
+        "title",
+        "category",
+        "page_family",
+        "tags",
+        "sources",
+        "summary",
+        "provenance",
+        "base_confidence",
+        "lifecycle",
+        "lifecycle_changed",
+        "tier",
+        "created",
+        "updated",
+    ]
+    empty = [
+        field
+        for field in non_empty_required
+        if field in frontmatter and _frontmatter_value_is_empty(frontmatter.get(field))
+    ]
+    if empty:
+        issues.append("formal page frontmatter has empty required fields: " + ", ".join(empty))
+    provenance = frontmatter.get("provenance") if isinstance(frontmatter.get("provenance"), dict) else {}
+    missing_provenance = [
+        field
+        for field in schema.get("provenance_required_fields") or []
+        if field not in provenance
+    ]
+    if missing_provenance:
+        issues.append("formal page frontmatter provenance is incomplete: " + ", ".join(missing_provenance))
+    family = relative_path.replace("\\", "/").split("/", 1)[0]
+    if family not in formal_page_family_names():
+        issues.append("formal page must be under one EPI page family: " + ", ".join(formal_page_family_names()))
+    for field in ["category", "page_family"]:
+        if str(frontmatter.get(field) or "").strip().strip('"') != family:
+            issues.append(f"formal page frontmatter {field} must match page family {family}")
+    lifecycle = str(frontmatter.get("lifecycle") or "").strip().strip('"')
+    allowed_lifecycles = [str(item) for item in schema.get("allowed_lifecycle_values") or []]
+    allowed_initial = [str(item) for item in schema.get("initial_lifecycle_values") or []]
+    if lifecycle and lifecycle not in set(allowed_lifecycles).union(allowed_initial):
+        issues.append("formal page frontmatter lifecycle is not allowed: " + lifecycle)
+    return issues
+
+
+def _validate_family_content(relative_path: str, text: str) -> list[str]:
+    normalized = relative_path.replace("\\", "/")
+    family = normalized.split("/", 1)[0]
+    lower_text = text.lower()
+    issues: list[str] = []
+    gates = wiki_deposition_quality_gates()
+    forbidden_languages = gates.get("forbidden_fenced_formula_languages") or []
+    for language in forbidden_languages:
+        if f"```{language}" in lower_text:
+            issues.append(f"formal page uses forbidden fenced formula block: ```{language}")
+    if "[[" not in text and gates.get("wikilinks_required"):
+        issues.append("formal page must use Obsidian wikilinks for internal knowledge")
+    if family == "derivations":
+        if "variable" not in lower_text and "变量" not in text:
+            issues.append("derivations page must include variable definitions")
+        if "derivation" not in lower_text and "推导" not in text:
+            issues.append("derivations page must include a derivation chain")
+    if family == "references":
+        required_topics = {
+            "model_or_method": ("model", "method", "模型", "方法"),
+            "formula": ("formula", "equation", "公式"),
+            "experiment_or_metric": ("experiment", "metric", "实验", "指标"),
+            "limitations": ("limitation", "caveat", "限制", "局限"),
+        }
+        missing_topics = [
+            name
+            for name, needles in required_topics.items()
+            if not any(needle in lower_text or needle in text for needle in needles)
+        ]
+        if missing_topics:
+            issues.append("references page must include model/method, formula, experiment/metric, and limitations")
+    if family == "synthesis" and "matrix" not in lower_text and "矩阵" not in text and "|" not in text:
+        issues.append("synthesis page must include a cross-paper comparison matrix")
+    return issues
 
 
 def _validate_formal_page_shape(relative_path: str, text: str) -> None:
@@ -126,6 +267,12 @@ def _validate_formal_page_shape(relative_path: str, text: str) -> None:
         raise ValueError("recorded final wiki page must not be an EPI per-paper routes or pseudo concept page: " + normalized)
     if normalized.startswith("synthesis/") and normalized.endswith("-synthesis.md"):
         raise ValueError("recorded final wiki page must not be an EPI per-paper routes or pseudo synthesis page: " + normalized)
+    issues = [
+        *_validate_formal_frontmatter(normalized, text),
+        *_validate_family_content(normalized, text),
+    ]
+    if issues:
+        raise ValueError("formal page validation failed for " + normalized + ": " + "; ".join(issues))
 
 
 def _source_first_confirmed(brief: dict[str, Any]) -> bool:

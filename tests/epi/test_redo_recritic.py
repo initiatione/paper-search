@@ -42,6 +42,7 @@ def _ingest_fixture(tmp_path):
         pdf_path=pdf,
         mineru_markdown_path=mineru_md,
         mineru_tex_path=mineru_tex,
+        workflow_mode="audited-ingest",
     )
     return tmp_path / "vault", candidate["slug"], result["paper_root"]
 

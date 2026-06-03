@@ -235,6 +235,7 @@ def test_epi_literature_wiki_contract_documents_seven_page_families_and_research
     workflow = _read("workflow.md")
     structure = _read("structure.md")
     overview = _read("overview.zh.md")
+    linkage = _read("epi-linkage.md")
     paper_ingest = (PLUGIN_ROOT / "skills" / "paper-ingest" / "SKILL.md").read_text(
         encoding="utf-8"
     )
@@ -244,7 +245,12 @@ def test_epi_literature_wiki_contract_documents_seven_page_families_and_research
     wiki_setup = (PLUGIN_ROOT / "skills" / "wiki-setup" / "SKILL.md").read_text(
         encoding="utf-8"
     )
-    combined = "\n".join([workflow, structure, overview, paper_ingest, wiki_provenance, wiki_setup])
+    epi_deposition = (
+        PLUGIN_ROOT / "skills" / "epi-paper-deposition" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    combined = "\n".join(
+        [workflow, structure, overview, linkage, paper_ingest, wiki_provenance, wiki_setup, epi_deposition]
+    )
 
     for page_family in [
         "references/",
@@ -261,6 +267,7 @@ def test_epi_literature_wiki_contract_documents_seven_page_families_and_research
         assert page_family in paper_ingest
         assert page_family in wiki_provenance
         assert page_family in wiki_setup
+        assert page_family in epi_deposition
 
     for field in [
         "theory_reconstruction",
@@ -274,12 +281,57 @@ def test_epi_literature_wiki_contract_documents_seven_page_families_and_research
     ]:
         assert field in combined
 
+    for skill in [
+        "epi-paper-deposition",
+        "llm-wiki",
+        "wiki-ingest",
+        "wiki-context-pack",
+        "wiki-lint",
+        "wiki-stage-commit",
+        "wiki-status",
+        "wiki-query",
+        "wiki-provenance",
+        "tag-taxonomy",
+    ]:
+        assert skill in combined
+
+    assert "wiki_deposition_task.json" in combined
+    assert "epi-wiki-deposition" in combined
+    assert "compatibility" in epi_deposition or "alias" in epi_deposition
+
+    for field in [
+        "title",
+        "category",
+        "page_family",
+        "tags",
+        "aliases",
+        "sources",
+        "summary",
+        "provenance",
+        "base_confidence",
+        "lifecycle",
+        "lifecycle_changed",
+        "tier",
+        "created",
+        "updated",
+    ]:
+        assert field in combined
+
     for phrase in [
-        "draft -> source-reviewed -> under-review -> verified",
+        "frontmatter",
+        "category",
+        "page_family",
+        "draft` or `review-needed`",
+        "do not mark pages `source-reviewed` or `verified`",
+        "forbidden formula blocks",
+        "Obsidian wikilinks",
         "tag-taxonomy",
         "wiki-provenance",
+        "wiki-lint",
+        "wiki-stage-commit",
         "source reread",
         "formula/figure review",
+        "cross-paper comparison matrix",
         "author-claimed novelty",
         "EPI-confirmed novelty",
     ]:

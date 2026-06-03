@@ -10,8 +10,14 @@ from epi.wiki_ingest_record import create_wiki_ingest_record
 
 
 EXPECTED_RESEARCH_WIKI_SKILLS = [
-    "epi-wiki-deposition",
+    "epi-paper-deposition",
+    "llm-wiki",
     "wiki-ingest",
+    "wiki-context-pack",
+    "wiki-lint",
+    "wiki-stage-commit",
+    "wiki-status",
+    "wiki-query",
     "wiki-provenance",
     "tag-taxonomy",
 ]
@@ -231,6 +237,43 @@ def _write_final_page(vault, relative, content):
     return path
 
 
+def _formal_page_content(family, title, *, body=None):
+    body = body or (
+        f"# {title}\n\n"
+        "This page links source-backed claims to [[fixture-method-family]] and preserves evidence routes.\n\n"
+        "## Model And Method\n\n"
+        "The page records the method, assumptions, and control variables from the source bundle.\n\n"
+        "## Key Formulas\n\n"
+        "$$y = x + 1$$\n\n"
+        "## Experiments And Metrics\n\n"
+        "The experiment section records baselines, metrics, and evaluation settings.\n\n"
+        "## Limitations\n\n"
+        "Limitations and caveats remain tied to the source artifacts.\n"
+    )
+    return (
+        "---\n"
+        f'title: "{title}"\n'
+        f"category: {family}\n"
+        f"page_family: {family}\n"
+        "tags: [epi, fixture]\n"
+        "aliases: []\n"
+        'sources: ["_epi/raw/papers/fixture-paper/metadata.json", "_epi/raw/papers/fixture-paper/mineru/fixture-paper.md"]\n'
+        f'summary: "Source-grounded {family} page for fixture validation."\n'
+        "provenance:\n"
+        "  extracted: [\"mineru/fixture-paper.md#method\"]\n"
+        "  inferred: []\n"
+        "  ambiguous: []\n"
+        "base_confidence: high\n"
+        "lifecycle: draft\n"
+        "lifecycle_changed: 2026-06-03\n"
+        "tier: source\n"
+        "created: 2026-06-03\n"
+        "updated: 2026-06-03\n"
+        "---\n\n"
+        + body
+    )
+
+
 def _source_artifact_record(paper_root, artifact):
     path = paper_root / artifact
     return {
@@ -383,8 +426,16 @@ def _run_orchestrator_cli(monkeypatch, capsys, *args):
 def test_record_wiki_ingest_records_agent_pages_without_modifying_them(tmp_path):
     vault = tmp_path / "vault"
     slug = _seed_agent_handoff(vault)
-    reference = _write_final_page(vault, "papers/fixture-paper.md", "# Final Reference\n")
-    concept = _write_final_page(vault, "concepts/navigation-control.md", "# Final Concept\n")
+    reference = _write_final_page(
+        vault,
+        "references/fixture-paper.md",
+        _formal_page_content("references", "Fixture Paper"),
+    )
+    concept = _write_final_page(
+        vault,
+        "concepts/navigation-control.md",
+        _formal_page_content("concepts", "Navigation Control"),
+    )
     source_review = _write_final_source_review(vault, slug, [reference, concept])
     _approve_handoff(vault, slug)
     before_hashes = {path: file_sha256(path) for path in [reference, concept]}
@@ -414,7 +465,7 @@ def test_record_wiki_ingest_records_agent_pages_without_modifying_them(tmp_path)
     assert record["final_source_review"]["page_lifecycle"]["status"] == "verified"
     assert record["final_source_review"]["page_lifecycle"]["allowed_states"] == EXPECTED_PAGE_LIFECYCLE_STATES
     assert record["relative_page_paths"] == [
-        "papers/fixture-paper.md",
+        "references/fixture-paper.md",
         "concepts/navigation-control.md",
     ]
     assert [item["sha256"] for item in record["page_records"]] == [
@@ -443,14 +494,14 @@ def test_record_wiki_ingest_records_agent_pages_without_modifying_them(tmp_path)
     run_state = json.loads((run_dir / "run-state.json").read_text(encoding="utf-8"))
     paper_state = json.loads((vault / "_epi" / "raw" / "papers" / slug / "run-state.json").read_text(encoding="utf-8"))
     assert report_json["workflow_type"] == "record-wiki-ingest"
-    assert report_json["wiki_pages_written"] == ["papers/fixture-paper.md", "concepts/navigation-control.md"]
+    assert report_json["wiki_pages_written"] == ["references/fixture-paper.md", "concepts/navigation-control.md"]
     assert report_json["human_gate"]["status"] == "approved"
-    assert report_json["page_records"][0]["relative_path"] == "papers/fixture-paper.md"
+    assert report_json["page_records"][0]["relative_path"] == "references/fixture-paper.md"
     assert report_json["wiki_ingest_record"]["final_source_review"]["status"] == "verified"
     assert report_json["zotero_results"]["status"] == "skipped"
     assert report_json["zotero_results"]["reason"] == "zotero_not_configured"
     zotero_record = json.loads((vault / "_epi" / "raw" / "papers" / slug / "zotero-record.json").read_text(encoding="utf-8"))
-    assert zotero_record["wiki_ingest"]["final_wiki_pages"][0]["relative_path"] == "papers/fixture-paper.md"
+    assert zotero_record["wiki_ingest"]["final_wiki_pages"][0]["relative_path"] == "references/fixture-paper.md"
     assert run_state["compiled_wiki_write"] is False
     assert run_state["record_only"] is True
     assert run_state["input_artifact_hashes"]["final-source-review.json"] == file_sha256(source_review)
@@ -463,7 +514,11 @@ def test_record_wiki_ingest_uses_enabled_zotero_config_in_report(tmp_path):
     vault = tmp_path / "vault"
     slug = _seed_agent_handoff(vault)
     _enable_zotero(vault, collection="Reading Lab")
-    page = _write_final_page(vault, "papers/fixture-paper.md", "# Final Reference\n")
+    page = _write_final_page(
+        vault,
+        "references/fixture-paper.md",
+        _formal_page_content("references", "Fixture Paper"),
+    )
     source_review = _write_final_source_review(vault, slug, [page])
     _approve_handoff(vault, slug)
 
@@ -482,7 +537,7 @@ def test_record_wiki_ingest_uses_enabled_zotero_config_in_report(tmp_path):
     assert raw_zotero["collection"] == "Reading Lab"
     assert raw_zotero["paper_metadata"]["title"] == "Fixture Paper"
     assert raw_zotero["wiki_ingest"]["status"] == "recorded"
-    assert raw_zotero["wiki_ingest"]["final_wiki_pages"][0]["relative_path"] == "papers/fixture-paper.md"
+    assert raw_zotero["wiki_ingest"]["final_wiki_pages"][0]["relative_path"] == "references/fixture-paper.md"
 
     run_dir = vault / "_epi" / "runs" / result["run_id"]
     report_json = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
@@ -497,7 +552,11 @@ def test_record_wiki_ingest_uses_enabled_zotero_config_in_report(tmp_path):
 def test_create_wiki_ingest_record_rejects_missing_human_approval(tmp_path):
     vault = tmp_path / "vault"
     slug = _seed_agent_handoff(vault)
-    page = _write_final_page(vault, "papers/fixture-paper.md", "# Final Reference\n")
+    page = _write_final_page(
+        vault,
+        "references/fixture-paper.md",
+        _formal_page_content("references", "Fixture Paper"),
+    )
 
     with pytest.raises(ValueError, match="human gate approval"):
         create_wiki_ingest_record(vault, slug, [str(page)], approved_by="")
@@ -508,7 +567,11 @@ def test_create_wiki_ingest_record_rejects_missing_human_approval(tmp_path):
 def test_create_wiki_ingest_record_rejects_missing_prewrite_approval_artifact(tmp_path):
     vault = tmp_path / "vault"
     slug = _seed_agent_handoff(vault)
-    page = _write_final_page(vault, "papers/fixture-paper.md", "# Final Reference\n")
+    page = _write_final_page(
+        vault,
+        "references/fixture-paper.md",
+        _formal_page_content("references", "Fixture Paper"),
+    )
 
     with pytest.raises(ValueError, match="pre-write human approval"):
         create_wiki_ingest_record(vault, slug, [str(page)], approved_by="codex-test")
@@ -519,7 +582,11 @@ def test_create_wiki_ingest_record_rejects_missing_prewrite_approval_artifact(tm
 def test_create_wiki_ingest_record_rejects_mismatched_prewrite_approval_actor(tmp_path):
     vault = tmp_path / "vault"
     slug = _seed_agent_handoff(vault)
-    page = _write_final_page(vault, "papers/fixture-paper.md", "# Final Reference\n")
+    page = _write_final_page(
+        vault,
+        "references/fixture-paper.md",
+        _formal_page_content("references", "Fixture Paper"),
+    )
     source_review = _write_final_source_review(vault, slug, [page])
     _approve_handoff(vault, slug, approved_by="codex-test")
 
@@ -554,13 +621,72 @@ def test_create_wiki_ingest_record_rejects_internal_staging_page_as_final_page(t
         create_wiki_ingest_record(vault, slug, [str(staging_page)], approved_by="codex-test")
 
 
+def test_create_wiki_ingest_record_rejects_missing_formal_frontmatter(tmp_path):
+    vault = tmp_path / "vault"
+    slug = _seed_agent_handoff(vault)
+    page = _write_final_page(
+        vault,
+        "references/missing-frontmatter.md",
+        "# Missing Frontmatter\n\nThis links to [[fixture-method-family]] but lacks required properties.\n",
+    )
+    source_review = _write_final_source_review(vault, slug, [page])
+    _approve_handoff(vault, slug)
+
+    with pytest.raises(ValueError, match="frontmatter"):
+        create_wiki_ingest_record(
+            vault,
+            slug,
+            [str(page)],
+            approved_by="codex-test",
+            source_review_path=str(source_review),
+        )
+
+
+def test_create_wiki_ingest_record_rejects_fenced_formula_blocks(tmp_path):
+    vault = tmp_path / "vault"
+    slug = _seed_agent_handoff(vault)
+    page = _write_final_page(
+        vault,
+        "derivations/fixture-derivation.md",
+        _formal_page_content(
+            "derivations",
+            "Fixture Derivation",
+            body=(
+                "# Fixture Derivation\n\n"
+                "This derivation links to [[fixture-method-family]].\n\n"
+                "## Variable Definitions\n\n"
+                "- x: input\n- y: output\n\n"
+                "## Derivation Chain\n\n"
+                "```math\n"
+                "y = x + 1\n"
+                "```\n"
+            ),
+        ),
+    )
+    source_review = _write_final_source_review(vault, slug, [page])
+    _approve_handoff(vault, slug)
+
+    with pytest.raises(ValueError, match="fenced formula"):
+        create_wiki_ingest_record(
+            vault,
+            slug,
+            [str(page)],
+            approved_by="codex-test",
+            source_review_path=str(source_review),
+        )
+
+
 def test_create_wiki_ingest_record_rejects_audit_shaped_final_page(tmp_path):
     vault = tmp_path / "vault"
     slug = _seed_agent_handoff(vault)
     page = _write_final_page(
         vault,
         "concepts/fixture-audit.md",
-        "# Audit\n\n## Wiki Ingest Brief\n\n- Evidence claims tracked: 3\n- reader/claim-support.json\n",
+        _formal_page_content(
+            "concepts",
+            "Fixture Audit",
+            body="# Audit\n\n## Wiki Ingest Brief\n\n- Evidence claims tracked: 3\n- reader/claim-support.json\n",
+        ),
     )
     source_review = _write_final_source_review(vault, slug, [page])
     _approve_handoff(vault, slug)
@@ -578,7 +704,11 @@ def test_create_wiki_ingest_record_rejects_audit_shaped_final_page(tmp_path):
 def test_create_wiki_ingest_record_rejects_per_paper_pseudo_routes(tmp_path):
     vault = tmp_path / "vault"
     slug = _seed_agent_handoff(vault)
-    page = _write_final_page(vault, "concepts/fixture-paper-concept.md", "# Pseudo Concept\n")
+    page = _write_final_page(
+        vault,
+        "concepts/fixture-paper-concept.md",
+        _formal_page_content("concepts", "Fixture Paper Concept"),
+    )
     source_review = _write_final_source_review(vault, slug, [page])
     _approve_handoff(vault, slug)
 
@@ -595,7 +725,11 @@ def test_create_wiki_ingest_record_rejects_per_paper_pseudo_routes(tmp_path):
 def test_create_wiki_ingest_record_rejects_invalid_final_source_review(tmp_path):
     vault = tmp_path / "vault"
     slug = _seed_agent_handoff(vault)
-    page = _write_final_page(vault, "papers/fixture-paper.md", "# Final Reference\n")
+    page = _write_final_page(
+        vault,
+        "references/fixture-paper.md",
+        _formal_page_content("references", "Fixture Paper"),
+    )
     source_review = _write_final_source_review(vault, slug, [page])
     _approve_handoff(vault, slug)
     payload = json.loads(source_review.read_text(encoding="utf-8"))
@@ -617,7 +751,11 @@ def test_create_wiki_ingest_record_rejects_invalid_final_source_review(tmp_path)
 def test_create_wiki_ingest_record_requires_research_review_contract(tmp_path):
     vault = tmp_path / "vault"
     slug = _seed_agent_handoff(vault)
-    page = _write_final_page(vault, "papers/fixture-paper.md", "# Final Reference\n")
+    page = _write_final_page(
+        vault,
+        "references/fixture-paper.md",
+        _formal_page_content("references", "Fixture Paper"),
+    )
     source_review = _write_final_source_review(vault, slug, [page])
     _approve_handoff(vault, slug)
     payload = json.loads(source_review.read_text(encoding="utf-8"))
@@ -639,7 +777,11 @@ def test_create_wiki_ingest_record_requires_research_review_contract(tmp_path):
 def test_record_wiki_ingest_cli_outputs_json(tmp_path, monkeypatch, capsys):
     vault = tmp_path / "vault"
     slug = _seed_agent_handoff(vault)
-    page = _write_final_page(vault, "papers/fixture-paper.md", "# Final Reference\n")
+    page = _write_final_page(
+        vault,
+        "references/fixture-paper.md",
+        _formal_page_content("references", "Fixture Paper"),
+    )
     source_review = _write_final_source_review(vault, slug, [page])
     _approve_handoff(vault, slug)
 
@@ -663,7 +805,7 @@ def test_record_wiki_ingest_cli_outputs_json(tmp_path, monkeypatch, capsys):
     payload = json.loads(output)
     assert exit_code == 0
     assert payload["record"]["status"] == "recorded"
-    assert payload["record"]["relative_page_paths"] == ["papers/fixture-paper.md"]
+    assert payload["record"]["relative_page_paths"] == ["references/fixture-paper.md"]
     assert payload["record"]["source_first_verification_method"] == "final-source-review-json"
     assert payload["run_id"].startswith("record-wiki-ingest-")
     assert payload["zotero_results"]["status"] == "skipped"

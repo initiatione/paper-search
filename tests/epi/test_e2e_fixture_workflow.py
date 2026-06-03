@@ -140,7 +140,13 @@ def test_dry_run_to_critic_decision_e2e_fixture_updates_reports_index_and_dashbo
         )
 
         stage_results = [
-            advance_paper_batch_from_run(vault, dry_run_dir.name, mineru_command=mineru_command, max_papers=1)
+            advance_paper_batch_from_run(
+                vault,
+                dry_run_dir.name,
+                mineru_command=mineru_command,
+                max_papers=1,
+                workflow_mode="audited-ingest",
+            )
             for _ in range(4)
         ]
 

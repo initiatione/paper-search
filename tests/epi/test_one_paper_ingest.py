@@ -8,8 +8,14 @@ from epi.stage_wiki import stage_paper
 
 
 EXPECTED_RESEARCH_WIKI_SKILLS = [
-    "epi-wiki-deposition",
+    "epi-paper-deposition",
+    "llm-wiki",
     "wiki-ingest",
+    "wiki-context-pack",
+    "wiki-lint",
+    "wiki-stage-commit",
+    "wiki-status",
+    "wiki-query",
     "wiki-provenance",
     "tag-taxonomy",
 ]

@@ -7,8 +7,14 @@ from epi.wiki_ingest_trigger import build_wiki_ingest_trigger, render_wiki_inges
 
 
 EXPECTED_RESEARCH_WIKI_SKILLS = [
-    "epi-wiki-deposition",
+    "epi-paper-deposition",
+    "llm-wiki",
     "wiki-ingest",
+    "wiki-context-pack",
+    "wiki-lint",
+    "wiki-stage-commit",
+    "wiki-status",
+    "wiki-query",
     "wiki-provenance",
     "tag-taxonomy",
 ]

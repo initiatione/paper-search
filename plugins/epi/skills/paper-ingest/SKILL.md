@@ -13,7 +13,7 @@ If config is missing, stop and use `config-setup`. See `docs\config.md`.
 
 Load `references/source-first-reading.md` when generating or checking reader outputs, critic inputs, staging bundles, or wiki-ingest handoffs. Keep reader summaries compact, but preserve source paper claims, formulas, figures, tables, image interpretations, caveats, and evidence pointers. Treat parse quality as a source bundle check: Markdown alone is not enough when `parse-record.json` says parse succeeded; inspect TeX, images, and the MinerU manifest too.
 
-For final wiki-page provenance, support labels, and claim-to-evidence round-trips, use `wiki-provenance` as the final deposition layer. This skill stays focused on source bundle preparation, optional reader/critic aids, source-staging reports, approval, and handoff.
+For formal wiki deposition from an EPI source bundle or `wiki_deposition_task.json`, switch to `epi-paper-deposition`. Use `wiki-provenance` inside that layer for final wiki-page provenance, support labels, and claim-to-evidence round-trips. This skill stays focused on source bundle preparation, optional reader/critic aids, source-staging reports, approval, and handoff.
 
 ## Choose Path
 
@@ -100,6 +100,8 @@ Safety: raw/staging writes are allowed. Final wiki writes require handoff, pre-w
 
 ## Literature Wiki Contract
 
-Final deposition may land in `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`, chosen by the target vault contract and the wiki agent. EPI does not write these pages directly; it prepares source bundles, approval, trigger, and record artifacts.
+Final deposition may land in `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`, chosen by the target vault contract and the wiki agent. EPI does not write these pages directly; it prepares source bundles, approval, trigger, record artifacts, and `wiki_deposition_task.json`.
 
-The handoff should require `epi-wiki-deposition`, `wiki-ingest`, `wiki-provenance`, and `tag-taxonomy`. `final-source-review.json` must cover `theory_reconstruction`, `formula_derivation`, `figure_table_evidence`, `novelty_type`, `implementability`, `reproducibility_risk`, `research_gap`, and `cost_level`. Page lifecycle is `draft -> source-reviewed -> under-review -> verified`.
+The handoff should require `epi-paper-deposition`, `llm-wiki`, `wiki-ingest`, `wiki-context-pack`, `wiki-lint`, `wiki-stage-commit`, `wiki-status`, `wiki-query`, `wiki-provenance`, and `tag-taxonomy`. Older artifacts may mention `epi-wiki-deposition`; treat that name as a compatibility alias only. Formal pages need frontmatter fields `title`, `category`, `page_family`, `tags`, `aliases`, `sources`, `summary`, `provenance`, `base_confidence`, `lifecycle`, `lifecycle_changed`, `tier`, `created`, and `updated`. Initial lifecycle is `draft` or `review-needed`; do not mark pages `source-reviewed` or `verified` until source reread, formula/figure review, `wiki-lint`, and human stage review have actually passed.
+
+`final-source-review.json` must cover `theory_reconstruction`, `formula_derivation`, `figure_table_evidence`, `novelty_type`, `implementability`, `reproducibility_risk`, `research_gap`, and `cost_level`. Record gates also check Obsidian wikilinks, source bundle paths, provenance fields, category/page_family alignment, no `_epi/` formal pages, no forbidden formula blocks, derivation variable definitions and derivation chain, reference model/formula/experiment/limit coverage, and synthesis cross-paper comparison matrix.
