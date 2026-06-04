@@ -4,6 +4,8 @@ Use this when the user asks to extract, process, or deposit EPI-collected papers
 
 This workflow adapts Ar9av/obsidian-wiki `wiki-ingest`: do not summarize papers in isolation. Instead, distill and integrate source-grounded paper knowledge into the existing wiki graph.
 
+Before planning or writing pages, read `../../../rules/wiki-writing-standard.md` and treat it as the mandatory page-writing contract.
+
 ## Preflight
 
 1. Resolve the target vault.
@@ -24,11 +26,12 @@ This workflow adapts Ar9av/obsidian-wiki `wiki-ingest`: do not summarize papers 
 ## Write Pages
 
 1. Write staged or formal pages according to the target vault contract.
-2. Preserve source support status and evidence addresses.
-3. Add Obsidian wikilinks from new pages to existing related pages.
-4. Add `relationships:` frontmatter entries only when direction and type are clear.
-5. Keep formula and figure claims tied to formula or figure evidence.
-6. Write or update `final-source-review.json`.
+2. Apply the page template, merge-before-create rule, and body rules from `wiki-writing-standard.md`.
+3. Preserve source support status and evidence addresses.
+4. Add Obsidian wikilinks from new pages to existing related pages.
+5. Add `relationships:` frontmatter entries only when direction and type are clear.
+6. Keep formula and figure claims tied to formula or figure evidence.
+7. Write or update `final-source-review.json`.
 
 ## Tracking
 

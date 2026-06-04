@@ -149,6 +149,7 @@ def test_required_docs_and_rules_exist():
         "rules/source-trust.md",
         "rules/page-families.md",
         "rules/formal-page-frontmatter.md",
+        "rules/wiki-writing-standard.md",
     ]
 
     for relative in required:
@@ -249,6 +250,55 @@ def test_workflows_adapt_upstream_ingest_status_update_and_relink_patterns():
 
     for phrase in ["relationships:", "source-grounded", "unsupported"]:
         assert phrase in provenance
+
+
+def test_prw_enforces_ar9av_style_wiki_writing_standard():
+    standard_path = PLUGIN / "rules" / "wiki-writing-standard.md"
+    standard = _read(standard_path)
+    skill = _read(PUBLIC_SKILL / "SKILL.md")
+    extract = _read(PUBLIC_SKILL / "workflows" / "extract-papers.md")
+    check = _read(PUBLIC_SKILL / "workflows" / "check-wiki.md")
+    update = _read(PUBLIC_SKILL / "workflows" / "update-wiki.md")
+
+    assert "../../rules/wiki-writing-standard.md" in skill
+    for text in [extract, check, update]:
+        assert "../../../rules/wiki-writing-standard.md" in text
+
+    for phrase in [
+        "Do not summarize papers in isolation",
+        "merge before create",
+        "page template",
+        "frontmatter",
+        "title:",
+        "category:",
+        "page_family:",
+        "tags:",
+        "aliases:",
+        "relationships:",
+        "sources:",
+        "summary:",
+        "provenance:",
+        "base_confidence:",
+        "lifecycle:",
+        "lifecycle_changed:",
+        "tier:",
+        "created:",
+        "updated:",
+        "Key Ideas",
+        "Open Questions",
+        "Sources",
+        "manifest",
+        "index.md",
+        "log.md",
+        "hot.md",
+        "orphan",
+        "broken wikilinks",
+        "relationship issues",
+        "staged writes",
+        "final-source-review.json",
+        "record-wiki-ingest",
+    ]:
+        assert phrase in standard
 
 
 def test_skill_ui_metadata_uses_single_public_skill():

@@ -4,13 +4,16 @@ Use this when the user asks to update, repair, continue, or relink the paper wik
 
 This workflow adapts Ar9av/obsidian-wiki `wiki-update`, `cross-linker`, `wiki-lint`, and `tag-taxonomy` for paper wiki maintenance.
 
+Read `../../../rules/wiki-writing-standard.md` first. Repairs must move pages toward that standard, not merely make tests pass.
+
 1. Run the check workflow first.
 2. Continue safe pending deposition for ready EPI papers.
 3. Repair staged pages with lint or provenance gaps.
-4. Refresh links, tags, aliases, and duplicate-page decisions.
-5. Run relink/cross-link cleanup only after preserving evidence addresses.
-6. Stop before destructive reset or ambiguous merge.
-7. Preserve EPI boundaries for human approval and `record-wiki-ingest`.
+4. Repair page template, required frontmatter, source/provenance, and tracking-file drift against `wiki-writing-standard.md`.
+5. Refresh links, tags, aliases, and duplicate-page decisions.
+6. Run relink/cross-link cleanup only after preserving evidence addresses.
+7. Stop before destructive reset or ambiguous merge.
+8. Preserve EPI boundaries for human approval and `record-wiki-ingest`.
 
 ## Relink And Maintenance
 

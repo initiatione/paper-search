@@ -19,6 +19,7 @@ These files apply to every task:
 1. `references/epi-artifact-contract.md`
 2. `references/page-family-contract.md`
 3. `references/upstream-obsidian-wiki-map.md`
+4. `../../rules/wiki-writing-standard.md`
 
 ## Intent Router
 
@@ -47,6 +48,7 @@ For vague EPI plus wiki requests, default to deposition:
 - EPI owns `paper-gate`, human approval records, and `record-wiki-ingest`.
 - Formal pages may land only in the target vault's allowed paper page families.
 - Relink or tag cleanup must preserve provenance and never hide unsupported claims.
+- Every formal wiki write must follow `../../rules/wiki-writing-standard.md`; this is the PRW page-writing contract derived from Ar9av/obsidian-wiki.
 
 ## Internal References
 

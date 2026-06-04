@@ -4,6 +4,8 @@ Use this when the user asks to detect or inspect the paper wiki library. Also ru
 
 This workflow adapts Ar9av/obsidian-wiki `wiki-status` and `wiki-lint`: report current state, delta, and the next useful action instead of dumping raw JSON.
 
+Read `../../../rules/wiki-writing-standard.md` before reporting health. Use it as the checklist for whether PRW-written pages are standardized enough to record back into EPI.
+
 Check:
 
 - target vault contract files
@@ -20,6 +22,7 @@ Check:
 - staged writes waiting for review
 - stale core pages
 - fragmented tag clusters
+- wiki-writing-standard.md compliance
 
 ## Report Shape
 
@@ -27,7 +30,7 @@ Return:
 
 1. Overview: target vault, pending EPI handoffs, ready papers, blocked papers, already recorded papers.
 2. Wiki health: orphan pages, broken wikilinks, missing frontmatter, provenance gaps, stale pages, staged writes.
-3. Paper-specific gaps: missing `final-source-review.json`, weak evidence addresses, formula/figure review gaps.
+3. Paper-specific gaps: missing `final-source-review.json`, weak evidence addresses, formula/figure review gaps, page template drift.
 4. What to Do Next: a ranked list of no more than six actions.
 
 ## What to Do Next
