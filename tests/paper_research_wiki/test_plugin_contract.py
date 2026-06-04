@@ -13,6 +13,7 @@ WORKFLOWS = {
     "extract-papers.md",
     "check-wiki.md",
     "update-wiki.md",
+    "redo-extraction.md",
 }
 REFERENCES = {
     "epi-artifact-contract.md",
@@ -99,7 +100,12 @@ def test_public_skill_routes_natural_epi_deposition_actions():
         "继续上次",
         "默认",
         "重link",
+        "重做",
+        "重新提取",
+        "更详细",
+        "批量",
         "relink",
+        "redo",
         "extract",
         "check",
         "update",
@@ -299,6 +305,34 @@ def test_prw_enforces_ar9av_style_wiki_writing_standard():
         "record-wiki-ingest",
     ]:
         assert phrase in standard
+
+
+def test_prw_supports_single_and_batch_redo_deep_extraction():
+    skill = _read(PUBLIC_SKILL / "SKILL.md")
+    redo = _read(PUBLIC_SKILL / "workflows" / "redo-extraction.md")
+    metadata = _read(PUBLIC_SKILL / "agents" / "openai.yaml")
+
+    assert "workflows/redo-extraction.md" in skill
+    for phrase in ["重做", "重新提取", "更详细", "批量", "redo", "deep extraction"]:
+        assert phrase in skill
+        assert phrase in redo or phrase in metadata
+
+    for phrase in [
+        "single paper",
+        "batch",
+        "source reread",
+        "MinerU Markdown",
+        "TeX",
+        "images",
+        "PDF",
+        "compare existing pages",
+        "staged patch",
+        "one confirmation",
+        "final-source-review.json",
+        "record-wiki-ingest",
+        "do not write human approval",
+    ]:
+        assert phrase in redo
 
 
 def test_skill_ui_metadata_uses_single_public_skill():

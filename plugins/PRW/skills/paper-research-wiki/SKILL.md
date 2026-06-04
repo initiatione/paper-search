@@ -2,10 +2,12 @@
 name: paper-research-wiki
 description: >
   Use when the user wants to deposit EPI-collected papers into a wiki, check a
-  paper wiki library, update or relink paper wiki knowledge, or continue EPI
+  paper wiki library, update or relink paper wiki knowledge, redo or deepen
+  paper extraction, or continue EPI
   paper deposition. Triggers include "直接沉淀 EPI 抓下来的论文", "提取这些论文",
   "检测 wiki 库", "更新 wiki 库", "继续上次的论文沉淀", "重link",
-  extract papers, check wiki, update wiki, relink, and EPI paper deposition.
+  "重做", "重新提取", "更详细", "批量", extract papers, check wiki,
+  update wiki, relink, redo, deep extraction, and EPI paper deposition.
 ---
 
 # Paper Research Wiki
@@ -27,6 +29,7 @@ These files apply to every task:
 | --- | --- |
 | 直接沉淀 EPI 抓下来的论文 / 提取这些论文 / 沉淀论文进 wiki / extract EPI papers | `workflows/extract-papers.md` |
 | 检测 wiki 库 / 检查论文 wiki / wiki 状态 / check wiki | `workflows/check-wiki.md` |
+| 重做 / 重新提取 / 更详细提取 / 批量重提取 / redo / deep extraction | `workflows/redo-extraction.md` |
 | 更新 wiki 库 / 继续上次的论文沉淀 / 重link / relink / update wiki | `workflows/update-wiki.md` |
 
 ## Default EPI Flow
