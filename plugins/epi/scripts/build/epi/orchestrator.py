@@ -29,6 +29,7 @@ from epi.paper_gate import build_paper_gate, render_paper_gate
 from epi.paper_library import load_existing_paper_index
 from epi.paper_search_adapter import discover
 from epi.query_planner import build_query_plan, infer_research_mode, topic_focus_terms
+from epi.raw_cleanup import cleanup_failed_raw_paper
 from epi.rank_papers import rank_candidates
 from epi.redo import redo_acquire, redo_parse, redo_read, redo_read_recritic, recritic
 from epi.report_run import write_report
@@ -103,6 +104,41 @@ def _auto_manage_run_lifecycle(vault_path: Path) -> dict:
     else:
         refresh_epi_manifest(vault_path)
     return result
+
+
+def _hash_paper_run_states(vault_path: Path, results: list[dict]) -> dict[str, str]:
+    hashes: dict[str, str] = {}
+    for result in results:
+        slug = result.get("paper_slug")
+        if not slug:
+            continue
+        run_state_path = raw_paper_root(vault_path, slug) / "run-state.json"
+        if run_state_path.exists():
+            hashes[f"paper:{slug}:run-state.json"] = file_sha256(run_state_path)
+        raw_cleanup = result.get("raw_cleanup") if isinstance(result.get("raw_cleanup"), dict) else {}
+        manifest_path = raw_cleanup.get("manifest_path")
+        if manifest_path and Path(manifest_path).exists():
+            hashes[f"paper:{slug}:raw-cleanup.json"] = file_sha256(Path(manifest_path))
+    return hashes
+
+
+def _cleanup_failed_prepare_raw_results(vault_path: Path, results: list[dict]) -> list[dict]:
+    cleanup_records: list[dict] = []
+    for result in results:
+        state = str(result.get("state") or "")
+        last_action = str(result.get("last_action") or "")
+        slug = str(result.get("paper_slug") or "")
+        if not slug or not state.endswith("_failed") or last_action not in {"acquire", "parse", "prepare"}:
+            continue
+        cleanup = cleanup_failed_raw_paper(
+            vault_path,
+            slug,
+            reason="failed_before_complete_parse",
+            stage_record=result.get("stage_record") if isinstance(result.get("stage_record"), dict) else None,
+        )
+        result["raw_cleanup"] = cleanup
+        cleanup_records.append(cleanup)
+    return cleanup_records
 
 
 def _hash_existing_outputs(paths: dict[str, Path]) -> dict[str, str]:
@@ -1673,6 +1709,7 @@ def prepare_ranked_papers_from_run(
         except Exception as exc:
             result = _prepare_candidate_failure_state(vault_path, candidate, exc, workflow_mode=workflow_mode)
         results.append(result)
+    raw_cleanup_records = _cleanup_failed_prepare_raw_results(vault_path, results)
     failed = any(result["state"].endswith("_failed") for result in results)
     awaiting_wiki_ingest = any(result.get("next_action") == "run-wiki-ingest-agent" for result in results)
     titles_by_slug = {
@@ -1743,17 +1780,13 @@ def prepare_ranked_papers_from_run(
             "stage_wiki",
         ),
         "results": results,
+        "raw_cleanup": raw_cleanup_records,
         "next_actions": next_actions,
         "input_artifact_hashes": {
             "candidates": json_sha256(selected_candidates),
             "candidate_source": file_sha256(rank_path),
         },
-        "output_artifact_hashes": {
-            f"paper:{result['paper_slug']}:run-state.json": file_sha256(
-                raw_paper_root(vault_path, result["paper_slug"]) / "run-state.json"
-            )
-            for result in results
-        },
+        "output_artifact_hashes": _hash_paper_run_states(vault_path, results),
     }
     _write_json(batch_run_dir / "batch-advance-record.json", batch)
     _write_json(batch_run_dir / "run-state.json", batch)
@@ -1789,6 +1822,7 @@ def prepare_ranked_papers_from_run(
     report_payload["rank_decision_filter"] = rank_decision_filter
     report_payload["paper_states"] = paper_states
     report_payload["failed_papers"] = failed_papers
+    report_payload["raw_cleanup"] = raw_cleanup_records
     report_payload["next_actions"] = next_actions
     report_payload["wiki_pages_written"] = []
     report_payload["source_run_id"] = run_id

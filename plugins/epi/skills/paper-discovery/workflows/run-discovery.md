@@ -26,16 +26,18 @@ Default `dry-run` writes `_epi/runs/<run-id>/query-plan.json`, records `research
 ## Dry Run
 
 ```powershell
-python scripts\orchestrator.py dry-run --query "<topic>" --max-results 10 --sources arxiv,semantic,openalex,crossref --plugin-root <plugin-root> --vault <vault>
-python scripts\orchestrator.py dry-run --query "<topic>" --max-results 10 --sources arxiv,semantic,openalex,crossref --plugin-root <plugin-root> --vault <vault> --json
+python scripts\orchestrator.py dry-run --query "<topic>" --max-results 10 --sources arxiv,semantic,openalex,crossref,unpaywall --plugin-root <plugin-root> --vault <vault>
+python scripts\orchestrator.py dry-run --query "<topic>" --max-results 10 --sources arxiv,semantic,openalex,crossref,unpaywall --plugin-root <plugin-root> --vault <vault> --json
 ```
 
 Use `--json` when another agent or script needs the run id and artifact paths.
 
+When `--sources` is omitted, the default source list includes `unpaywall` so open-access PDF links are collected alongside DOI and metadata records. If the provider warns that `PAPER_SEARCH_MCP_UNPAYWALL_EMAIL` / `UNPAYWALL_EMAIL` is missing, configure the provider env file before judging PDF recall.
+
 Use `--no-query-plan` only when debugging or when the profile-derived plan drifts from the narrow topic:
 
 ```powershell
-python scripts\orchestrator.py dry-run --query "<exact narrow topic>" --no-query-plan --max-results 10 --sources arxiv,semantic,openalex,crossref --plugin-root <plugin-root> --vault <vault>
+python scripts\orchestrator.py dry-run --query "<exact narrow topic>" --no-query-plan --max-results 10 --sources arxiv,semantic,openalex,crossref,unpaywall --plugin-root <plugin-root> --vault <vault>
 ```
 
 ## Report Existing Run

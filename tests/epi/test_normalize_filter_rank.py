@@ -45,6 +45,38 @@ def test_normalize_filter_rank_keeps_relevant_pdf_candidate():
     assert ranked[0]["sources"] == ["openalex", "semantic_scholar"]
 
 
+def test_normalize_candidates_prefers_direct_pdf_over_doi_landing_url():
+    raw_records = [
+        {
+            "source": "semantic",
+            "title": "AUV Reinforcement Learning Control",
+            "authors": ["A. Researcher"],
+            "year": 2025,
+            "doi": "10.1000/auv-rl",
+            "pdf_url": "https://doi.org/10.1000/auv-rl",
+            "citation_count": 5,
+        },
+        {
+            "source": "openalex",
+            "title": "AUV Reinforcement Learning Control",
+            "authors": ["A. Researcher"],
+            "year": 2025,
+            "doi": "10.1000/auv-rl",
+            "pdf_url": "https://example.org/articles/auv-rl.pdf",
+            "citation_count": 7,
+        },
+    ]
+
+    normalized = normalize_candidates(raw_records)
+
+    assert len(normalized) == 1
+    assert normalized[0]["pdf_url"] == "https://example.org/articles/auv-rl.pdf"
+    assert normalized[0]["pdf_urls"] == [
+        "https://example.org/articles/auv-rl.pdf",
+        "https://doi.org/10.1000/auv-rl",
+    ]
+
+
 def test_filter_candidates_can_hard_exclude_reviews_when_requested():
     candidates = [
         {

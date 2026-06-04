@@ -79,6 +79,17 @@ print("batch_id: batch-router-001")
     return [sys.executable, str(script)]
 
 
+def _write_failing_mineru_command(tmp_path):
+    script = tmp_path / "fake_mineru_failure.py"
+    script.write_text(
+        "import sys\n"
+        "print('simulated MinerU failure', file=sys.stderr)\n"
+        "raise SystemExit(2)\n",
+        encoding="utf-8",
+    )
+    return [sys.executable, str(script)]
+
+
 def _candidate(slug, title, pdf_url):
     return {
         "slug": slug,
@@ -474,6 +485,78 @@ def test_prepare_ranked_papers_records_failed_candidate_and_continues(tmp_path, 
         "state": "staged",
         "next_action": "run-wiki-ingest-agent",
     }
+
+
+def test_prepare_ranked_papers_cleans_raw_folder_after_acquire_failure(tmp_path):
+    server_root = tmp_path / "server"
+    server_root.mkdir()
+    vault = tmp_path / "vault"
+    run_id = "20260527T122700Z"
+    run_dir = vault / "_epi" / "runs" / run_id
+    run_dir.mkdir(parents=True)
+
+    with _LocalServer(server_root) as base_url:
+        failing_candidate = _candidate("missing-pdf", "Missing PDF", f"{base_url}/missing.pdf")
+        failing_candidate["ranking_protocol"] = {"decision": "advance-candidate"}
+        (run_dir / "rank.json").write_text(json.dumps([failing_candidate]), encoding="utf-8")
+
+        batch = prepare_ranked_papers_from_run(
+            vault,
+            run_id,
+            mineru_command=_write_success_mineru_command(tmp_path),
+            max_papers=1,
+        )
+
+    failed_root = vault / "_epi" / "raw" / "papers" / "missing-pdf"
+    result = batch["results"][0]
+
+    assert result["state"] == "acquire_failed"
+    assert result["stage_record"]["status"] == "failed"
+    assert result["raw_cleanup"]["status"] == "deleted"
+    assert result["raw_cleanup"]["reason"] == "failed_before_complete_parse"
+    assert not failed_root.exists()
+
+    report_json = json.loads((vault / "_epi" / "runs" / batch["run_id"] / "report.json").read_text(encoding="utf-8"))
+    assert report_json["failed_papers"] == [
+        {"paper_slug": "missing-pdf", "state": "acquire_failed", "next_action": None}
+    ]
+    assert report_json["raw_cleanup"][0]["slug"] == "missing-pdf"
+    assert report_json["raw_cleanup"][0]["status"] == "deleted"
+
+
+def test_prepare_ranked_papers_cleans_raw_folder_after_parse_failure(tmp_path):
+    server_root = tmp_path / "server"
+    server_root.mkdir()
+    (server_root / "paper.pdf").write_bytes(b"%PDF-1.4\nparse failure fixture\n")
+    vault = tmp_path / "vault"
+    run_id = "20260527T122800Z"
+    run_dir = vault / "_epi" / "runs" / run_id
+    run_dir.mkdir(parents=True)
+
+    with _LocalServer(server_root) as base_url:
+        failing_candidate = _candidate("parse-failure", "Parse Failure", f"{base_url}/paper.pdf")
+        failing_candidate["ranking_protocol"] = {"decision": "advance-candidate"}
+        (run_dir / "rank.json").write_text(json.dumps([failing_candidate]), encoding="utf-8")
+
+        batch = prepare_ranked_papers_from_run(
+            vault,
+            run_id,
+            mineru_command=_write_failing_mineru_command(tmp_path),
+            max_papers=1,
+        )
+
+    failed_root = vault / "_epi" / "raw" / "papers" / "parse-failure"
+    result = batch["results"][0]
+
+    assert result["state"] == "parse_failed"
+    assert result["stage_record"]["status"] == "failed"
+    assert "MinerU command failed" in result["stage_record"]["error"]
+    assert result["raw_cleanup"]["status"] == "deleted"
+    assert not failed_root.exists()
+
+    report_json = json.loads((vault / "_epi" / "runs" / batch["run_id"] / "report.json").read_text(encoding="utf-8"))
+    assert report_json["raw_cleanup"][0]["slug"] == "parse-failure"
+    assert report_json["raw_cleanup"][0]["status"] == "deleted"
 
 
 def test_prepare_ranked_papers_can_skip_existing_parsed_candidates_when_resuming(tmp_path):

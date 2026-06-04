@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -32,6 +33,16 @@ _AUDIT_PAGE_MARKERS = [
     "stage: staging",
     "formal_page: false",
 ]
+_OBSIDIAN_SOURCE_PDF_PATTERN = re.compile(
+    r"\[\[_epi/raw/papers/(?P<slug>[^/\]\|]+)/paper\.pdf\|(?P=slug)\]\]",
+    re.IGNORECASE,
+)
+_OBSIDIAN_SOURCE_PDF_ANY_ALIAS_PATTERN = re.compile(
+    r"\[\[_epi/raw/papers/(?P<slug>[^/\]\|]+)/paper\.pdf\|(?P<alias>[^\]]+)\]\]",
+    re.IGNORECASE,
+)
+
+
 def _read_json(path: Path) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -140,6 +151,14 @@ def _frontmatter_block(text: str) -> tuple[dict[str, Any], str] | None:
             continue
         if raw_line.startswith("  ") and current_map_key:
             nested = raw_line.strip()
+            if nested.startswith("- "):
+                value = nested[2:].strip()
+                current_value = frontmatter.get(current_map_key)
+                if not isinstance(current_value, list):
+                    current_value = []
+                    frontmatter[current_map_key] = current_value
+                current_value.append(value)
+                continue
             if ":" in nested:
                 key, value = nested.split(":", 1)
                 nested_map = frontmatter.get(current_map_key)
@@ -167,6 +186,106 @@ def _frontmatter_value_is_empty(value: Any) -> bool:
         return False
     text = str(value).strip()
     return text in {"", "[]", "{}", "null", "None"}
+
+
+def _frontmatter_value_text(value: Any) -> str:
+    if isinstance(value, list):
+        return "\n".join(str(item) for item in value)
+    return str(value)
+
+
+def _strip_frontmatter_scalar(value: str) -> str:
+    text = str(value).strip()
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in {'"', "'"}:
+        return text[1:-1].strip()
+    return text
+
+
+def _split_inline_frontmatter_list(value: str) -> list[str]:
+    text = str(value).strip()
+    if not (text.startswith("[") and text.endswith("]")):
+        return [_strip_frontmatter_scalar(text)]
+    if text.startswith("[[") and text.endswith("]]"):
+        return [_strip_frontmatter_scalar(text)]
+
+    inner = text[1:-1].strip()
+    if not inner:
+        return []
+    entries: list[str] = []
+    token: list[str] = []
+    quote: str | None = None
+    escaped = False
+    for char in inner:
+        if quote:
+            if escaped:
+                token.append(char)
+                escaped = False
+                continue
+            if char == "\\":
+                escaped = True
+                continue
+            if char == quote:
+                quote = None
+                continue
+            token.append(char)
+            continue
+        if char in {'"', "'"}:
+            quote = char
+            continue
+        if char == ",":
+            entry = _strip_frontmatter_scalar("".join(token))
+            if entry:
+                entries.append(entry)
+            token = []
+            continue
+        token.append(char)
+    entry = _strip_frontmatter_scalar("".join(token))
+    if entry:
+        entries.append(entry)
+    return entries
+
+
+def _frontmatter_source_entries(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [_strip_frontmatter_scalar(str(item)) for item in value if _strip_frontmatter_scalar(str(item))]
+    return _split_inline_frontmatter_list(str(value))
+
+
+def _formal_source_pdf_link_issues(value: Any) -> list[str]:
+    entries = _frontmatter_source_entries(value)
+    if not entries:
+        return [
+            "formal page frontmatter sources must include an Obsidian source PDF link displayed as <paper-slug>"
+        ]
+
+    valid = [entry for entry in entries if _OBSIDIAN_SOURCE_PDF_PATTERN.fullmatch(entry)]
+    alias_mismatches = [
+        entry
+        for entry in entries
+        if _OBSIDIAN_SOURCE_PDF_ANY_ALIAS_PATTERN.fullmatch(entry)
+        and not _OBSIDIAN_SOURCE_PDF_PATTERN.fullmatch(entry)
+    ]
+    invalid_non_pdf = [
+        entry
+        for entry in entries
+        if not _OBSIDIAN_SOURCE_PDF_PATTERN.fullmatch(entry)
+        and not _OBSIDIAN_SOURCE_PDF_ANY_ALIAS_PATTERN.fullmatch(entry)
+    ]
+
+    issues: list[str] = []
+    if not valid:
+        issues.append(
+            "formal page frontmatter sources must include an Obsidian source PDF link displayed as <paper-slug>"
+        )
+    if alias_mismatches:
+        issues.append(
+            "formal page frontmatter sources PDF links must be displayed as <paper-slug>"
+        )
+    if invalid_non_pdf:
+        issues.append(
+            "formal page frontmatter sources must contain only Obsidian source PDF links displayed as <paper-slug>"
+        )
+    return issues
 
 
 def _validate_formal_frontmatter(relative_path: str, text: str) -> list[str]:
@@ -202,6 +321,8 @@ def _validate_formal_frontmatter(relative_path: str, text: str) -> list[str]:
     ]
     if empty:
         issues.append("formal page frontmatter has empty required fields: " + ", ".join(empty))
+    if "sources" in frontmatter and not _frontmatter_value_is_empty(frontmatter.get("sources")):
+        issues.extend(_formal_source_pdf_link_issues(frontmatter.get("sources")))
     provenance = frontmatter.get("provenance") if isinstance(frontmatter.get("provenance"), dict) else {}
     missing_provenance = [
         field

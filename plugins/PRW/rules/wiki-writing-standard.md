@@ -46,7 +46,7 @@ aliases: [alternate name]
 relationships:
   - target: "[[concepts/related-concept]]"
     type: uses
-sources: [source-bundle-or-paper-id]
+sources: ["[[_epi/raw/papers/<slug>/paper.pdf|<slug>]]"]
 summary: One or two sentences under 200 characters.
 provenance:
   extracted: 0.70
@@ -98,6 +98,8 @@ Required frontmatter fields:
 - `updated:`
 
 Do not set `lifecycle: reviewed`, `verified`, or `source-reviewed` automatically. New agent-written pages start as `draft` or `review-needed` unless the target vault contract says otherwise.
+
+`sources:` must contain only Obsidian wikilinks to original paper PDFs, each displayed as the paper slug: `"[[_epi/raw/papers/<slug>/paper.pdf|<slug>]]"`. Do not leave the PDF as plain path text such as `_epi/raw/papers/<slug>/paper.pdf (原论文 PDF)`, a Markdown link, or an alias such as `原论文 PDF`; the Obsidian properties view must show the source slug and still click through to the PDF. Put metadata, MinerU Markdown/TeX, DOI/arXiv URLs, figure paths, and other evidence details in the page body or Provenance section instead of frontmatter `sources`.
 
 ## Body Rules
 

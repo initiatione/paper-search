@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import re
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -50,6 +51,92 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def _load_openai_metadata(metadata_path: Path):
+    text = _read(metadata_path)
+    try:
+        import yaml
+    except ModuleNotFoundError:
+        yaml = None
+    if yaml is not None:
+        return yaml.safe_load(text)
+
+    interface = {}
+    for line in text.splitlines():
+        match = re.match(r'^\s{2}([a-z_]+):\s+"([^"]*)"$', line)
+        if match:
+            key, value = match.groups()
+            interface[key] = value
+    return {"interface": interface}
+
+
+def _skill_body_line_count(path: Path) -> int:
+    lines = _read(path).splitlines()
+    if lines and lines[0] == "---":
+        for index, line in enumerate(lines[1:], start=1):
+            if line == "---":
+                return len(lines[index + 1 :])
+    return len(lines)
+
+
+def _load_prw_routing():
+    text = _read(PLUGIN / "skills" / "routing.yaml")
+    try:
+        import yaml
+    except ModuleNotFoundError:
+        yaml = None
+    if yaml is not None:
+        return yaml.safe_load(text)
+
+    routes = {}
+    data = {"routes": routes, "always_read": []}
+    current = None
+    current_key = None
+    in_routes = False
+    in_always_read = False
+    for line in text.splitlines():
+        top_key = re.match(r"^([a-z_]+):\s*(.*)$", line)
+        if top_key and not line.startswith(" "):
+            key, value = top_key.groups()
+            if key in {"schema_version", "source_of_truth"}:
+                data[key] = value
+            in_always_read = key == "always_read"
+            if key == "routes":
+                in_routes = True
+                in_always_read = False
+                continue
+        if in_always_read:
+            always_match = re.match(r"^  -\s+(.*)$", line)
+            if always_match:
+                data["always_read"].append(always_match.group(1))
+            continue
+        if line == "routes:":
+            in_routes = True
+            continue
+        if line == "task_closure:":
+            break
+        if not in_routes or not line.strip():
+            continue
+        route_match = re.match(r"^  ([a-z0-9_]+):$", line)
+        if route_match:
+            current = {}
+            routes[route_match.group(1)] = current
+            current_key = None
+            continue
+        key_match = re.match(r"^    ([a-z_]+):\s*(.*)$", line)
+        if key_match and current is not None:
+            key, value = key_match.groups()
+            current_key = key
+            if value:
+                current[key] = value
+            elif key in {"triggers", "workflows", "references", "rules"}:
+                current[key] = []
+            continue
+        list_match = re.match(r"^      -\s+(.*)$", line)
+        if list_match and current is not None and current_key:
+            current.setdefault(current_key, []).append(list_match.group(1))
+    return data
+
+
 def test_plugin_manifest_exposes_simple_user_prompts():
     manifest = _read_json(PLUGIN / ".codex-plugin" / "plugin.json")
 
@@ -94,6 +181,33 @@ def test_plugin_has_one_public_skill_plus_language_gate():
     language_skill = _read(PLUGIN / "skills" / "paper-wiki-language" / "SKILL.md")
     assert "formal PRW/EPI" in language_skill
     assert "Language Gate" in language_skill
+    assert "references/style-guide.md" in language_skill
+
+
+def test_prw_all_skill_entrypoints_stay_thin():
+    for skill_name in PUBLIC_SKILLS | SUPPORT_SKILLS:
+        skill_path = PLUGIN / "skills" / skill_name / "SKILL.md"
+        assert _skill_body_line_count(skill_path) <= 90, skill_name
+
+
+def test_prw_support_skill_entrypoints_stay_thin_and_route_to_style_guide():
+    language_skill_path = PLUGIN / "skills" / "paper-wiki-language" / "SKILL.md"
+    style_guide_path = PLUGIN / "skills" / "paper-wiki-language" / "references" / "style-guide.md"
+
+    assert _skill_body_line_count(language_skill_path) <= 90
+    assert style_guide_path.exists()
+
+    language_skill = _read(language_skill_path)
+    style_guide = _read(style_guide_path)
+
+    assert "references/style-guide.md" in language_skill
+    for phrase in [
+        "Voice Target",
+        "Chinese Style Rules",
+        "Page-Family Voice",
+        "Claim-Preserving Rewrite Pattern",
+    ]:
+        assert phrase in style_guide
 
 
 def test_public_skill_routes_natural_epi_deposition_actions():
@@ -124,6 +238,42 @@ def test_public_skill_routes_natural_epi_deposition_actions():
         path = PUBLIC_SKILL / "workflows" / workflow
         assert path.exists(), workflow
         assert path.read_text(encoding="utf-8").strip(), workflow
+
+
+def test_prw_skill_routing_manifest_matches_public_workflows():
+    routing_path = PLUGIN / "skills" / "routing.yaml"
+    assert routing_path.exists()
+
+    routing = _load_prw_routing()
+    assert routing["schema_version"] == "prw-skill-routing-v1"
+    assert routing["source_of_truth"] == "skills/routing.yaml"
+    assert len(routing["always_read"]) <= 3
+    assert "paper-research-wiki/references/upstream-obsidian-wiki-map.md" not in routing["always_read"]
+    assert "../rules/wiki-writing-standard.md" in routing["always_read"]
+
+    routes = routing["routes"]
+    assert set(routes) == {"extract_papers", "check_wiki", "redo_extraction", "update_wiki", "language_gate"}
+
+    routed_workflows = {
+        Path(workflow).name
+        for route in routes.values()
+        for workflow in route.get("workflows", [])
+    }
+    assert routed_workflows == WORKFLOWS
+
+    for route_name, route in routes.items():
+        assert route.get("skill") in {
+            "paper-research-wiki/SKILL.md",
+            "paper-wiki-language/SKILL.md",
+        }, route_name
+        assert route.get("triggers"), route_name
+        assert any(re.search(r"[\u4e00-\u9fff]", str(trigger)) for trigger in route["triggers"]), route_name
+
+    skill = _read(PUBLIC_SKILL / "SKILL.md")
+    assert "../routing.yaml" in skill
+    assert "routing manifest" in skill
+
+    assert "paper-wiki-language/references/style-guide.md" in routes["language_gate"].get("references", [])
 
 
 def test_public_skill_references_internal_contract_files():
@@ -468,6 +618,23 @@ def test_prw_supports_single_and_batch_redo_deep_extraction():
         assert phrase in redo
 
 
+def test_prw_requires_clickable_source_pdf_links_in_frontmatter():
+    standard = _read(PLUGIN / "rules" / "wiki-writing-standard.md")
+    frontmatter = _read(PLUGIN / "rules" / "formal-page-frontmatter.md")
+    provenance = _read(PUBLIC_SKILL / "references" / "page-provenance.md")
+    extract = _read(PUBLIC_SKILL / "workflows" / "extract-papers.md")
+
+    for text in [standard, frontmatter, provenance, extract]:
+        assert "displayed as the paper slug" in text
+        assert "only Obsidian wikilinks to original paper PDFs" in text
+        assert "[[_epi/raw/papers/<slug>/paper.pdf|<slug>]]" in text
+    assert "Markdown link" in standard
+    assert "原论文 PDF" in standard
+    assert "plain path text" in standard
+    for phrase in ["metadata", "MinerU", "DOI", "arXiv"]:
+        assert phrase in standard
+
+
 def test_skill_ui_metadata_uses_single_public_skill():
     metadata = _read(PUBLIC_SKILL / "agents" / "openai.yaml")
 
@@ -475,6 +642,21 @@ def test_skill_ui_metadata_uses_single_public_skill():
     assert "$paper-research-wiki" in metadata
     for phrase in ["提取", "检测", "更新", "沉淀"]:
         assert phrase in metadata
+
+
+def test_all_prw_skills_have_ui_metadata():
+    for skill_name in PUBLIC_SKILLS | SUPPORT_SKILLS:
+        metadata_path = PLUGIN / "skills" / skill_name / "agents" / "openai.yaml"
+        assert metadata_path.exists(), skill_name
+
+        metadata = _load_openai_metadata(metadata_path)
+        interface = metadata.get("interface", {})
+        assert interface.get("display_name"), skill_name
+        short_description = interface.get("short_description", "")
+        assert 20 <= len(short_description) <= 80, skill_name
+        default_prompt = interface.get("default_prompt", "")
+        assert f"${skill_name}" in default_prompt, skill_name
+        assert re.search(r"[\u4e00-\u9fff]", default_prompt), skill_name
 
 
 def test_epi_bridge_points_to_plugin_level_experience():

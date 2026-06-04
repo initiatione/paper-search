@@ -180,7 +180,7 @@ def test_paper_discovery_skill_documents_quality_first_chat_recommendations():
     assert "references/two-stage-retrieval.md" in discovery
     assert "references/citation-graph.md" in discovery
     assert "references/evaluation-set.md" in discovery
-    assert "references/workflows/multi-source-discovery.md" in discovery
+    assert "workflows/multi-source-discovery.md" in discovery
     assert "references/quality-gate.md" in discovery
     assert "The full EPI chain stays documented" in discovery or "docs\\epi-linkage.md" in discovery
     assert "read-priority reporting" in discovery_workflow
@@ -204,7 +204,7 @@ def test_paper_discovery_skill_defines_stronger_high_quality_search_protocol():
     assert "references/two-stage-retrieval.md" in discovery
     assert "references/citation-graph.md" in discovery
     assert "references/evaluation-set.md" in discovery
-    assert "references/workflows/multi-source-discovery.md" in discovery
+    assert "workflows/multi-source-discovery.md" in discovery
     assert "references/quality-gate.md" in discovery
     assert "references/output-format.md" in discovery
     assert "references/anti-patterns.md" in discovery
@@ -227,7 +227,6 @@ def test_paper_discovery_reference_files_exist_and_hold_split_protocol():
     workflow = _read(
         SKILL_DIR
         / "paper-discovery"
-        / "references"
         / "workflows"
         / "multi-source-discovery.md"
     )

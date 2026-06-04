@@ -36,6 +36,7 @@ routes:
     skill: paper-discovery/SKILL.md
     workflows:
       - paper-discovery/workflows/run-discovery.md
+      - paper-discovery/workflows/multi-source-discovery.md
     notes:
       - use profile-driven query planning, not fixed domain defaults
   topic_tracking:

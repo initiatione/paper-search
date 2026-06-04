@@ -9,6 +9,7 @@ SKILLS = ROOT / "skills"
 CHINESE_TEXT = re.compile(r"[\u4e00-\u9fff]")
 CATEGORIES = {"primary", "support", "maintenance"}
 MAX_ENTRYPOINT_LINES = 90
+MAX_DESCRIPTION_LINES = 25
 WORKFLOW_SKILLS = {
     "paper-discovery",
     "paper-ingest",
@@ -33,11 +34,28 @@ def _load_routing():
         return loaded
 
     routes = {}
+    data = {"routes": routes, "always_read": []}
     current = None
     current_key = None
     in_routes = False
+    in_always_read = False
 
     for line in text.splitlines():
+        top_key = re.match(r"^([a-z_]+):\s*(.*)$", line)
+        if top_key and not line.startswith(" "):
+            key, value = top_key.groups()
+            if key in {"schema_version", "source_of_truth"}:
+                data[key] = value
+            in_always_read = key == "always_read"
+            if key == "routes":
+                in_routes = True
+                in_always_read = False
+                continue
+        if in_always_read:
+            always_match = re.match(r"^  -\s+(.*)$", line)
+            if always_match:
+                data["always_read"].append(always_match.group(1))
+            continue
         if line == "routes:":
             in_routes = True
             continue
@@ -67,7 +85,36 @@ def _load_routing():
         if list_match and current is not None and current_key:
             current.setdefault(current_key, []).append(list_match.group(1))
 
-    return {"routes": routes}
+    return data
+
+
+def _skill_line_counts(skill_path):
+    lines = skill_path.read_text(encoding="utf-8").splitlines()
+    description_lines = 0
+    body_start = 0
+    if lines and lines[0] == "---":
+        end = None
+        for index, line in enumerate(lines[1:], start=1):
+            if line == "---":
+                end = index
+                break
+        if end is not None:
+            in_description = False
+            for line in lines[1:end]:
+                if line.startswith("description:"):
+                    in_description = True
+                    description_lines += 1
+                    continue
+                if in_description:
+                    if re.match(r"^\S", line):
+                        in_description = False
+                    else:
+                        description_lines += 1
+            body_start = end + 1
+    return {
+        "description": description_lines,
+        "body": len(lines[body_start:]),
+    }
 
 
 def _routes_by_skill():
@@ -172,6 +219,24 @@ def test_all_skills_are_classified_in_plugin_routing():
         assert route["triggers"], skill_name
 
 
+def test_plugin_routing_manifest_is_the_small_source_of_truth():
+    routing = _load_routing()
+
+    assert routing["schema_version"] == "epi-skill-routing-v1"
+    assert routing["source_of_truth"] == "skills/routing.yaml"
+    assert len(routing["always_read"]) <= 3
+
+
+def test_all_skill_entrypoints_stay_thin():
+    for skill_dir in SKILLS.iterdir():
+        if not skill_dir.is_dir() or not (skill_dir / "SKILL.md").exists():
+            continue
+
+        counts = _skill_line_counts(skill_dir / "SKILL.md")
+        assert counts["description"] <= MAX_DESCRIPTION_LINES, skill_dir.name
+        assert counts["body"] <= MAX_ENTRYPOINT_LINES, skill_dir.name
+
+
 def test_core_skill_entrypoints_route_to_workflows_without_becoming_runbooks():
     route_blocks = _routes_by_skill()
 
@@ -199,6 +264,11 @@ def test_core_skill_entrypoints_route_to_workflows_without_becoming_runbooks():
         for path in SKILLS.glob("*/workflows/*.md")
     }
     assert actual_workflows == routed_workflows
+
+
+def test_workflows_do_not_hide_under_references():
+    hidden_workflows = sorted(SKILLS.glob("*/references/workflows/*.md"))
+    assert hidden_workflows == []
 
 
 def test_skill_descriptions_and_routes_include_chinese_task_triggers():
@@ -259,6 +329,8 @@ def test_paper_discovery_keeps_policy_in_skill_and_references():
 
     assert "references/query-planner.md" in discovery
     assert "references/search-protocol.md" in discovery
+    assert "workflows/multi-source-discovery.md" in discovery
+    assert "references/workflows/" not in discovery
     assert not (SKILLS / "paper-discovery" / "README.md").exists()
 
 
@@ -297,4 +369,9 @@ def test_epi_paper_deposition_documents_required_wiki_adapter_stack():
     ]:
         assert field in combined
     assert "draft` or `review-needed`" in combined
+    assert "only Obsidian wikilinks to original paper PDFs" in combined
+    assert "[[_epi/raw/papers/<slug>/paper.pdf|<slug>]]" in combined
+    assert "displayed as the paper slug" in combined
+    for phrase in ["metadata", "MinerU", "DOI", "arXiv"]:
+        assert phrase in combined
     assert "must not enter the formal graph" in combined

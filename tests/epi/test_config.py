@@ -42,3 +42,14 @@ def test_load_config_uses_relative_defaults(tmp_path):
     assert config.venue_prior == ["ICRA", "Science Robotics"]
     assert config.paper_search_command == "paper-search"
     assert config.paper_search_sources == ["arxiv", "semantic", "openalex"]
+
+
+def test_load_config_defaults_include_open_access_pdf_source(tmp_path):
+    plugin_root = tmp_path / "plugin"
+    templates = plugin_root / "templates"
+    templates.mkdir(parents=True)
+    (templates / "interests.example.yaml").write_text("profile: general_academic_research\n", encoding="utf-8")
+
+    config = load_config(plugin_root=plugin_root, vault_path=tmp_path / "vault", max_results=None)
+
+    assert "unpaywall" in config.paper_search_sources

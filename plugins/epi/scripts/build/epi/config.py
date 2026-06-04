@@ -46,7 +46,7 @@ DEFAULT_EPI_CONFIG: dict[str, Any] = {
     "negative_keywords": [],
     "venue_prior": [],
     "budget": {"max_results": 20},
-    "paper_search": {"command": "paper-search", "sources": ["arxiv", "semantic", "openalex", "crossref"]},
+    "paper_search": {"command": "paper-search", "sources": ["arxiv", "semantic", "openalex", "crossref", "unpaywall"]},
     "quality_enrichment": {
         "easyscholar": {
             "enabled": True,
@@ -601,6 +601,7 @@ def load_config(plugin_root: Path, vault_path: Path, max_results: int | None) ->
         "semantic",
         "openalex",
         "crossref",
+        "unpaywall",
     ]
     quality_enrichment = interests.get("quality_enrichment")
     if not isinstance(quality_enrichment, dict):

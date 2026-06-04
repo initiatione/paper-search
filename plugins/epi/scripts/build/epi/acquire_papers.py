@@ -25,6 +25,7 @@ def _metadata_from_candidate(candidate: dict) -> dict:
         "venue": candidate.get("venue", ""),
         "doi": candidate.get("doi"),
         "pdf_url": candidate.get("pdf_url"),
+        "pdf_urls": candidate.get("pdf_urls", []),
         "score": candidate.get("score"),
         "sources": candidate.get("sources", []),
         "arxiv_id": candidate.get("arxiv_id"),
@@ -50,6 +51,32 @@ def _candidate_download_identity(candidate: dict) -> tuple[str, str] | None:
     if "arxiv" in normalized_sources and candidate.get("arxiv_id"):
         return "arxiv", str(candidate["arxiv_id"])
     return None
+
+
+def _candidate_pdf_urls(candidate: dict) -> list[str]:
+    urls: list[str] = []
+
+    def add(value: object) -> None:
+        if not value:
+            return
+        text = str(value).strip()
+        if text and text not in urls:
+            urls.append(text)
+
+    add(candidate.get("pdf_url"))
+    pdf_urls = candidate.get("pdf_urls")
+    if isinstance(pdf_urls, str):
+        add(pdf_urls)
+    elif isinstance(pdf_urls, list):
+        for url in pdf_urls:
+            add(url)
+    for record in candidate.get("raw_records") or []:
+        if not isinstance(record, dict):
+            continue
+        add(record.get("pdf_url"))
+        raw_record = record.get("raw_record") if isinstance(record.get("raw_record"), dict) else {}
+        add(raw_record.get("pdf_url"))
+    return urls
 
 
 def _classify_acquire_failure(http_status: int | None, error_kind: str | None = None) -> tuple[str, bool, str]:
@@ -139,7 +166,13 @@ def _extract_pdf_url_from_landing_page(page_url: str, body: bytes, content_type:
 
 
 def _download_url_to_temp(url: str, temp_pdf: Path, timeout_seconds: int) -> tuple[int | None, str | None]:
-    request = urllib.request.Request(url, headers={"User-Agent": "EPI/0.1"})
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0 (compatible; EPI/0.1; +https://github.com/initiatione/paper-search)",
+            "Accept": "application/pdf,text/html;q=0.9,*/*;q=0.8",
+        },
+    )
     with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
         http_status = getattr(response, "status", None) or response.getcode()
         content_type = response.headers.get("content-type")
@@ -158,6 +191,7 @@ def _write_failed_acquire_record(
     candidate_metadata_hash: str,
     http_status: int | None = None,
     error_kind: str | None = None,
+    acquire_attempts: list[dict] | None = None,
 ) -> dict:
     paper_root.mkdir(parents=True, exist_ok=True)
     write_json_atomic(paper_root / "metadata.json", _metadata_from_candidate(candidate))
@@ -171,12 +205,14 @@ def _write_failed_acquire_record(
         "retrieved_at": utc_now(),
         "exit_status": 1,
         "pdf_url": candidate.get("pdf_url"),
+        "candidate_pdf_urls": _candidate_pdf_urls(candidate),
         "http_status": http_status,
         "failure_class": failure_class,
         "retryable": retryable,
         "recovery_hint": recovery_hint,
         "output_path": str(paper_root / "paper.pdf"),
         "error": error,
+        "acquire_attempts": acquire_attempts or [],
         "input_artifact_hashes": {
             "candidate_metadata": candidate_metadata_hash,
         },
@@ -235,7 +271,8 @@ def acquire_paper_from_url(
     redo: bool = False,
 ) -> dict:
     paper_root.mkdir(parents=True, exist_ok=True)
-    pdf_url = candidate.get("pdf_url")
+    candidate_pdf_urls = _candidate_pdf_urls(candidate)
+    pdf_url = candidate_pdf_urls[0] if candidate_pdf_urls else candidate.get("pdf_url")
     target_pdf = paper_root / "paper.pdf"
     started_at = utc_now()
     metadata = _metadata_from_candidate(candidate)
@@ -329,90 +366,133 @@ def acquire_paper_from_url(
 
     http_status: int | None = None
     candidate_pdf_url = str(pdf_url)
-    current_url = candidate_pdf_url
     attempted_urls: set[str] = set()
-    try:
+    acquire_attempts: list[dict] = []
+    last_error = "failed to download PDF"
+    last_error_kind: str | None = "network"
+    for initial_url in candidate_pdf_urls or [candidate_pdf_url]:
+        current_url = str(initial_url)
+        if current_url in attempted_urls:
+            continue
         while True:
             attempted_urls.add(current_url)
-            http_status, content_type = _download_url_to_temp(current_url, temp_pdf, timeout_seconds)
+            try:
+                http_status, content_type = _download_url_to_temp(current_url, temp_pdf, timeout_seconds)
+            except urllib.error.HTTPError as exc:
+                temp_pdf.unlink(missing_ok=True)
+                failure_class, _, _ = _classify_acquire_failure(exc.code)
+                last_error = f"HTTP {exc.code} while downloading PDF: {current_url}"
+                last_error_kind = None
+                http_status = exc.code
+                acquire_attempts.append(
+                    {
+                        "url": current_url,
+                        "status": "failed",
+                        "http_status": exc.code,
+                        "failure_class": failure_class,
+                        "error": last_error,
+                    }
+                )
+                break
+            except Exception as exc:
+                temp_pdf.unlink(missing_ok=True)
+                last_error = f"failed to download PDF: {exc}"
+                last_error_kind = "network"
+                acquire_attempts.append(
+                    {
+                        "url": current_url,
+                        "status": "failed",
+                        "http_status": http_status,
+                        "failure_class": _classify_acquire_failure(http_status, last_error_kind)[0],
+                        "error": last_error,
+                    }
+                )
+                break
             size_bytes = temp_pdf.stat().st_size
             if size_bytes <= 0:
                 temp_pdf.unlink(missing_ok=True)
-                return _write_failed_acquire_record(
-                    paper_root,
-                    candidate,
-                    mode="url",
-                    http_status=http_status,
-                    error=f"downloaded PDF is empty: {current_url}",
-                    started_at=started_at,
-                    candidate_metadata_hash=candidate_metadata_hash,
-                    error_kind="empty-pdf",
+                last_error = f"downloaded PDF is empty: {current_url}"
+                last_error_kind = "empty-pdf"
+                acquire_attempts.append(
+                    {
+                        "url": current_url,
+                        "status": "failed",
+                        "http_status": http_status,
+                        "failure_class": _classify_acquire_failure(http_status, last_error_kind)[0],
+                        "error": last_error,
+                    }
                 )
-            if _downloaded_file_is_pdf(temp_pdf):
                 break
+            if _downloaded_file_is_pdf(temp_pdf):
+                acquire_attempts.append(
+                    {
+                        "url": current_url,
+                        "status": "success",
+                        "http_status": http_status,
+                    }
+                )
+                os.replace(temp_pdf, target_pdf)
+                record = {
+                    "stage": "acquire",
+                    "mode": "url",
+                    "status": "success",
+                    "started_at": started_at,
+                    "finished_at": utc_now(),
+                    "retrieved_at": utc_now(),
+                    "exit_status": 0,
+                    "pdf_url": current_url,
+                    "candidate_pdf_url": candidate_pdf_url,
+                    "candidate_pdf_urls": candidate_pdf_urls,
+                    "resolved_pdf_url": current_url,
+                    "http_status": http_status,
+                    "acquire_attempts": acquire_attempts,
+                    "output_path": str(target_pdf),
+                    "size_bytes": target_pdf.stat().st_size,
+                }
+                write_json_atomic(paper_root / "metadata.json", metadata)
+                record["input_artifact_hashes"] = {
+                    "candidate_metadata": candidate_metadata_hash,
+                }
+                record["output_artifact_hashes"] = {
+                    "paper.pdf": file_sha256(target_pdf),
+                    "metadata.json": file_sha256(paper_root / "metadata.json"),
+                }
+                write_json_atomic(paper_root / "acquire-record.json", record)
+                return record
             body = temp_pdf.read_bytes()
             resolved_pdf_url = _extract_pdf_url_from_landing_page(current_url, body, content_type)
             temp_pdf.unlink(missing_ok=True)
             if resolved_pdf_url and resolved_pdf_url not in attempted_urls:
+                acquire_attempts.append(
+                    {
+                        "url": current_url,
+                        "status": "resolved",
+                        "http_status": http_status,
+                        "resolved_pdf_url": resolved_pdf_url,
+                    }
+                )
                 current_url = resolved_pdf_url
                 continue
-            return _write_failed_acquire_record(
-                paper_root,
-                candidate,
-                mode="url",
-                http_status=http_status,
-                error=f"downloaded URL is not a PDF and no PDF link was found: {current_url}",
-                started_at=started_at,
-                candidate_metadata_hash=candidate_metadata_hash,
-                error_kind="not-pdf",
+            last_error = f"downloaded URL is not a PDF and no PDF link was found: {current_url}"
+            last_error_kind = "not-pdf"
+            acquire_attempts.append(
+                {
+                    "url": current_url,
+                    "status": "failed",
+                    "http_status": http_status,
+                    "failure_class": _classify_acquire_failure(http_status, last_error_kind)[0],
+                    "error": last_error,
+                }
             )
-        os.replace(temp_pdf, target_pdf)
-    except urllib.error.HTTPError as exc:
-        temp_pdf.unlink(missing_ok=True)
-        return _write_failed_acquire_record(
-            paper_root,
-            candidate,
-            mode="url",
-            http_status=exc.code,
-            error=f"HTTP {exc.code} while downloading PDF: {current_url}",
-            started_at=started_at,
-            candidate_metadata_hash=candidate_metadata_hash,
-        )
-    except Exception as exc:
-        temp_pdf.unlink(missing_ok=True)
-        return _write_failed_acquire_record(
-            paper_root,
-            candidate,
-            mode="url",
-            http_status=http_status,
-            error=f"failed to download PDF: {exc}",
-            started_at=started_at,
-            candidate_metadata_hash=candidate_metadata_hash,
-            error_kind="network",
-        )
-
-    record = {
-        "stage": "acquire",
-        "mode": "url",
-        "status": "success",
-        "started_at": started_at,
-        "finished_at": utc_now(),
-        "retrieved_at": utc_now(),
-        "exit_status": 0,
-        "pdf_url": current_url,
-        "candidate_pdf_url": candidate_pdf_url,
-        "resolved_pdf_url": current_url,
-        "http_status": http_status,
-        "output_path": str(target_pdf),
-        "size_bytes": target_pdf.stat().st_size,
-    }
-    write_json_atomic(paper_root / "metadata.json", metadata)
-    record["input_artifact_hashes"] = {
-        "candidate_metadata": candidate_metadata_hash,
-    }
-    record["output_artifact_hashes"] = {
-        "paper.pdf": file_sha256(target_pdf),
-        "metadata.json": file_sha256(paper_root / "metadata.json"),
-    }
-    write_json_atomic(paper_root / "acquire-record.json", record)
-    return record
+            break
+    return _write_failed_acquire_record(
+        paper_root,
+        candidate,
+        mode="url",
+        http_status=http_status,
+        error=last_error,
+        started_at=started_at,
+        candidate_metadata_hash=candidate_metadata_hash,
+        error_kind=last_error_kind,
+        acquire_attempts=acquire_attempts,
+    )

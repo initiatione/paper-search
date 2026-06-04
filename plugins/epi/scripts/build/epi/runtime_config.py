@@ -9,6 +9,16 @@ from typing import Any
 
 RUNTIME_CONFIG_ENV = "EPI_RUNTIME_CONFIG"
 RUNTIME_CONFIG_SCHEMA = "epi-runtime-config-v1"
+PAPER_SEARCH_PROVIDER_ENV_KEYS = {
+    "PAPER_SEARCH_MCP_UNPAYWALL_EMAIL",
+    "UNPAYWALL_EMAIL",
+    "PAPER_SEARCH_MCP_CORE_API_KEY",
+    "CORE_API_KEY",
+    "PAPER_SEARCH_MCP_SEMANTIC_SCHOLAR_API_KEY",
+    "SEMANTIC_SCHOLAR_API_KEY",
+    "PAPER_SEARCH_MCP_DOAJ_API_KEY",
+    "DOAJ_API_KEY",
+}
 
 
 def _codex_home() -> Path:
@@ -36,7 +46,7 @@ def _empty_status(path: Path) -> dict[str, Any]:
 
 
 def _safe_env_key(key: str) -> bool:
-    return key.startswith("EPI_") and key != RUNTIME_CONFIG_ENV
+    return (key.startswith("EPI_") and key != RUNTIME_CONFIG_ENV) or key in PAPER_SEARCH_PROVIDER_ENV_KEYS
 
 
 def _normalize_env_value(value: object) -> str:
@@ -46,7 +56,18 @@ def _normalize_env_value(value: object) -> str:
 
 
 def _runtime_secret_key(key: str) -> bool:
-    return key in {"MINERU_TOKEN", "EASYSCHOLAR_SECRET_KEY"}
+    return key in {
+        "MINERU_TOKEN",
+        "EASYSCHOLAR_SECRET_KEY",
+        "PAPER_SEARCH_MCP_UNPAYWALL_EMAIL",
+        "UNPAYWALL_EMAIL",
+        "PAPER_SEARCH_MCP_CORE_API_KEY",
+        "CORE_API_KEY",
+        "PAPER_SEARCH_MCP_SEMANTIC_SCHOLAR_API_KEY",
+        "SEMANTIC_SCHOLAR_API_KEY",
+        "PAPER_SEARCH_MCP_DOAJ_API_KEY",
+        "DOAJ_API_KEY",
+    }
 
 
 def _set_env_if_missing(status: dict[str, Any], key: str, value: object) -> None:
@@ -143,6 +164,7 @@ def _apply_runtime_payload(status: dict[str, Any], payload: dict[str, Any]) -> N
             _set_env_if_missing(status, "EPI_PAPER_SEARCH_MCP_COMMAND", command)
         if args:
             _set_env_if_missing(status, "EPI_PAPER_SEARCH_MCP_ARGS", args)
+        _apply_env_file_section(status, paper_search_mcp)
 
     paper_search_cli = payload.get("paper_search_cli")
     if isinstance(paper_search_cli, dict) and paper_search_cli.get("command"):

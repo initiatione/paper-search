@@ -128,6 +128,32 @@ def test_acquire_paper_from_url_follows_landing_page_citation_pdf_url(tmp_path):
     assert (paper_root / "paper.pdf").read_bytes().startswith(b"%PDF-1.4")
 
 
+def test_acquire_paper_from_url_tries_candidate_pdf_url_fallbacks(tmp_path):
+    server_root = tmp_path / "server"
+    server_root.mkdir()
+    (server_root / "paper.pdf").write_bytes(b"%PDF-1.4\nfallback fixture\n")
+    paper_root = tmp_path / "vault" / "_epi" / "raw" / "papers" / "fallback-paper"
+
+    with _LocalServer(server_root) as base_url:
+        first_url = f"{base_url}/missing.pdf"
+        fallback_url = f"{base_url}/paper.pdf"
+        candidate = _candidate(first_url, slug="fallback-paper")
+        candidate["pdf_urls"] = [first_url, fallback_url]
+
+        record = acquire_paper_from_url(candidate, paper_root)
+
+    assert record["status"] == "success"
+    assert record["candidate_pdf_url"] == first_url
+    assert record["resolved_pdf_url"] == fallback_url
+    assert record["pdf_url"] == fallback_url
+    assert record["acquire_attempts"][0]["url"] == first_url
+    assert record["acquire_attempts"][0]["status"] == "failed"
+    assert record["acquire_attempts"][0]["http_status"] == 404
+    assert record["acquire_attempts"][1]["url"] == fallback_url
+    assert record["acquire_attempts"][1]["status"] == "success"
+    assert (paper_root / "paper.pdf").read_bytes().startswith(b"%PDF-1.4")
+
+
 def test_acquire_paper_from_url_rejects_html_without_pdf_link(tmp_path):
     server_root = tmp_path / "server"
     server_root.mkdir()

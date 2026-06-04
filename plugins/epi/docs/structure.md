@@ -91,6 +91,7 @@ scripts/build/epi/
   wiki_ingest_record.py
   wiki_record_workflows.py
   promote_to_wiki.py
+  raw_cleanup.py
   run_index.py
   wiki_query.py
   skill_aware_evolve.py
@@ -104,9 +105,10 @@ scripts/build/epi/
 - `config_protection.py` 负责共享确认口令和 config 保护白名单，供 reset、repair、restore 复用。
 - `wiki_reset.py` 负责 wiki reset 执行器：preview、确认口令、备份/删除、config 默认保护、初始化和 reset manifest。
 - `doctor.py` 负责只读健康检查；外部依赖缺失是 warning，插件结构缺失才 error。
-- `runtime_config.py` 负责从 `%USERPROFILE%\.codex\plugins\paper-search\epi\runtime.json` 加载本机依赖配置，只补缺失的进程环境变量，不覆盖显式 env，不保存 token 明文。
+- `runtime_config.py` 负责从 `%USERPROFILE%\.codex\plugins\paper-search\epi\runtime.json` 加载本机依赖配置，只补缺失的进程环境变量，不覆盖显式 env，不保存 token 明文；paper-search provider key/email 只能通过 `paper_search_mcp.env_file` 或显式进程环境进入。
 - `paper_search_adapter.py` 优先调用外部 `paper-search-mcp` stdio server，并在失败、超时或空结果时回退到 `paper-search` CLI，把上游输出标准化为 EPI 候选记录。
-- `acquire_papers.py` 负责下载或复制 PDF，并在失败 `acquire-record.json` 中写 `failure_class`、`retryable` 和 `recovery_hint`，让后续 agent 区分重试、换源和跳过。
+- `acquire_papers.py` 负责下载或复制 PDF，保留合并候选的 `candidate_pdf_urls` 并逐个尝试 fallback；失败 `acquire-record.json` 中写 `acquire_attempts`、`failure_class`、`retryable` 和 `recovery_hint`，让后续 agent 区分重试、换源和跳过。
+- `raw_cleanup.py` 负责清理失败的 `_epi/raw/papers/<slug>` 目录；只有在没有完整 parse、没有 staging、没有 wiki-ingest/zotero 下游记录且路径仍直属 raw papers root 时才删除，并把 manifest 写到 `_epi/meta/raw-cleanup/`。
 - `rank_papers.py` 负责 paper type classification、ranking signals、ranking rubric、ranking protocol 和三角色排序解释。
 - `run_mineru_parse.py` 负责 MinerU 命令调用、失败记录和 fixture materialization；默认 7200 秒超时，可由 `--mineru-timeout` 或 `EPI_MINERU_TIMEOUT` 覆盖。
 - `generate_reader.py`、`reader_outputs.py`、`reader_evidence.py`、`reader_protocol.py` 负责多角色 reader、evidence map 和证据地址校验；reader 会把 TeX、MinerU manifest 和 PDF fallback 作为 source-first 证据写入 evidence/claim-support，而不是只输出摘要。
@@ -265,7 +267,7 @@ python scripts\orchestrator.py evaluation-brief --target-asset <asset> --rationa
 
 安装副本在 `%USERPROFILE%\.codex\plugins\cache\paper-search\epi\<version>`。源码改动必须先提交并通过 GitHub/marketplace 升级流程进入安装副本；不要把安装 cache 当成开发源。
 
-用户级 runtime 配置不放在安装 cache 版本目录，而放在 `%USERPROFILE%\.codex\plugins\paper-search\epi\runtime.json`，用于保存 MCP/CLI/MinerU 命令路径和 `mineru.env` 路径；插件升级 cache 不应覆盖它。
+用户级 runtime 配置不放在安装 cache 版本目录，而放在 `%USERPROFILE%\.codex\plugins\paper-search\epi\runtime.json`，用于保存 MCP/CLI/MinerU 命令路径、`mineru.env` 路径，以及 `paper_search_mcp.env_file` / `easyscholar.env_file` 这类 secret env file 路径；插件升级 cache 不应覆盖它。
 
 ## Literature Wiki Contract
 

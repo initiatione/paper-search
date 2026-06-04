@@ -30,6 +30,7 @@ The full EPI chain stays documented in `docs\epi-linkage.md`; this skill only ow
 | Intent | Load |
 | --- | --- |
 | One-off dry-run, query planning, report existing run, or evidence check | `workflows/run-discovery.md` |
+| High-quality/latest/non-review discovery that needs high recall before precision filtering | `workflows/multi-source-discovery.md` |
 | Prepare PDFs, MinerU artifacts, and source-staging handoff from a ranked run | `paper-ingest/workflows/prepare-ranked.md` |
 | Track deltas across prior runs, backlog, coverage gap, or library duplicates | `topic-tracking/SKILL.md` |
 | Formal wiki deposition after source-staging and approval | `epi-paper-deposition/SKILL.md` |
@@ -52,7 +53,6 @@ Load only what is needed:
 - Quality gates: `references/quality-gate.md`
 - Chat output: `references/output-format.md`
 - Anti-patterns: `references/anti-patterns.md`
-- Full workflow: `references/workflows/multi-source-discovery.md`
 - Regression checks: `references/evaluation-set.md`
 
 ## Source Boundary

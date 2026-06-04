@@ -104,6 +104,38 @@ def test_apply_runtime_config_loads_dedicated_easyscholar_env_file(tmp_path, mon
     assert "easyscholar-secret" not in json.dumps(status)
 
 
+def test_apply_runtime_config_loads_paper_search_provider_env_file(tmp_path, monkeypatch):
+    runtime_path = tmp_path / "runtime.json"
+    paper_search_env = tmp_path / "paper-search.env"
+    paper_search_env.write_text(
+        "PAPER_SEARCH_MCP_UNPAYWALL_EMAIL=researcher@example.org\n"
+        "PAPER_SEARCH_MCP_SEMANTIC_SCHOLAR_API_KEY=semantic-key\n",
+        encoding="utf-8",
+    )
+    _write_json(
+        runtime_path,
+        {
+            "schema_version": "epi-runtime-config-v1",
+            "paper_search_mcp": {
+                "command": "runtime-python",
+                "env_file": str(paper_search_env),
+            },
+        },
+    )
+    monkeypatch.setenv("EPI_RUNTIME_CONFIG", str(runtime_path))
+    monkeypatch.delenv("PAPER_SEARCH_MCP_UNPAYWALL_EMAIL", raising=False)
+    monkeypatch.delenv("PAPER_SEARCH_MCP_SEMANTIC_SCHOLAR_API_KEY", raising=False)
+
+    status = apply_runtime_config()
+
+    assert os.environ["PAPER_SEARCH_MCP_UNPAYWALL_EMAIL"] == "researcher@example.org"
+    assert os.environ["PAPER_SEARCH_MCP_SEMANTIC_SCHOLAR_API_KEY"] == "semantic-key"
+    assert "PAPER_SEARCH_MCP_UNPAYWALL_EMAIL" in status["applied_env"]
+    assert "PAPER_SEARCH_MCP_SEMANTIC_SCHOLAR_API_KEY" in status["applied_env"]
+    assert "researcher@example.org" not in json.dumps(status)
+    assert "semantic-key" not in json.dumps(status)
+
+
 def test_apply_runtime_config_does_not_override_explicit_environment(tmp_path, monkeypatch):
     runtime_path = tmp_path / "runtime.json"
     _write_json(

@@ -271,7 +271,7 @@ def _formal_page_content(family, title, *, body=None):
         f"page_family: {family}\n"
         "tags: [epi, fixture]\n"
         "aliases: []\n"
-        'sources: ["_epi/raw/papers/fixture-paper/metadata.json", "_epi/raw/papers/fixture-paper/mineru/fixture-paper.md"]\n'
+        'sources: ["[[_epi/raw/papers/fixture-paper/paper.pdf|fixture-paper]]"]\n'
         f'summary: "Source-grounded {family} page for fixture validation."\n'
         "provenance:\n"
         "  extracted: [\"mineru/fixture-paper.md#method\"]\n"
@@ -731,6 +731,112 @@ def test_create_wiki_ingest_record_rejects_missing_formal_frontmatter(tmp_path):
     _approve_handoff(vault, slug)
 
     with pytest.raises(ValueError, match="frontmatter"):
+        create_wiki_ingest_record(
+            vault,
+            slug,
+            [str(page)],
+            approved_by="codex-test",
+            source_review_path=str(source_review),
+        )
+
+
+def test_create_wiki_ingest_record_rejects_plain_text_pdf_source(tmp_path):
+    vault = tmp_path / "vault"
+    slug = _seed_agent_handoff(vault)
+    page = _write_final_page(
+        vault,
+        "references/plain-text-source.md",
+        _formal_page_content("references", "Plain Text Source").replace(
+            '"[[_epi/raw/papers/fixture-paper/paper.pdf|fixture-paper]]"',
+            '"_epi/raw/papers/fixture-paper/paper.pdf (原论文 PDF)"',
+        ),
+    )
+    source_review = _write_final_source_review(vault, slug, [page])
+    _approve_handoff(vault, slug)
+
+    with pytest.raises(ValueError, match="Obsidian source PDF link"):
+        create_wiki_ingest_record(
+            vault,
+            slug,
+            [str(page)],
+            approved_by="codex-test",
+            source_review_path=str(source_review),
+        )
+
+
+def test_create_wiki_ingest_record_rejects_markdown_pdf_source_link(tmp_path):
+    vault = tmp_path / "vault"
+    slug = _seed_agent_handoff(vault)
+    page = _write_final_page(
+        vault,
+        "references/markdown-source-link.md",
+        _formal_page_content("references", "Markdown Source Link").replace(
+            '"[[_epi/raw/papers/fixture-paper/paper.pdf|fixture-paper]]"',
+            '"[fixture-paper](_epi/raw/papers/fixture-paper/paper.pdf)"',
+        ),
+    )
+    source_review = _write_final_source_review(vault, slug, [page])
+    _approve_handoff(vault, slug)
+
+    with pytest.raises(ValueError, match="Obsidian source PDF link"):
+        create_wiki_ingest_record(
+            vault,
+            slug,
+            [str(page)],
+            approved_by="codex-test",
+            source_review_path=str(source_review),
+        )
+
+
+def test_create_wiki_ingest_record_rejects_pdf_source_alias_that_is_not_slug(tmp_path):
+    vault = tmp_path / "vault"
+    slug = _seed_agent_handoff(vault)
+    page = _write_final_page(
+        vault,
+        "references/source-alias-not-slug.md",
+        _formal_page_content("references", "Source Alias Not Slug").replace(
+            '"[[_epi/raw/papers/fixture-paper/paper.pdf|fixture-paper]]"',
+            '"[[_epi/raw/papers/fixture-paper/paper.pdf|fixture-paper 原论文 PDF]]"',
+        ),
+    )
+    source_review = _write_final_source_review(vault, slug, [page])
+    _approve_handoff(vault, slug)
+
+    with pytest.raises(ValueError, match="displayed as <paper-slug>"):
+        create_wiki_ingest_record(
+            vault,
+            slug,
+            [str(page)],
+            approved_by="codex-test",
+            source_review_path=str(source_review),
+        )
+
+
+@pytest.mark.parametrize(
+    "extra_source",
+    [
+        '"[[_epi/raw/papers/fixture-paper/metadata.json|metadata.json]]"',
+        '"[[_epi/raw/papers/fixture-paper/mineru/fixture-paper.md|MinerU Markdown]]"',
+        '"https://doi.org/10.1000/fixture"',
+    ],
+)
+def test_create_wiki_ingest_record_rejects_non_pdf_entries_in_frontmatter_sources(tmp_path, extra_source):
+    vault = tmp_path / "vault"
+    slug = _seed_agent_handoff(vault)
+    page = _write_final_page(
+        vault,
+        "references/non-pdf-source-entry.md",
+        _formal_page_content("references", "Non PDF Source Entry").replace(
+            'sources: ["[[_epi/raw/papers/fixture-paper/paper.pdf|fixture-paper]]"]',
+            'sources: ["[[_epi/raw/papers/fixture-paper/paper.pdf|fixture-paper]]", '
+            + extra_source
+            + "]",
+        ),
+    )
+    source_review = _write_final_source_review(vault, slug, [page])
+    _approve_handoff(vault, slug)
+
+    with pytest.raises(ValueError, match="sources must contain only Obsidian source PDF links"):
         create_wiki_ingest_record(
             vault,
             slug,

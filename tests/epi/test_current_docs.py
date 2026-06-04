@@ -111,6 +111,9 @@ def test_structure_doc_covers_current_plugin_boundaries():
     assert "MinerU Markdown、TeX、images、manifest" in text
     assert "不要把安装 cache 当成开发源" in text
     assert "runtime_config.py" in text
+    assert "raw_cleanup.py" in text
+    assert "candidate_pdf_urls" in text
+    assert "paper_search_mcp.env_file" in text
     assert r"%USERPROFILE%\.codex\plugins\paper-search\epi\runtime.json" in text
 
 
@@ -171,7 +174,7 @@ def test_linkage_doc_records_paper_discovery_bundle_and_venue_prior():
     assert "references/two-stage-retrieval.md" in text
     assert "references/citation-graph.md" in text
     assert "references/evaluation-set.md" in text
-    assert "references/workflows/multi-source-discovery.md" in text
+    assert "workflows/multi-source-discovery.md" in text
     assert "references/anti-patterns.md" in text
     assert "query_plan" in text
     assert "research_mode" in text
@@ -265,6 +268,25 @@ def test_docs_document_landing_page_acquisition_recovery():
         "citation_pdf_url",
         "landing page",
         "publisher PDF link",
+        "candidate_pdf_urls",
+        "acquire_attempts",
+        "Unpaywall",
+    ]:
+        assert phrase in combined
+
+
+def test_docs_document_failed_raw_cleanup_and_provider_env_file():
+    config = _read("config.md")
+    workflow = _read("workflow.md")
+    structure = _read("structure.md")
+    combined = "\n".join([config, workflow, structure])
+
+    for phrase in [
+        "paper_search_mcp.env_file",
+        "PAPER_SEARCH_MCP_UNPAYWALL_EMAIL",
+        "raw_cleanup.py",
+        "_epi/meta/raw-cleanup/",
+        "failed attempts do not accumulate as library entries",
     ]:
         assert phrase in combined
 

@@ -29,11 +29,12 @@ Before planning or writing pages, read `../../../rules/wiki-writing-standard.md`
 2. Apply the page template, merge-before-create rule, and body rules from `wiki-writing-standard.md`.
 3. Apply `paper-wiki-language`: write natural Chinese research-wiki prose, avoid machine-translation headings, and keep terminology stable.
 4. Preserve source support status and evidence addresses.
-5. Add Obsidian wikilinks from new pages to existing related pages.
-6. Add `relationships:` frontmatter entries only when direction and type are clear.
-7. Keep formula and figure claims tied to formula or figure evidence.
-8. Write or update `final-source-review.json`.
-9. Run `workflows/check-wiki.md` after writing as the post-task check.
+5. Put only Obsidian wikilinks to original paper PDFs in frontmatter `sources`, each displayed as the paper slug: `"[[_epi/raw/papers/<slug>/paper.pdf|<slug>]]"`, not plain path text, a Markdown link, an alias such as `原论文 PDF`, or metadata/MinerU/DOI/arXiv entries.
+6. Add Obsidian wikilinks from new pages to existing related pages.
+7. Add `relationships:` frontmatter entries only when direction and type are clear.
+8. Keep formula and figure claims tied to formula or figure evidence.
+9. Write or update `final-source-review.json`.
+10. Run `workflows/check-wiki.md` after writing as the post-task check.
 
 ## Tracking
 

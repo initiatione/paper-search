@@ -14,7 +14,7 @@ from pathlib import Path
 from epi.runtime_config import apply_runtime_config
 
 
-DEFAULT_SOURCES = ["arxiv", "semantic", "openalex", "crossref", "dblp"]
+DEFAULT_SOURCES = ["arxiv", "semantic", "openalex", "crossref", "unpaywall", "dblp"]
 COMMAND_UNAVAILABLE = "paper-search command unavailable; install paper-search-mcp or configure EPI_PAPER_SEARCH_COMMAND"
 PROBE_TIMEOUT_SECONDS = 60
 SEARCH_TIMEOUT_SECONDS = 180

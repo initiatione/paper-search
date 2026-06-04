@@ -1,0 +1,104 @@
+schema_version: prw-skill-routing-v1
+source_of_truth: skills/routing.yaml
+session_discipline:
+  re_match_every_task: true
+  re_read_when:
+    - route_changed
+    - context_compacted
+    - unsure
+always_read:
+  - paper-research-wiki/references/epi-artifact-contract.md
+  - paper-research-wiki/references/page-family-contract.md
+  - ../rules/wiki-writing-standard.md
+routes:
+  extract_papers:
+    category: primary
+    triggers:
+      - 直接沉淀 EPI 抓下来的论文
+      - 提取这些论文
+      - 沉淀论文进 wiki
+      - extract EPI papers
+      - EPI paper deposition
+    skill: paper-research-wiki/SKILL.md
+    workflows:
+      - paper-research-wiki/workflows/extract-papers.md
+    references:
+      - paper-research-wiki/references/page-provenance.md
+    notes:
+      - read paper-wiki-language before drafting or rewriting formal pages
+      - ask one short confirmation question before formal writes
+  check_wiki:
+    category: primary
+    triggers:
+      - 检测 wiki 库
+      - 检查论文 wiki
+      - wiki 状态
+      - check wiki
+      - post-task check
+    skill: paper-research-wiki/SKILL.md
+    workflows:
+      - paper-research-wiki/workflows/check-wiki.md
+    notes:
+      - default to Quick + Targeted unless systemic link or tag chaos appears
+      - QMD is optional and must fall back to manifest and direct Markdown search
+  redo_extraction:
+    category: primary
+    triggers:
+      - 重做
+      - 重新提取
+      - 更详细提取
+      - 批量重提取
+      - redo
+      - deep extraction
+    skill: paper-research-wiki/SKILL.md
+    workflows:
+      - paper-research-wiki/workflows/redo-extraction.md
+    references:
+      - paper-research-wiki/references/page-provenance.md
+    notes:
+      - compare existing pages before staging replacement edits
+      - do not write EPI human approval records
+  update_wiki:
+    category: primary
+    triggers:
+      - 更新 wiki 库
+      - 继续上次的论文沉淀
+      - 重link
+      - relink
+      - update wiki
+      - repair paper wiki links
+    skill: paper-research-wiki/SKILL.md
+    workflows:
+      - paper-research-wiki/workflows/update-wiki.md
+    references:
+      - paper-research-wiki/references/upstream-obsidian-wiki-map.md
+    notes:
+      - repair links, aliases, tags, duplicate concept owners, and relationship drift in small batches
+      - rerun check-wiki after writing
+  language_gate:
+    category: support
+    triggers:
+      - 中文正式页
+      - 语言质量
+      - 机器翻译腔
+      - polish formal paper wiki pages
+      - language gate
+    skill: paper-wiki-language/SKILL.md
+    references:
+      - paper-wiki-language/references/style-guide.md
+    notes:
+      - applies to any formal page draft, rewrite, repair, or material update
+task_closure:
+  applies_to:
+    - formal page writes
+    - link or tag repairs
+    - provenance edits
+    - tracking file updates
+    - skill behavior changes
+  skip_for:
+    - pure read-only Q&A
+  checklist:
+    - run the matched workflow's post-task check
+    - report QMD refreshed, skipped, or failed with fallback
+    - report EPI record readiness or the exact remaining EPI action
+    - route recurring failures into PRW rules, workflows, references, or tests

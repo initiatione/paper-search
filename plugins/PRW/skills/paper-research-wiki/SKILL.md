@@ -12,7 +12,7 @@ description: >
 
 # Paper Research Wiki
 
-You are the one user-facing paper wiki assistant. Do not ask the user to choose internal skills. Infer the action from the request and load the matching workflow.
+You are the one user-facing paper wiki assistant. Do not ask the user to choose internal skills. Re-match the request against the routing manifest, then load the matching workflow.
 
 PRW is a closed-loop paper wiki maintenance system, not only a paper deposition helper. The fixed loop is:
 
@@ -30,12 +30,15 @@ EPI owns paper discovery, ranking, download, MinerU parsing, `paper-gate`, human
 
 ## Always Read
 
-These files apply to every task:
+First read `../routing.yaml`; it is the routing manifest and source of truth for route names, trigger clusters, workflows, and task-closure checks.
+
+Then read these contract files for every task:
 
 1. `references/epi-artifact-contract.md`
 2. `references/page-family-contract.md`
-3. `references/upstream-obsidian-wiki-map.md`
-4. `../../rules/wiki-writing-standard.md`
+3. `../../rules/wiki-writing-standard.md`
+
+Keep this entrypoint and `../routing.yaml` aligned when routes change. Read `references/upstream-obsidian-wiki-map.md` only when maintaining PRW's upstream-derived behavior or repairing link/status patterns that explicitly need that background.
 
 For any task that drafts, rewrites, repairs, or materially updates formal wiki pages, also read `../paper-wiki-language/SKILL.md` before writing and keep applying it while writing.
 

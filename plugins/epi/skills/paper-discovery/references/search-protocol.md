@@ -8,7 +8,7 @@ Before running the first query:
 2. Split the request using the user's config/profile: discipline/domain, method or topic terms, problem/task, context, quality evidence, venue prior, and exclusions.
 3. Build 5-8 query variants instead of one vague query. Include exact phrases, synonyms, acronym expansions, and task-specific terms derived from config first; load `domain-ontology.md` only as optional examples.
 4. Default discovery is non-review: every query variant should carry `-review -survey` and the filter stage should still enforce the exclusion. Skip this only when the user explicitly asks for review or survey papers.
-5. Route sources by intent: use `paper_search_mcp` first with configured sources such as `arxiv,semantic,openalex,crossref`; use live academic/web search to verify recent journal papers, DOI pages, citation counts, JCR/CiteScore-style metrics, code/PDF availability, and gaps that MCP missed.
+5. Route sources by intent: use `paper_search_mcp` first with configured sources such as `arxiv,semantic,openalex,crossref,unpaywall`; use live academic/web search to verify recent journal papers, DOI pages, citation counts, JCR/CiteScore-style metrics, code/PDF availability, and gaps that MCP missed.
 6. Apply `two-stage-retrieval.md`: first form a high-recall candidate pool, then deduplicate, verify, and precision-rank.
 7. Apply the `domain_focus_terms` hard anchor gate before ranking when the query plan provides it. A paper that only matches a broad method term, such as reinforcement learning, graph neural network, or deep learning, but not the requested object/task/domain anchor should be rejected as `outside_domain`.
 8. Apply `venue-prior.md` as a recall/ranking prior from user config. Check whether the user's configured flagship venues, journals, conferences, or field databases are missing before accepting the result set.
@@ -20,8 +20,8 @@ For any narrow field, do not let the query planner blur the target into generic 
 
 If the current request activates a domain hint pack, keep the hard anchor gate on that pack's strong synonyms and the user's configured domain terms. Long-query n-grams that describe only a broad task or object class are recall aids, not sufficient evidence for domain fit.
 
-Treat publisher PDF blocks as acquisition evidence, not as the end of discovery. HTTP 403/502 from IEEE, Wiley, or publisher PDFs should be reported as publisher PDF blocks; then try open sources, arXiv versions, DOI landing pages, Semantic Scholar/OpenAlex metadata, or a sharper arXiv-first query before concluding that the paper cannot be processed.
+Treat publisher PDF blocks as acquisition evidence, not as the end of discovery. HTTP 403/502 from IEEE, Wiley, or publisher PDFs should be reported as publisher PDF blocks; then try open sources, Unpaywall, arXiv versions, DOI landing pages, Semantic Scholar/OpenAlex metadata, or a sharper arXiv-first query before concluding that the paper cannot be processed.
 
-During acquisition, a DOI or publisher landing page is not a PDF. If a landing page exposes `citation_pdf_url` or an obvious publisher PDF link, EPI can follow it once; otherwise `acquire-record.json` should report `failure_class=not-pdf` and the next step is to switch to a direct PDF/open-access source rather than sending HTML to MinerU.
+During acquisition, a DOI or publisher landing page is not a PDF. If a landing page exposes `citation_pdf_url` or an obvious publisher PDF link, EPI can follow it once. When merged candidates provide multiple `pdf_urls`, acquisition should try each candidate URL in order and record `candidate_pdf_urls` plus `acquire_attempts`; only after those fallbacks fail should `acquire-record.json` report `failure_class=not-pdf` or a publisher/network block and ask for a direct PDF/open-access source rather than sending HTML to MinerU.
 
 If the first result set is generic, stale, too review-heavy, or full of blocked PDFs, run a sharper rerun rather than stopping early.
