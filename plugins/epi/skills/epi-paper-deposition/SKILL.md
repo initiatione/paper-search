@@ -9,7 +9,7 @@ description: >
 
 # EPI Paper Deposition
 
-Use this skill at the boundary where EPI stops being a paper evidence engine and the wiki layer starts writing formal knowledge. EPI Core prepares source bundles and audit artifacts under `_epi/`; this adapter reads `wiki_deposition_task.json` and coordinates the formal wiki skills.
+Use this skill at the boundary where EPI stops being a paper evidence engine and the wiki layer starts writing formal knowledge. EPI Core prepares source bundles and audit artifacts under `_epi/`; those internal audit artifacts must not enter the formal graph. This adapter reads `wiki_deposition_task.json` and coordinates the formal wiki skills.
 
 Compatibility note: older EPI artifacts may say `epi-wiki-deposition`. Treat that as an alias for this skill.
 
