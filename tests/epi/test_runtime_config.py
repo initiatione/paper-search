@@ -241,6 +241,28 @@ def test_config_status_include_runtime_reports_easyscholar_secret_without_value(
     assert "easyscholar-secret" not in json.dumps(payload)
 
 
+def test_cli_main_applies_runtime_config_before_default_vault_resolution(tmp_path, monkeypatch, capsys):
+    from epi import cli
+
+    runtime_path = tmp_path / "runtime.json"
+    vault = tmp_path / "paper-research-wiki"
+    meta = vault / "_epi" / "meta"
+    meta.mkdir(parents=True)
+    (meta / "epi-config.yaml").write_text("profile: runtime_vault\n", encoding="utf-8")
+    _write_json(runtime_path, {"env": {"EPI_VAULT": str(vault)}})
+    monkeypatch.setenv("EPI_RUNTIME_CONFIG", str(runtime_path))
+    monkeypatch.delenv("EPI_VAULT", raising=False)
+
+    exit_code = cli.main(["config-status", "--json", "--include-runtime"])
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert payload["config_path"] == str(vault / "_epi" / "meta" / "epi-config.yaml")
+    assert payload["runtime_config"]["loaded"] is True
+    env_mentions = set(payload["runtime_config"]["applied_env"]) | set(payload["runtime_config"]["skipped_env"])
+    assert "EPI_VAULT" in env_mentions
+
+
 def test_dry_run_uses_runtime_configured_cli_fallback(tmp_path, monkeypatch):
     plugin_root = tmp_path / "plugin"
     _write_minimal_plugin_template(plugin_root)

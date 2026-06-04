@@ -833,5 +833,6 @@ HANDLERS = cli_routes.bind_handlers(globals())
 
 
 def main(argv: list[str] | None = None) -> int:
+    apply_runtime_config()
     args = build_parser().parse_args(argv)
     return cli_routes.dispatch(args, HANDLERS)
