@@ -12,3 +12,4 @@ coverage/
 plugins/epi/.runtime/
 plugins/epi/.plugin-eval/
 .codex_tmp_refs/
+.worktrees/
