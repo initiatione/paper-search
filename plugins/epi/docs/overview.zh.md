@@ -440,4 +440,6 @@ EPI 的目标不是把论文摘要塞进单页，也不是自己充当通用 wik
 
 正式页 frontmatter 至少包含 `title`、`category`、`page_family`、`tags`、`aliases`、`sources`、`summary`、`provenance`、`base_confidence`、`lifecycle`、`lifecycle_changed`、`tier`、`created`、`updated`。`category` 与 `page_family` 必须匹配所在七类目录；初始 `lifecycle` 只能是 `draft` 或 `review-needed`，不能默认写成 `source-reviewed` 或 `verified`。record 前的质量 gate 要检查 Obsidian wikilinks、source bundle 路径、provenance.extracted/inferred/ambiguous、禁止 `_epi/` 进入正式图谱、禁止 fenced `math`/`tex`/`latex` 公式块、`derivations/` 的变量定义和推导链、`references/` 的模型/公式/实验/限制，以及 `synthesis/` 的 cross-paper comparison matrix。
 
+QMD 只作为检索辅助，不是 source of truth。`paper-research-wiki` qmd collection 可索引七类正式页目录，加 `AGENTS.md`、`index.md`、`hot.md`、`log.md`、`_meta/` 合约页；必须 ignore `_epi/**`、`.obsidian/**`、`.claude/**`，所以 `_epi/meta/formal-page-snapshots/`、raw MinerU source Markdown 和 staging handoff 不进入 QMD。信任 QMD 前用 `qmd collection show paper-research-wiki`、`qmd ls paper-research-wiki/_epi`、`qmd ls paper-research-wiki/_epi/meta/formal-page-snapshots` 验证。
+
 `final-source-review.json` 仍需要覆盖 `theory_reconstruction`、`formula_derivation`、`figure_table_evidence`、`novelty_type`、`implementability`、`reproducibility_risk`、`research_gap`、`cost_level`。它记录 source reread、formula/figure review、证据路径和 source review 完整性；创新性判断必须区分 author-claimed novelty 和 EPI-confirmed novelty。

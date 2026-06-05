@@ -377,6 +377,47 @@ def test_epi_paper_deposition_documents_required_wiki_adapter_stack():
     assert "must not enter the formal graph" in combined
 
 
+def test_prw_qmd_boundary_is_explicit_in_plugin_contracts():
+    files = [
+        ROOT / "docs" / "workflow.md",
+        ROOT / "docs" / "epi-linkage.md",
+        ROOT / "docs" / "structure.md",
+        SKILLS / "epi-paper-deposition" / "SKILL.md",
+        SKILLS / "epi-paper-deposition" / "workflows" / "formal-wiki-write.md",
+        ROOT / "scripts" / "build" / "epi" / "wiki_contracts.py",
+        ROOT / "scripts" / "build" / "epi" / "wiki_init.py",
+        ROOT / "scripts" / "build" / "epi" / "stage_wiki.py",
+        ROOT / "scripts" / "build" / "epi" / "wiki_ingest_handoff.py",
+    ]
+    combined = "\n".join(path.read_text(encoding="utf-8") for path in files)
+
+    assert "QMD" in combined
+    assert "qmd collection" in combined
+    for allowed in [
+        "references/",
+        "concepts/",
+        "derivations/",
+        "experiments/",
+        "synthesis/",
+        "reports/",
+        "opportunities/",
+        "AGENTS.md",
+        "index.md",
+        "hot.md",
+        "log.md",
+        "_meta/",
+    ]:
+        assert allowed in combined
+    for ignored in [
+        "_epi/**",
+        "_epi/meta/formal-page-snapshots/",
+        "MinerU source Markdown",
+        ".obsidian/**",
+        ".claude/**",
+    ]:
+        assert ignored in combined
+
+
 def test_epi_formal_deposition_route_is_compatibility_adapter():
     routing = _load_routing()
     routes = routing["routes"]

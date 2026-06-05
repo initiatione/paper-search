@@ -16,6 +16,7 @@ from epi.wiki_contracts import (
     formal_page_family_records,
     page_lifecycle_states,
     quality_enhancement_wiki_skills,
+    qmd_collection_policy,
     required_wiki_skills,
     research_review_fields,
     optional_wiki_skills,
@@ -700,8 +701,10 @@ def _wiki_rule_source_model() -> dict:
             "log.md",
             ".manifest.json",
         ],
+        "qmd_collection_policy": qmd_collection_policy(),
         "write_contract_requirements": [
             "Search existing pages with index/frontmatter, QMD when configured, and grep before creating a new page.",
+            "Use QMD only with the paper-research-wiki qmd collection boundary: formal page families plus AGENTS.md, index.md, hot.md, log.md, and _meta/ contract pages may be indexed; _epi/**, .obsidian/**, and .claude/** must be ignored.",
             "Merge or update existing notes before creating duplicates.",
             "Keep Markdown vault files as the source of truth; QMD and search indexes are retrieval aids.",
             "Preserve source provenance and distinguish extracted, inferred, and ambiguous claims.",
@@ -797,6 +800,7 @@ def _build_wiki_deposition_task(
         "optional_skills": optional_wiki_skills(),
         "formal_frontmatter_schema": formal_frontmatter_schema(),
         "quality_gates": wiki_deposition_quality_gates(),
+        "qmd_collection_policy": qmd_collection_policy(),
         "wiki_rule_source_model": wiki_ingest_brief.get("wiki_rule_source_model", {}),
         "final_source_review_contract": wiki_ingest_brief.get("final_source_review_contract", {}),
         "agent_context_policy": agent_context_policy(),
@@ -924,6 +928,7 @@ def _build_wiki_ingest_brief(
         ],
         "final_source_review_contract": _final_source_review_contract(slug),
         "wiki_rule_source_model": _wiki_rule_source_model(),
+        "qmd_collection_policy": qmd_collection_policy(),
         "ingest_policy": {
             "authority": "Resolve the target vault contract first; local skills are helpers, not sole authority.",
             "workflow_mode": workflow_mode,
@@ -946,6 +951,7 @@ def _build_wiki_ingest_brief(
                 "implementability, reproducibility risk, research gaps, and cost."
             ),
             "source_of_truth": "Markdown vault plus EPI source bundle; QMD/search indexes are retrieval aids only.",
+            "qmd_collection_policy": qmd_collection_policy(),
             "source_first_policy": (
                 f"Read the source paper artifacts ({source_markdown}, mineru/paper.tex, mineru/images/*, "
                 "and mineru/mineru-manifest.json) before final wiki writing; reader and critic outputs, "
@@ -1010,6 +1016,7 @@ def _build_wiki_ingest_brief(
             "formal_page_families": formal_page_family_names(),
             "formal_frontmatter_schema": formal_frontmatter_schema(),
             "quality_gates": wiki_deposition_quality_gates(),
+            "qmd_collection_policy": qmd_collection_policy(),
             "research_review_fields": research_review_fields(),
             "page_lifecycle_states": page_lifecycle_states(),
             "agent_context_policy": agent_context_policy(),

@@ -47,6 +47,12 @@ Do not create generic `entities/`, `skills/`, `journal/`, or `projects/` pages f
 
 Do not initialize, repair, reset, or silently create a paper wiki vault from this adapter. If vault structure is missing, switch to EPI `wiki-setup` first. PRW consumes an initialized vault contract; this adapter only bridges already prepared EPI handoff artifacts to the wiki-writing layer.
 
+## QMD Boundary
+
+QMD is a retrieval aid and must follow the target vault boundary. The `paper-research-wiki` qmd collection may index formal wiki pages in `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`, plus `AGENTS.md`, `index.md`, `hot.md`, `log.md`, and `_meta/` contract pages.
+
+The qmd collection must ignore `_epi/**`, `.obsidian/**`, and `.claude/**`. This excludes `_epi/meta/formal-page-snapshots/`, `_epi/raw/<slug>/mineru/<slug>.md`, `_epi/raw/<slug>/mineru/paper.md`, `_epi/raw/<slug>/mineru/paper.tex`, and other MinerU source Markdown from QMD. Check with `qmd collection show paper-research-wiki`, `qmd ls paper-research-wiki/_epi`, and `qmd ls paper-research-wiki/_epi/meta/formal-page-snapshots` before trusting QMD results.
+
 ## Frontmatter And Quality Gates
 
 Every formal page must include frontmatter fields `title`, `category`, `page_family`, `tags`, `aliases`, `sources`, `summary`, `provenance`, `base_confidence`, `lifecycle`, `lifecycle_changed`, `tier`, `created`, and `updated`. Frontmatter `sources` must contain only Obsidian wikilinks to original paper PDFs, each displayed as the paper slug: `"[[_epi/raw/<slug>/paper.pdf|<slug>]]"`. Initial lifecycle is `draft` or `review-needed`; do not mark pages `source-reviewed` or `verified` until source review and lint gates pass.

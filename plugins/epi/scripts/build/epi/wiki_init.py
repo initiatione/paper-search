@@ -7,7 +7,7 @@ from pathlib import Path
 
 from epi.epi_repository import ensure_epi_repository
 from epi.graph_visibility import graph_search_filter, sync_graph_json
-from epi.wiki_contracts import formal_page_family_names, formal_page_family_paths
+from epi.wiki_contracts import formal_page_family_names, formal_page_family_paths, qmd_collection_policy
 
 
 FORMAL_PAGE_DIRS = formal_page_family_names()
@@ -71,6 +71,18 @@ Formal wiki pages must use Obsidian-renderable LaTeX delimiters:
   ```
 
 Do not use fenced code blocks such as ```` ```math ```` or ```` ```tex ```` for formulas in formal wiki pages; Obsidian displays those as code blocks instead of rendering them as math.
+
+## QMD retrieval boundary
+
+QMD is a retrieval aid, not the vault source of truth. The active `paper-research-wiki` qmd collection may index formal wiki pages in `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`, plus `AGENTS.md`, `index.md`, `hot.md`, `log.md`, and `_meta/` contract pages. It must ignore `_epi/**`, `.obsidian/**`, and `.claude/**`; this excludes `_epi/meta/formal-page-snapshots/`, `_epi/raw/<slug>/mineru/<slug>.md`, `_epi/raw/<slug>/mineru/paper.md`, `_epi/raw/<slug>/mineru/paper.tex`, and other MinerU source Markdown from QMD.
+
+Verify the boundary with:
+
+```text
+qmd collection show paper-research-wiki
+qmd ls paper-research-wiki/_epi
+qmd ls paper-research-wiki/_epi/meta/formal-page-snapshots
+```
 """
 
 
@@ -82,6 +94,7 @@ AGENT_OPERATING_CONTRACT_MD = """# Agent Operating Contract
 - Preserve central formulas, figures, tables, and image evidence when distilling claims.
 - Render formulas with Obsidian math delimiters: inline `$...$`, block `$$...$$`. Never place final-page formulas in fenced `math`, `tex`, or `latex` code blocks.
 - Search existing pages before creating new ones.
+- When using QMD, keep the `paper-research-wiki` qmd collection scoped to formal page families plus `AGENTS.md`, `index.md`, `hot.md`, `log.md`, and `_meta/`; `_epi/**`, `.obsidian/**`, and `.claude/**` must stay ignored.
 """
 
 
@@ -218,6 +231,7 @@ def _manifest_payload(existing: dict | None = None) -> dict:
                 "forbidden_fenced_languages": ["math", "tex", "latex"],
             },
             "graph_ignore_internal_dirs": True,
+            "qmd_collection_policy": qmd_collection_policy(),
             "raw_paper_markdown_role": "source-material-not-formal-page",
             "wiki_dirs": [*FORMAL_PAGE_DIRS],
             "operational_dirs": ["_epi"],

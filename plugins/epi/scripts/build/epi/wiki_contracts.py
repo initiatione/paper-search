@@ -147,6 +147,29 @@ WIKI_DEPOSITION_QUALITY_GATES: dict[str, object] = {
     "internal_roots_forbidden_in_formal_graph": ["_epi", "_raw", "_staging", "_runs", "_quarantine"],
 }
 
+QMD_ALLOWED_EXTRA_PATHS: tuple[str, ...] = (
+    "AGENTS.md",
+    "index.md",
+    "hot.md",
+    "log.md",
+    "_meta/",
+)
+
+QMD_IGNORED_PATTERNS: tuple[str, ...] = (
+    "_epi/**",
+    ".obsidian/**",
+    ".claude/**",
+)
+
+QMD_FORBIDDEN_EXAMPLES: tuple[str, ...] = (
+    "_epi/meta/formal-page-snapshots/",
+    "_epi/raw/<slug>/mineru/<slug>.md",
+    "_epi/raw/<slug>/mineru/paper.md",
+    "_epi/raw/<slug>/mineru/paper.tex",
+    "_epi/staging/papers/<slug>/wiki-ingest-brief.json",
+    "MinerU source Markdown",
+)
+
 
 def required_wiki_skills() -> list[str]:
     return list(REQUIRED_WIKI_SKILLS)
@@ -202,6 +225,27 @@ def wiki_deposition_quality_gates() -> dict[str, object]:
     return {
         key: list(value) if isinstance(value, list) else value
         for key, value in WIKI_DEPOSITION_QUALITY_GATES.items()
+    }
+
+
+def qmd_collection_policy() -> dict[str, object]:
+    return {
+        "collection_name": "paper-research-wiki",
+        "pattern": "**/*.md",
+        "allowed_index_scope": [*formal_page_family_paths(), *QMD_ALLOWED_EXTRA_PATHS],
+        "ignore_patterns": list(QMD_IGNORED_PATTERNS),
+        "forbidden_examples": list(QMD_FORBIDDEN_EXAMPLES),
+        "qmd_collection_contract": (
+            "qmd collection for paper-research-wiki may index formal wiki pages plus AGENTS.md, "
+            "index.md, hot.md, log.md, and _meta/ contract pages; it must ignore _epi/**, "
+            ".obsidian/**, and .claude/**."
+        ),
+        "verification_commands": [
+            "qmd collection show paper-research-wiki",
+            "qmd ls paper-research-wiki/_epi",
+            "qmd ls paper-research-wiki/_epi/meta/formal-page-snapshots",
+        ],
+        "source_of_truth": "Markdown vault files; QMD is a retrieval aid only.",
     }
 
 

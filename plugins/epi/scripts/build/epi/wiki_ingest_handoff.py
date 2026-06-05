@@ -11,6 +11,7 @@ from epi.wiki_contracts import (
     formal_page_family_names,
     formal_page_family_paths,
     page_lifecycle_states,
+    qmd_collection_policy,
     required_wiki_skills,
     research_review_fields,
 )
@@ -310,6 +311,11 @@ def build_wiki_ingest_handoff(vault_path: Path, slug: str) -> dict[str, Any]:
         "candidate_topics": brief.get("candidate_topics") or [],
         "candidate_clusters": brief.get("candidate_clusters") or [],
         "wiki_skill_handoff": brief.get("wiki_skill_handoff") or {},
+        "qmd_collection_policy": (
+            brief.get("qmd_collection_policy")
+            if isinstance(brief.get("qmd_collection_policy"), dict)
+            else qmd_collection_policy()
+        ),
         "agent_context_policy": _agent_context_policy(brief),
         "entrypoints": brief.get("entrypoints") or {},
         "trust_status": brief.get("trust_status") or {},
@@ -355,6 +361,21 @@ def render_wiki_ingest_handoff(handoff: dict[str, Any]) -> str:
         lines.append(f"- allowed_executors: {allowed}")
         lines.append(f"- brand_neutrality: {execution_policy.get('brand_neutrality')}")
         lines.append(f"- local_skills_role: {execution_policy.get('local_skills_role')}")
+    else:
+        lines.append("- missing")
+    qmd_policy = handoff.get("qmd_collection_policy") if isinstance(handoff.get("qmd_collection_policy"), dict) else {}
+    lines.extend(["", "## QMD Collection Boundary", ""])
+    if qmd_policy:
+        lines.append(f"- collection: {qmd_policy.get('collection_name')}")
+        lines.append(f"- pattern: {qmd_policy.get('pattern')}")
+        allowed = ", ".join(str(item) for item in qmd_policy.get("allowed_index_scope") or [])
+        ignored = ", ".join(str(item) for item in qmd_policy.get("ignore_patterns") or [])
+        forbidden = ", ".join(str(item) for item in qmd_policy.get("forbidden_examples") or [])
+        lines.append(f"- allowed_index_scope: {allowed}")
+        lines.append(f"- ignore_patterns: {ignored}")
+        lines.append(f"- forbidden_examples: {forbidden}")
+        for command in qmd_policy.get("verification_commands") or []:
+            lines.append(f"- verify: {command}")
     else:
         lines.append("- missing")
     context_policy = handoff.get("agent_context_policy") if isinstance(handoff.get("agent_context_policy"), dict) else {}

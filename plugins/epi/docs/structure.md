@@ -115,14 +115,14 @@ scripts/build/epi/
 - `run_critic.py`、`paper_quality.py`、`role_critics.py` 负责 critic quorum、学术论文可靠性检查和三角色质量门；其中 `parse-quality-critic` 会检查 MinerU Markdown、TeX、images、manifest 和 `parse-record.json`，避免原文公式/图像证据在进入 reader/wiki 前被静默抹掉。
 - `report_run.py` 负责生成 `_epi/runs/<run-id>/report.md` 和 `report.json`，并提供 `report --run-id` 的只读 loader；该 CLI 会展示 run report artifact 和 `run-state.json` payload，但不刷新 index、queue、raw、staging、Zotero 或 wiki。
 - `research_decision.py`、`reader_revision_plan.py`、`reader_revision_guidance.py`、`reproduction_plan.py` 把 critic 结果翻译成决策、修复建议和紧凑复现 caveat。
-- `wiki_contracts.py` 固定七类正式页面、required wiki skills、frontmatter schema、quality gates 和 legacy alias 等跨模块常量。
+- `wiki_contracts.py` 固定七类正式页面、required wiki skills、frontmatter schema、quality gates、legacy alias 和 QMD collection boundary 等跨模块常量；`paper-research-wiki` qmd collection 允许正式页目录加 `AGENTS.md`、`index.md`、`hot.md`、`log.md`、`_meta/`，必须 ignore `_epi/**`、`.obsidian/**`、`.claude/**`，让 `_epi/meta/formal-page-snapshots/`、raw MinerU source Markdown 和 staging handoff 不进入 QMD。
 - `stage_wiki.py` 负责 `_epi/staging` 内部证据包、轻阅读报告、`wiki-ingest-brief.json`、`wiki_deposition_task.json`、`final_source_review_contract` 和 `promotion-plan.json`；它不得把审计页当成正式 wiki 页写到根目录。
 - `paper_gate.py` 是只读质量门面板，决定当前 slug 是 failure、waiting for human gate，还是允许进入下一动作；它调用 `source_bundle_audit.py` 检查 `paper.pdf`、`metadata.json`、MinerU Markdown、`mineru/paper.tex`、`mineru/images/*` 和 `mineru/mineru-manifest.json`，当 source bundle is incomplete 时阻止 final handoff。
 - `source_bundle_audit.py` 负责 raw source bundle 的磁盘完整性审计和 image hash 明细，供 `paper_gate.py` 与 record provenance 复用。
 - `graph_visibility.py` 负责 Obsidian `.obsidian/graph.json` 的正式目录 filter 和 `collapse-filter` 修复，避免过度转义导致图谱只剩 index。
 - `wiki_language.py` 负责 formal page language gate：formal wiki page body prose defaults to Chinese；英文只保留论文题名、术语、缩写、证据字段和路径。
 - `wiki_handoff_contracts.py` 保存 agent context policy：独立 wiki deposition 子任务可交给 fresh-context worker，主 agent 只读最终产物、changed file list 和 verification result；Codex 仍必须先有用户显式授权才可用 subagents。
-- `wiki_ingest_handoff.py` 是只读 handoff 渲染器，给最终 wiki ingest agent 提供路径、规则优先级、final-source-review 合同、agent context policy 和 checklist。
+- `wiki_ingest_handoff.py` 是只读 handoff 渲染器，给最终 wiki ingest agent 提供路径、规则优先级、final-source-review 合同、QMD 边界、agent context policy 和 checklist；它应显示 `qmd collection show paper-research-wiki`、`qmd ls paper-research-wiki/_epi`、`qmd ls paper-research-wiki/_epi/meta/formal-page-snapshots` 这类验证命令。
 - `wiki_ingest_approval.py` 是 agent-mediated 前置人类批准 helper：写入并校验 `_epi/staging/papers/<slug>/human-approval.json`，要求当前 gate 只有 `human-approval` 待办。
 - `wiki_ingest_trigger.py` 是批准后的继续/触发 helper：写入 `_epi/staging/papers/<slug>/wiki-agent-trigger.json`，让当前 Claude、Codex 或其他 wiki-capable agent 按同一 target vault contract 继续最终页写入；它不写最终 wiki 页面。
 - `wiki_ingest_record.py` 是 agent-mediated 完成态记录器：只读取最终 Markdown 页面、前置 `human-approval.json` 和 `final-source-review.json`，校验路径在 vault 内且不在 EPI 内部目录，验证源工件 hash、公式/图片/PDF 复核和 final page provenance，检查 formal frontmatter、`category/page_family`、provenance、wikilinks、Chinese-default 正文、forbidden formula blocks 和 family-specific quality gates，记录 hash 和 human approval，不写最终页面。

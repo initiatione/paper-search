@@ -38,6 +38,16 @@ After first staged pages exist, `wiki-synthesize`, `wiki-dedup`, and `cross-link
 
 Do not initialize, reset, or repair vault structure in this workflow. If the target vault is missing `_epi/`, `_meta/`, `.obsidian`, or the formal page roots, switch to EPI `wiki-setup` first.
 
+## QMD Boundary
+
+When QMD is available, treat it as a retrieval aid only. The active `paper-research-wiki` qmd collection may index:
+
+- formal wiki pages under `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`
+- vault entry and maintenance notes: `AGENTS.md`, `index.md`, `hot.md`, and `log.md`
+- vault contract pages under `_meta/`
+
+The qmd collection must ignore `_epi/**`, `.obsidian/**`, and `.claude/**`. This means `_epi/meta/formal-page-snapshots/`, `_epi/raw/<slug>/mineru/<slug>.md`, `_epi/raw/<slug>/mineru/paper.md`, `_epi/raw/<slug>/mineru/paper.tex`, and other MinerU source Markdown are source material for writing, but not QMD-indexed wiki knowledge. Verify with `qmd collection show paper-research-wiki`, `qmd ls paper-research-wiki/_epi`, and `qmd ls paper-research-wiki/_epi/meta/formal-page-snapshots`.
+
 ## Page Families
 
 Choose final page families under the target vault contract:
