@@ -25,24 +25,27 @@ def test_initialize_paper_wiki_creates_required_layout(tmp_path):
         "_epi/raw",
         "_epi/staging/papers",
         "_epi/staging/wiki-batches/pending",
-        "_epi/quarantine/papers",
-        "_epi/runs",
-        "_epi/evolution/proposals",
-        "_epi/evolution/pending",
-        "_epi/evolution/active",
-        "_epi/evolution/archive",
-        "_epi/evolution/rejected",
         "_epi/meta",
-        "_epi/meta/raw-cleanup",
         "_epi/meta/formal-page-snapshots",
         "_epi/policies",
-        "_epi/tmp-manual-pdfs",
         "_meta",
         *EXPECTED_RESEARCH_WIKI_DIRS,
         ".obsidian",
     ]
     for relative_path in expected_dirs:
         assert (vault / relative_path).is_dir()
+
+    on_demand_dirs = [
+        "_epi/runs",
+        "_epi/cache",
+        "_epi/tmp",
+        "_epi/tmp-manual-pdfs",
+        "_epi/quarantine",
+        "_epi/evolution",
+        "_epi/meta/raw-cleanup",
+    ]
+    for relative_path in on_demand_dirs:
+        assert not (vault / relative_path).exists()
 
     manifest = json.loads((vault / ".manifest.json").read_text(encoding="utf-8"))
     assert manifest["vault_type"] == "academic-paper-research"
@@ -96,6 +99,9 @@ def test_initialize_paper_wiki_creates_required_layout(tmp_path):
     assert "formula derivation" in taxonomy
     assert "implementability" in taxonomy
     assert "research gap" in taxonomy
+    assert "on-demand workflow directories" in directory_structure
+    assert "`_epi/quarantine/`" in directory_structure
+    assert "`_epi/evolution/`" in directory_structure
     assert "_epi/" in (vault / "_meta" / "graph-visibility.md").read_text(encoding="utf-8")
     graph = json.loads((vault / ".obsidian" / "graph.json").read_text(encoding="utf-8"))
     assert "_epi" not in graph["search"]
@@ -391,3 +397,34 @@ def test_repository_cleanup_prunes_lifecycle_artifacts_even_when_under_budget(tm
         "snapshot-3"
     ]
     assert sorted(path.name for path in (vault / "_epi" / "tmp-manual-pdfs").iterdir()) == ["paper-3.pdf"]
+
+
+def test_repository_cleanup_removes_empty_on_demand_shell_dirs(tmp_path):
+    vault = tmp_path / "paper-research-wiki"
+    initialize_paper_wiki(vault)
+
+    empty_shells = [
+        vault / "_epi" / "cache" / "easyscholar",
+        vault / "_epi" / "quarantine" / "papers",
+        vault / "_epi" / "evolution" / "proposals",
+        vault / "_epi" / "evolution" / "pending",
+    ]
+    for path in empty_shells:
+        path.mkdir(parents=True, exist_ok=True)
+
+    non_empty_tmp = vault / "_epi" / "tmp" / "downloads"
+    non_empty_tmp.mkdir(parents=True)
+    (non_empty_tmp / "keep.pdf").write_text("keep", encoding="utf-8")
+
+    preview = cleanup_epi_repository(vault, dry_run=True)
+    assert any(action["action"] == "remove-empty-on-demand-dir" for action in preview["actions"])
+    assert (vault / "_epi" / "quarantine").exists()
+    assert non_empty_tmp.exists()
+
+    result = cleanup_epi_repository(vault)
+
+    assert result["status"] == "cleaned"
+    assert not (vault / "_epi" / "cache").exists()
+    assert not (vault / "_epi" / "quarantine").exists()
+    assert not (vault / "_epi" / "evolution").exists()
+    assert non_empty_tmp.exists()

@@ -140,7 +140,9 @@ The paper research vault keeps paper acquisition, staging, and final wiki output
 - `_epi/raw/<slug>/`: downloaded source paper artifacts
 - `_epi/staging/papers/<slug>/`: per-paper evidence handoff
 - `_epi/staging/wiki-batches/<batch-id>/`: multi-paper handoff for wiki skill deposition
-- `_epi/runs/`: transient run reports and dashboards, auto-cleaned by repository policy
+- `_epi/meta/`: EPI config, config history, formal-page snapshots, and bounded maintenance records
+- `_epi/policies/retention.json`: repository cleanup policy
+- `_epi/runs/`, `_epi/cache/`, `_epi/tmp/`, `_epi/tmp-manual-pdfs/`, `_epi/quarantine/`, `_epi/evolution/`: on-demand workflow directories, not empty bootstrap shells
 """ + _formal_page_directory_lines() + """
 """
 

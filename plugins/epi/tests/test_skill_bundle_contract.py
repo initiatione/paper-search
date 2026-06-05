@@ -1,11 +1,15 @@
 from pathlib import Path
 import re
 import subprocess
+import sys
 
 
 ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = ROOT.parents[1]
 SKILLS = ROOT / "skills"
+BUILD_ROOT = ROOT / "scripts" / "build"
+if str(BUILD_ROOT) not in sys.path:
+    sys.path.insert(0, str(BUILD_ROOT))
 CHINESE_TEXT = re.compile(r"[\u4e00-\u9fff]")
 CATEGORIES = {"primary", "support", "maintenance", "compatibility"}
 MAX_ENTRYPOINT_LINES = 90
@@ -227,6 +231,68 @@ def test_plugin_routing_manifest_is_the_small_source_of_truth():
     assert len(routing["always_read"]) <= 3
 
 
+def test_epi_repository_initialization_uses_lean_default_structure(tmp_path):
+    from epi.epi_repository import ensure_epi_repository
+
+    ensure_epi_repository(tmp_path)
+
+    required = [
+        "_epi/README.md",
+        "_epi/manifest.json",
+        "_epi/raw",
+        "_epi/staging/papers",
+        "_epi/staging/wiki-batches/pending",
+        "_epi/meta/config-history",
+        "_epi/meta/formal-page-snapshots",
+        "_epi/policies/retention.json",
+    ]
+    for relative in required:
+        assert (tmp_path / relative).exists(), relative
+
+    on_demand = [
+        "_epi/runs",
+        "_epi/quarantine",
+        "_epi/evolution",
+        "_epi/cache",
+        "_epi/tmp",
+        "_epi/tmp-manual-pdfs",
+    ]
+    for relative in on_demand:
+        assert not (tmp_path / relative).exists(), relative
+
+    manifest = (tmp_path / "_epi" / "manifest.json").read_text(encoding="utf-8")
+    assert "core_sections" in manifest
+    assert "on_demand_sections" in manifest
+    assert "not precreated" in manifest
+
+
+def test_wiki_setup_documents_lean_epi_bootstrap_contract():
+    wiki_setup = (SKILLS / "wiki-setup" / "SKILL.md").read_text(encoding="utf-8")
+
+    assert "core `_epi` bootstrap" in wiki_setup
+    assert "raw/staging/meta/policies" in wiki_setup
+    assert "on-demand" in wiki_setup
+    assert "quarantine/evolution" in wiki_setup
+    assert "raw/staging/runs/quarantine/evolution/meta roots" not in wiki_setup
+
+
+def test_prw_documents_core_epi_bootstrap_without_requiring_on_demand_dirs():
+    prw_root = ROOT.parent / "PRW"
+    files = [
+        prw_root / "skills" / "paper-research-wiki" / "SKILL.md",
+        prw_root / "docs" / "workflow.md",
+        prw_root / "docs" / "epi-integration.md",
+        prw_root / "skills" / "paper-research-wiki" / "workflows" / "check-wiki.md",
+        prw_root / "skills" / "paper-research-wiki" / "workflows" / "extract-papers.md",
+    ]
+    combined = "\n".join(path.read_text(encoding="utf-8") for path in files)
+
+    for required in ["_epi/raw/", "_epi/staging/", "_epi/meta/", "_epi/policies/"]:
+        assert required in combined
+    assert "not a bootstrap failure" in combined
+    assert "on-demand" in combined
+
+
 def test_all_skill_entrypoints_stay_thin():
     for skill_dir in SKILLS.iterdir():
         if not skill_dir.is_dir() or not (skill_dir / "SKILL.md").exists():
@@ -369,9 +435,10 @@ def test_epi_paper_deposition_documents_required_wiki_adapter_stack():
     ]:
         assert field in combined
     assert "draft` or `review-needed`" in combined
-    assert "only Obsidian wikilinks to original paper PDFs" in combined
+    assert "only Obsidian source PDF links" in combined
+    assert "obsidian://open?...paper.pdf" in combined
     assert "[[_epi/raw/<slug>/paper.pdf|<slug>]]" in combined
-    assert "displayed as the paper slug" in combined
+    assert "accepted for compatibility" in combined
     for phrase in ["metadata", "MinerU", "DOI", "arXiv"]:
         assert phrase in combined
     assert "must not enter the formal graph" in combined

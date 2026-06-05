@@ -8,7 +8,7 @@ Read `../../../rules/wiki-writing-standard.md` before reporting health. Use it a
 
 Check:
 
-- bootstrap contract from EPI `wiki-setup`: `_epi/`, `_meta/`, `.obsidian`, `.git`, and the seven formal page roots
+- bootstrap contract from EPI `wiki-setup`: core `_epi` roots (`_epi/`, `_epi/raw/`, `_epi/staging/`, `_epi/meta/`, `_epi/policies/`), `_meta/`, `.obsidian`, `.git`, and the seven formal page roots; EPI `runs`, `cache`, `tmp`, `tmp-manual-pdfs`, `quarantine`, and `evolution` are on-demand directories, not bootstrap requirements
 - target vault contract files
 - pending EPI handoffs
 - staged pages
@@ -37,7 +37,7 @@ Check:
 
 Use Quick + Targeted by default.
 
-- Quick check: read manifest or `.manifest.json`, `index.md`, `log.md`, `hot.md`, pending EPI handoffs, recent changed pages, current staged pages, and whether the EPI `wiki-setup` bootstrap structure exists.
+- Quick check: read manifest or `.manifest.json`, `index.md`, `log.md`, `hot.md`, pending EPI handoffs, recent changed pages, current staged pages, and whether the core EPI `wiki-setup` bootstrap structure exists.
 - Targeted check: scan only the current source, concept, tag, alias, page-family, backlink, outlink, and relationship neighborhood affected by the task.
 - Full check: scan the whole formal wiki graph only when the user asks for a comprehensive audit or when Quick + Targeted finds systemic link/tag chaos.
 

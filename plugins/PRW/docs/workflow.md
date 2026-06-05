@@ -16,7 +16,7 @@ PRW owns reading the paper wiki vault state, reading EPI handoff artifacts, writ
 
 EPI owns paper discovery, ranking, download, MinerU parsing, paper wiki vault bootstrap through EPI `wiki-setup`, `paper-gate`, human approval, and `record-wiki-ingest`.
 
-PRW assumes EPI `wiki-setup` has initialized the target vault contract. It checks `_epi/`, `_meta/`, `.obsidian`, `.git`, and the seven formal page roots; when missing vault structure blocks work, PRW reports the gap and points back to EPI `wiki-setup`. PRW does not initialize, repair, silently create, or reset the vault, and it does not reset EPI state.
+PRW assumes EPI `wiki-setup` has initialized the target vault contract. It checks the core `_epi` bootstrap (`_epi/`, `_epi/raw/`, `_epi/staging/`, `_epi/meta/`, `_epi/policies/`), `_meta/`, `.obsidian`, `.git`, and the seven formal page roots; when missing core vault structure blocks work, PRW reports the gap and points back to EPI `wiki-setup`. PRW does not initialize, repair, silently create, or reset the vault, and it does not reset EPI state. Missing `_epi/runs/`, `_epi/cache/`, `_epi/tmp/`, `_epi/tmp-manual-pdfs/`, `_epi/quarantine/`, or `_epi/evolution/` is not a bootstrap failure because those EPI directories are created on demand.
 
 Default checks are Quick + Targeted. Quick check reads manifest/index/log/hot, pending EPI handoffs, and recently changed pages. Targeted check scans only the current source, concept, tag, alias, page-family, and link neighborhood. Full check is reserved for explicit comprehensive audits or systemic link/tag chaos.
 

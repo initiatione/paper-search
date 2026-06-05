@@ -6,7 +6,7 @@ PRW owns the wiki-side closed loop: read vault state, consume EPI handoff artifa
 
 EPI owns paper discovery, ranking, download, MinerU parsing, paper wiki vault bootstrap through EPI `wiki-setup`, `paper-gate`, human approval, and `record-wiki-ingest`.
 
-PRW assumes an initialized vault contract. It may check for `_epi/`, `_meta/`, `.obsidian`, `.git`, and the seven formal page roots, but it does not initialize the vault, does not reset the vault, and does not silently create missing vault structure. If missing vault structure blocks paper wiki work, report the gap and point the user back to EPI `wiki-setup`.
+PRW assumes an initialized vault contract. It may check for the core `_epi` bootstrap (`_epi/`, `_epi/raw/`, `_epi/staging/`, `_epi/meta/`, `_epi/policies/`), `_meta/`, `.obsidian`, `.git`, and the seven formal page roots, but it does not initialize the vault, does not reset the vault, and does not silently create missing vault structure. If missing core vault structure blocks paper wiki work, report the gap and point the user back to EPI `wiki-setup`. Missing `_epi/runs/`, `_epi/cache/`, `_epi/tmp/`, `_epi/tmp-manual-pdfs/`, `_epi/quarantine/`, or `_epi/evolution/` is not a bootstrap failure; EPI creates those directories on demand.
 
 Required inputs include `wiki_deposition_task.json`, `wiki-ingest-brief.json`, reading report, metadata, PDF, MinerU Markdown, TeX, images, and manifest.
 

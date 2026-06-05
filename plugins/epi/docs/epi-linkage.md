@@ -54,17 +54,21 @@ EPI 不能把 Obsidian Wiki 写入规则简化成“调用本机 `llm-wiki` / `w
 
 EPI 在 vault 中只有一个内部写入根：`_epi/`。新初始化和迁移后的 vault 不再创建顶层 `_raw`、`_staging`、`_runs`、`_quarantine` 或 `_evolution`。这些旧目录只作为兼容迁移来源存在，可用 `epi-repository-migrate --preview --json` 预览，用 `epi-repository-migrate --json` 收拢到 `_epi/`。
 
-`_epi/README.md` 是给 AI/agent 的导航入口，`_epi/manifest.json` 是机器可读目录和统计索引，`_epi/policies/retention.json` 是仓库清理策略。Obsidian graph 应忽略 `_epi/`；正式图谱页只应由 wiki skill 写到 `references/`、`concepts/`、`derivations/`、`experiments/`、`synthesis/`、`reports/`、`opportunities/` 等正式目录。物理结构：
+`_epi/README.md` 是给 AI/agent 的导航入口，`_epi/manifest.json` 是机器可读目录和统计索引，`_epi/policies/retention.json` 是仓库清理策略。Obsidian graph 应忽略 `_epi/`；正式图谱页只应由 wiki skill 写到 `references/`、`concepts/`、`derivations/`、`experiments/`、`synthesis/`、`reports/`、`opportunities/` 等正式目录。默认初始化采用 lean 结构，只预建核心 source/handoff/config/policy 目录；运行、缓存、临时、隔离和 evolution 目录由实际 workflow 按需创建。
 
 - `_epi/raw/<slug>/`：PDF、metadata、`paper-search-read-preview.txt`、MinerU Markdown/TeX/images/manifest、reader、critic 和论文级 run-state。
 - `_epi/staging/papers/<slug>/`：source-reader、reading-report、wiki-ingest-brief、`wiki_deposition_task.json`、human approval、trigger、final-source-review 和 record sidecars。
 - `_epi/staging/wiki-batches/pending/wiki-batch-ingest-brief.json`：wiki skill 的多论文批量沉淀交接包。
-- `_epi/runs/`：dry-run、batch、record、dashboard、research-queue 和 workflow reports。
-- `_epi/quarantine/`：失败、隔离或不应推荐的论文工件。
-- `_epi/evolution/`：受控 skill/profile/template evolution proposals。
 - `_epi/meta/`：EPI config、config history、run lifecycle、raw cleanup、migration、wiki reset、formal-page snapshots 和 repository maintenance manifests。
-- `_epi/tmp-manual-pdfs/`：人工补 PDF 的临时入口，只保留最近少量文件；成功进入 raw source bundle 后不应长期堆积。
 - `_epi/policies/retention.json`：自动清理阈值和 lifecycle 上限；默认总量预算为 3000 files / 1 GiB，用来尽早暴露 `_epi` 体量压力并触发维护产物清理。默认不删除 `_epi/raw` 原始论文源文件，但会限制 terminal run dirs、`_epi/meta/run-lifecycle`、`_epi/meta/raw-cleanup`、`_epi/meta/repository-maintenance`、`_epi/meta/migrations`、`_epi/meta/wiki-reset`、`_epi/meta/formal-page-snapshots` 和 `_epi/tmp-manual-pdfs` 的累计数量。
+
+按需结构：
+
+- `_epi/runs/`：dry-run、batch、record、dashboard、research-queue 和 workflow reports；运行时创建，不作为空壳预建。
+- `_epi/cache/`：EasyScholar 等可再生成缓存；缓存不能替代原论文证据。
+- `_epi/tmp/`、`_epi/tmp-manual-pdfs/`：临时下载和人工补 PDF 入口，只保留最近少量文件；成功进入 raw source bundle 后不应长期堆积。
+- `_epi/quarantine/`：失败、隔离或不应推荐的论文工件；只有发生 identity mismatch 或隔离事件时创建。
+- `_epi/evolution/`：受控 skill/profile/template evolution proposals；只有 vault-local 证据必须绑定到演化提案时创建，空壳不属于默认结构。
 
 ### 2. 论文发现与排序
 

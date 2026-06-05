@@ -64,27 +64,32 @@ DEFAULT_RETENTION_POLICY: dict[str, Any] = {
 
 EPI_REPOSITORY_README = """# EPI Internal Repository
 
-This `_epi` folder is the only place where EPI writes operational paper artifacts. Obsidian graph views should ignore this folder. Formal wiki pages live outside `_epi` and are written by the wiki skill after source-first batch deposition.
+This `_epi` folder is the internal EPI workspace for source-first paper evidence, handoff, configuration, and maintenance records. It is not part of the formal Obsidian graph.
 
-## Navigation
+## Core Structure
 
-- `_epi/raw/<slug>/`: source paper repository. Keep `paper.pdf`, `metadata.json`, `mineru/<slug>.md`, `mineru/paper.tex`, `mineru/images/*`, and `mineru/mineru-manifest.json` here.
-- `_epi/staging/papers/<slug>/`: per-paper internal evidence handoff. These files are not formal wiki pages.
-- `_epi/staging/wiki-batches/pending/wiki-batch-ingest-brief.json`: batch handoff for the wiki skill.
-- `_epi/runs/`: workflow reports, dashboards, query plans, and transient execution state.
-- `_epi/quarantine/`: rejected, failed, or isolated paper artifacts.
-- `_epi/evolution/`: controlled skill/profile/template evolution proposals.
-- `_epi/meta/`: EPI config, config history, lifecycle manifests, migration records, and repository maintenance records.
-- `_epi/meta/formal-page-snapshots/`: bounded pre-rewrite formal-page snapshots.
-- `_epi/tmp-manual-pdfs/`: temporary manual acquisition PDFs, bounded by retention policy.
-- `_epi/policies/retention.json`: repository cleanup policy.
+- `_epi/raw/<slug>/`: durable source paper bundle. Keep `paper.pdf`, `metadata.json`, MinerU Markdown/TeX/images/manifest, and acquisition/parse records here.
+- `_epi/staging/papers/<slug>/`: per-paper evidence handoff for PRW. These files are not formal wiki pages.
+- `_epi/staging/wiki-batches/pending/wiki-batch-ingest-brief.json`: batch handoff for wiki skill deposition.
+- `_epi/meta/`: EPI config, config history, formal-page snapshots, and bounded maintenance records.
+- `_epi/policies/retention.json`: cleanup policy.
+
+## On-Demand Structure
+
+The following directories are created only when a workflow needs them, not as empty bootstrap shells:
+
+- `_epi/runs/`: transient run reports, dashboards, query plans, and execution state.
+- `_epi/cache/`: regenerable provider cache.
+- `_epi/tmp/` and `_epi/tmp-manual-pdfs/`: temporary acquisition and manual PDF recovery staging.
+- `_epi/quarantine/`: failed or isolated paper artifacts.
+- `_epi/evolution/`: controlled skill/profile/template evolution proposals when vault-local evidence must be attached.
 
 ## Agent Contract
 
 1. Start here, then read `AGENTS.md` and root `_meta/*` before final wiki writing.
 2. Use EPI reader/critic/staging outputs as navigation and quality signals only.
 3. Final wiki pages must be distilled from original paper artifacts, formulas, figures, images, and batch-level comparison.
-4. Never promote `_epi/staging` reports, audit pages, or per-paper pseudo routes as formal wiki pages.
+4. Never promote `_epi/staging`, `_epi/runs`, or raw source Markdown as formal wiki pages.
 5. New EPI writes must stay under `_epi`; root `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/` are wiki-skill-owned.
 """
 
@@ -93,22 +98,9 @@ REQUIRED_EPI_DIRS = [
     "raw",
     "staging/papers",
     "staging/wiki-batches/pending",
-    "quarantine/papers",
-    "runs",
-    "evolution/proposals",
-    "evolution/pending",
-    "evolution/active",
-    "evolution/archive",
-    "evolution/rejected",
-    "evolution/backups",
     "meta/config-history",
-    "meta/run-lifecycle",
-    "meta/repository-maintenance",
-    "meta/migrations",
-    "meta/raw-cleanup",
     "meta/formal-page-snapshots",
     "policies",
-    "tmp-manual-pdfs",
 ]
 
 
@@ -175,20 +167,28 @@ def refresh_epi_manifest(vault_path: Path) -> dict[str, Any]:
         "root": "_epi",
         "write_scope": "EPI writes only under _epi; formal wiki pages are wiki-skill-owned.",
         "graph_visibility": "ignore _epi in Obsidian graph; use _epi/README.md for agent navigation.",
-        "sections": {
+        "core_sections": {
             "raw": "raw/<slug>/ source PDFs, MinerU markdown, TeX, images, manifests",
             "staging": "staging/papers/<slug>/ internal evidence and wiki handoff",
             "wiki_batches": "staging/wiki-batches/pending/ batch handoff for wiki skill",
-            "runs": "runs/ workflow reports, dashboards, query records, transient state",
-            "quarantine": "quarantine/ failed or isolated artifacts",
-            "evolution": "evolution/ controlled EPI profile/template/skill changes",
-            "meta": "meta/ config, migrations, lifecycle, repository maintenance",
+            "meta": "meta/ config, formal-page snapshots, bounded maintenance records",
             "policies": "policies/ retention and cleanup policy",
+        },
+        "on_demand_sections": {
+            "runs": "runs/ workflow reports, dashboards, query records, transient state; not precreated",
+            "cache": "cache/ regenerable provider cache; not precreated",
+            "tmp": "tmp/ temporary acquisition staging; not precreated",
+            "tmp_manual_pdfs": "tmp-manual-pdfs/ manual PDF recovery staging; not precreated",
+            "quarantine": "quarantine/ failed or isolated artifacts; not precreated",
+            "evolution": "evolution/ controlled EPI profile/template/skill changes; not precreated",
         },
         "stats": {
             "raw": _dir_stats(raw_papers_root(vault_path)),
             "staging": _dir_stats(staging_papers_root(vault_path).parent),
             "runs": _dir_stats(runs_root(vault_path)),
+            "cache": _dir_stats(epi_root(vault_path) / "cache"),
+            "tmp": _dir_stats(epi_root(vault_path) / "tmp"),
+            "tmp_manual_pdfs": _dir_stats(epi_root(vault_path) / "tmp-manual-pdfs"),
             "quarantine": _dir_stats(quarantine_root(vault_path)),
             "evolution": _dir_stats(evolution_root(vault_path)),
             "meta": _dir_stats(epi_meta_root(vault_path)),
@@ -210,6 +210,9 @@ def inspect_epi_manifest(vault_path: Path) -> dict[str, Any]:
             "raw": _dir_stats(raw_papers_root(vault_path)),
             "staging": _dir_stats(staging_papers_root(vault_path).parent),
             "runs": _dir_stats(runs_root(vault_path)),
+            "cache": _dir_stats(epi_root(vault_path) / "cache"),
+            "tmp": _dir_stats(epi_root(vault_path) / "tmp"),
+            "tmp_manual_pdfs": _dir_stats(epi_root(vault_path) / "tmp-manual-pdfs"),
             "quarantine": _dir_stats(quarantine_root(vault_path)),
             "evolution": _dir_stats(evolution_root(vault_path)),
             "meta": _dir_stats(epi_meta_root(vault_path)),
@@ -481,6 +484,45 @@ def _collect_lifecycle_cleanup_actions(
     )
 
 
+def _collect_empty_on_demand_dir_cleanup_actions(
+    vault_path: Path,
+    actions: list[dict[str, Any]],
+    *,
+    dry_run: bool,
+) -> None:
+    root = epi_root(vault_path)
+    on_demand_roots = [
+        root / "cache",
+        root / "tmp",
+        root / "tmp-manual-pdfs",
+        root / "quarantine",
+        root / "evolution",
+    ]
+    for on_demand_root in on_demand_roots:
+        if not on_demand_root.exists() or not on_demand_root.is_dir():
+            continue
+        empty_dirs = [
+            path
+            for path in on_demand_root.rglob("*")
+            if path.is_dir() and not any(path.iterdir())
+        ]
+        empty_dirs.append(on_demand_root)
+        empty_dirs.sort(key=lambda path: len(path.parts), reverse=True)
+        for path in empty_dirs:
+            if not path.exists() or not path.is_dir() or any(path.iterdir()):
+                continue
+            actions.append(
+                {
+                    "action": "remove-empty-on-demand-dir",
+                    "path": str(path),
+                    "file_count": 0,
+                    "total_bytes": 0,
+                }
+            )
+            if not dry_run:
+                path.rmdir()
+
+
 def cleanup_epi_repository(vault_path: Path, *, dry_run: bool = False) -> dict[str, Any]:
     vault_path = vault_path.resolve()
     if not dry_run:
@@ -525,6 +567,8 @@ def cleanup_epi_repository(vault_path: Path, *, dry_run: bool = False) -> dict[s
                 break
         if enforce_lifecycle:
             _collect_lifecycle_cleanup_actions(vault_path, policy, actions, dry_run=dry_run)
+    if auto_cleanup_enabled:
+        _collect_empty_on_demand_dir_cleanup_actions(vault_path, actions, dry_run=dry_run)
 
     after = refresh_epi_manifest(vault_path) if not dry_run else inspect_epi_manifest(vault_path)
     result = {
