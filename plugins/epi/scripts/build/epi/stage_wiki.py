@@ -130,6 +130,23 @@ def _load_evidence_map(paper_root: Path) -> dict:
     return json.loads(evidence_map_path.read_text(encoding="utf-8"))
 
 
+def _load_full_text_evidence_index(paper_root: Path) -> dict:
+    path = paper_root / "evidence-index.json"
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {"status": "unreadable", "path": "evidence-index.json"}
+    return {
+        "status": "available",
+        "path": "evidence-index.json",
+        "chunk_count": len(payload.get("chunks") or []),
+        "input_hashes": payload.get("input_hashes") or {},
+        "warnings": payload.get("warnings") or [],
+    }
+
+
 def _existing_artifacts(paper_root: Path, candidates: list[str]) -> list[str]:
     artifacts: list[str] = []
     for relative in candidates:
@@ -838,10 +855,12 @@ def _build_wiki_ingest_brief(
     reader_artifacts: list[str] | None = None,
     critic_artifacts: list[str] | None = None,
     wiki_deposition_task_path: str | None = None,
+    full_text_evidence_index: dict | None = None,
 ) -> dict:
     workflow_mode = normalize_ingest_mode(workflow_mode)
     reader_artifacts = reader_artifacts or []
     critic_artifacts = critic_artifacts or []
+    full_text_evidence_index = full_text_evidence_index or {}
     source_first_artifacts = _source_first_artifacts(slug)
     source_markdown = _source_markdown_artifact(slug)
     optional_evidence_aids = [*reader_artifacts, *critic_artifacts]
@@ -1065,6 +1084,12 @@ def _build_wiki_ingest_brief(
                 "reader_roles": roles,
                 "exact_evidence_artifact": "reader/evidence-map.json" if "reader/evidence-map.json" in reader_artifacts else None,
                 "claim_support_artifact": "reader/claim-support.json" if "reader/claim-support.json" in reader_artifacts else None,
+                "full_text_evidence_index": full_text_evidence_index.get("path"),
+                "full_text_evidence_index_status": full_text_evidence_index.get("status", "missing"),
+                "full_text_chunk_count": full_text_evidence_index.get("chunk_count", 0),
+                "full_text_input_hashes": full_text_evidence_index.get("input_hashes", {}),
+                "full_text_warnings": full_text_evidence_index.get("warnings", []),
+                "vault_evidence_index": "_epi/meta/evidence-index.json",
             },
         },
         "reading_path": reading_path,
@@ -1279,6 +1304,7 @@ def stage_paper(vault_path: Path, slug: str, paper_root: Path, workflow_mode: st
     research_decision, research_decision_path = _load_research_decision(paper_root, critic_report)
     reproduction_plan, reproduction_plan_path = _load_reproduction_plan(paper_root, critic_report)
     evidence_map = _load_evidence_map(paper_root)
+    full_text_evidence_index = _load_full_text_evidence_index(paper_root)
     decision_frontmatter_lines = _decision_frontmatter_lines(research_decision)
     research_decision_lines = _research_decision_lines(research_decision)
     promotion_review_lines = _promotion_review_lines(research_decision)
@@ -1297,6 +1323,7 @@ def stage_paper(vault_path: Path, slug: str, paper_root: Path, workflow_mode: st
         reproduction_plan=reproduction_plan,
         reader_artifacts=reader_artifacts,
         critic_artifacts=critic_artifacts,
+        full_text_evidence_index=full_text_evidence_index,
     )
     wiki_deposition_task = _build_wiki_deposition_task(
         vault_path=vault_path,

@@ -314,6 +314,8 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
     assert "figures/tables/images" in formula_figure_review["figures_tables_images"]
     assert "paper.pdf" in formula_figure_review["parse_uncertainty"]
     assert wiki_ingest_brief["source_bundle"]["evidence"]["claim_count"] >= 3
+    assert wiki_ingest_brief["source_bundle"]["evidence"]["full_text_evidence_index"] == "evidence-index.json"
+    assert wiki_ingest_brief["source_bundle"]["evidence"]["vault_evidence_index"] == "_epi/meta/evidence-index.json"
     assert wiki_ingest_brief["source_bundle"]["evidence"]["claim_support_artifact"] == "reader/claim-support.json"
     assert wiki_ingest_brief["source_bundle"]["evidence"]["reader_roles"] == [
         "nature-sci-editor",
