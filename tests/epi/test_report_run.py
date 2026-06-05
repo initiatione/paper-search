@@ -119,6 +119,54 @@ def test_write_report_groups_dry_run_candidates_by_research_queue(tmp_path):
     assert "cautions: weak_reproducibility_signal" in report_md
 
 
+def test_write_report_surfaces_discovery_source_coverage(tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir(parents=True)
+
+    write_report(
+        run_dir,
+        ranked=[],
+        errors=[],
+        workflow_type="paper-discovery-dry-run",
+        run_id="dry-run-sources",
+        discovery_context={
+            "query_strategy": "query_plan_multi_query",
+            "source_coverage": {
+                "sources_used": ["arxiv", "semantic", "openalex"],
+                "source_results": {"arxiv": 3, "semantic": 0, "openalex": 1},
+                "errors": {"semantic": "rate limited"},
+                "raw_total": 5,
+                "deduped_total": 4,
+                "query_count": 2,
+                "capabilities": {
+                    "arxiv": {"download": "supported", "read": "supported"},
+                    "semantic": {"download": "oa", "read": "oa"},
+                    "openalex": {"download": "unsupported", "read": "info-only"},
+                },
+                "provider_readiness": {
+                    "unpaywall": {"status": "missing_required_env", "env": "PAPER_SEARCH_MCP_UNPAYWALL_EMAIL"},
+                    "google_scholar": {"status": "missing_optional_env", "env": "PAPER_SEARCH_MCP_GOOGLE_SCHOLAR_PROXY_URL"},
+                },
+            },
+        },
+    )
+
+    report_json = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
+    report_md = (run_dir / "report.md").read_text(encoding="utf-8")
+
+    assert report_json["discovery_context"]["source_coverage"]["raw_total"] == 5
+    assert "## Source Coverage" in report_md
+    assert "- raw_total: 5" in report_md
+    assert "- deduped_total: 4" in report_md
+    assert "- query_count: 2" in report_md
+    assert "- arxiv: 3" in report_md
+    assert "- semantic: 0 (error: rate limited)" in report_md
+    assert "- openalex: 1" in report_md
+    assert "openalex capability: download=unsupported, read=info-only" in report_md
+    assert "unpaywall: missing_required_env (PAPER_SEARCH_MCP_UNPAYWALL_EMAIL)" in report_md
+    assert "google_scholar: missing_optional_env (PAPER_SEARCH_MCP_GOOGLE_SCHOLAR_PROXY_URL)" in report_md
+
+
 def test_write_report_surfaces_reader_revision_plans_for_routed_runs(tmp_path):
     run_dir = tmp_path / "run"
     run_dir.mkdir(parents=True)

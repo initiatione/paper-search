@@ -188,6 +188,52 @@ def _append_easyscholar_section(report: list[str], easyscholar: dict) -> None:
             report.append(f"  - {status}: {count}")
 
 
+def _append_source_coverage_section(report: list[str], source_coverage: dict) -> None:
+    if not source_coverage:
+        return
+    report.append("")
+    report.append("## Source Coverage")
+    for key in ("raw_total", "deduped_total", "query_count"):
+        if source_coverage.get(key) is not None:
+            report.append(f"- {key}: {source_coverage.get(key)}")
+    source_results = source_coverage.get("source_results")
+    source_results = source_results if isinstance(source_results, dict) else {}
+    source_errors = source_coverage.get("errors")
+    source_errors = source_errors if isinstance(source_errors, dict) else {}
+    sources_used = source_coverage.get("sources_used")
+    if not isinstance(sources_used, list) or not sources_used:
+        sources_used = sorted(set(source_results) | set(source_errors))
+    for source in sources_used:
+        source_name = str(source)
+        count = source_results.get(source_name, 0)
+        error = source_errors.get(source_name)
+        suffix = f" (error: {error})" if error else ""
+        report.append(f"- {source_name}: {count}{suffix}")
+    capabilities = source_coverage.get("capabilities")
+    capabilities = capabilities if isinstance(capabilities, dict) else {}
+    if capabilities:
+        report.append("- capabilities:")
+        for source in sources_used:
+            source_name = str(source)
+            capability = capabilities.get(source_name)
+            if not isinstance(capability, dict):
+                continue
+            download = capability.get("download", "unknown")
+            read = capability.get("read", "unknown")
+            report.append(f"  - {source_name} capability: download={download}, read={read}")
+    provider_readiness = source_coverage.get("provider_readiness")
+    provider_readiness = provider_readiness if isinstance(provider_readiness, dict) else {}
+    if provider_readiness:
+        report.append("- provider_readiness:")
+        for provider, state in sorted(provider_readiness.items()):
+            if not isinstance(state, dict):
+                continue
+            status = state.get("status", "unknown")
+            env_name = state.get("env")
+            suffix = f" ({env_name})" if env_name else ""
+            report.append(f"  - {provider}: {status}{suffix}")
+
+
 def write_report(
     run_dir: Path,
     ranked: list[dict],
@@ -269,6 +315,9 @@ def write_report(
             query_records = discovery_context.get("query_records") or []
             if query_records:
                 report.append(f"- query_records: {len(query_records)}")
+            source_coverage = discovery_context.get("source_coverage") or {}
+            if source_coverage:
+                _append_source_coverage_section(report, source_coverage)
         _append_easyscholar_section(report, easyscholar_context)
         report.append("")
         report.append("## Next Actions")

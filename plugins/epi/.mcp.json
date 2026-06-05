@@ -15,7 +15,10 @@
   },
   "notes": [
     "EPI wraps openags/paper-search-mcp as an external dependency.",
-    "EPI discovery and acquisition prefer the paper-search-mcp stdio server, then fall back to the paper-search CLI when MCP is unavailable, fails, or returns no discoverable papers.",
-    "Use EPI_PAPER_SEARCH_MCP_COMMAND and EPI_PAPER_SEARCH_MCP_ARGS to override the stdio server command; use EPI_PAPER_SEARCH_COMMAND for the CLI fallback."
+    "EPI discovery calls search_papers and preserves source coverage telemetry in run reports, including source capabilities and provider readiness when available.",
+    "EPI acquisition tries download_with_fallback before source-native MCP, CLI, or direct URL fallback; Sci-Hub is disabled unless EPI_PAPER_SEARCH_MCP_USE_SCIHUB is explicitly enabled.",
+    "After successful acquisition, EPI may call read_<source>_paper or CLI read to write a non-authoritative retrieval preview sidecar at paper-search-read-preview.txt; this is not replacing MinerU.",
+    "Use EPI_PAPER_SEARCH_MCP_COMMAND and EPI_PAPER_SEARCH_MCP_ARGS to override the stdio server command; use EPI_PAPER_SEARCH_COMMAND for the CLI fallback.",
+    "doctor --json reports paper_search_provider_readiness so missing Unpaywall email, CORE key, Semantic Scholar key, Google Scholar proxy, DOAJ key, or Zenodo token can be treated as recall/fallback risk rather than hidden failure."
   ]
 }

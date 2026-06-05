@@ -155,7 +155,7 @@ def test_progress_doc_records_status_verification_and_next_steps():
     text = _read("progress.md")
 
     assert "# EPI 插件进度说明" in text
-    assert "更新时间：2026-06-04" in text
+    assert "更新时间：2026-06-05" in text
     assert "高质量论文收集和整理" in text
     assert "config-setup" in text
     assert "paper-quality-critic" in text
@@ -305,6 +305,82 @@ def test_docs_document_landing_page_acquisition_recovery():
         "candidate_pdf_urls",
         "acquire_attempts",
         "Unpaywall",
+    ]:
+        assert phrase in combined
+
+
+def test_docs_document_paper_search_mcp_fallback_and_source_coverage():
+    manifest = json.loads((PLUGIN_ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
+    mcp_config = (PLUGIN_ROOT / ".mcp.json").read_text(encoding="utf-8")
+    attribution = _read("attribution.md")
+    config = _read("config.md")
+    linkage = _read("epi-linkage.md")
+    privacy = _read("privacy.md")
+    progress = _read("progress.md")
+    structure = _read("structure.md")
+    terms = _read("terms.md")
+    workflow = _read("workflow.md")
+    vendor_notice = (PLUGIN_ROOT / "vendor-notices" / "paper-search-mcp.md").read_text(encoding="utf-8")
+    search_protocol = (
+        PLUGIN_ROOT / "skills" / "paper-discovery" / "references" / "search-protocol.md"
+    ).read_text(encoding="utf-8")
+    prepare_ranked = (
+        PLUGIN_ROOT / "skills" / "paper-ingest" / "workflows" / "prepare-ranked.md"
+    ).read_text(encoding="utf-8")
+    combined = "\n".join(
+        [
+            json.dumps(manifest, ensure_ascii=False),
+            mcp_config,
+            attribution,
+            config,
+            linkage,
+            privacy,
+            progress,
+            structure,
+            terms,
+            workflow,
+            vendor_notice,
+            search_protocol,
+            prepare_ranked,
+        ]
+    )
+
+    assert manifest["version"] == "0.1.7"
+    assert "v0.1.7" in manifest["interface"]["shortDescription"]
+    for phrase in [
+        "search_papers",
+        "source_coverage",
+        "Source Coverage",
+        "sources_used",
+        "source_results",
+        "raw_total",
+        "deduped_total",
+        "query_count",
+        "download_with_fallback",
+        "fallback_chain",
+        "use_scihub",
+        "EPI_PAPER_SEARCH_MCP_USE_SCIHUB=1",
+        "Sci-Hub 默认关闭",
+        "Sci-Hub is disabled",
+        "OpenAIRE",
+        "Europe PMC",
+        "mcp_server_probe",
+        "upstream.tool",
+        "retrieval_preview",
+        "paper-search-read-preview.txt",
+        "read_<source>_paper",
+        "CLI read",
+        "non-authoritative",
+        "not replacing MinerU",
+        "sidecar",
+        "paper_search_provider_readiness",
+        "provider_readiness",
+        "capabilities",
+        "PAPER_SEARCH_MCP_CORE_API_KEY",
+        "PAPER_SEARCH_MCP_GOOGLE_SCHOLAR_PROXY_URL",
+        "source capability matrix",
+        "0.1.7",
+        "installed cache",
     ]:
         assert phrase in combined
 

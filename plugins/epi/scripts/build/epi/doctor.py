@@ -6,6 +6,8 @@ import webbrowser
 from pathlib import Path
 
 from epi.config import config_status
+from epi.paper_search_adapter import paper_search_provider_readiness
+from epi.paper_search_adapter import paper_search_source_capabilities
 from epi.paper_search_adapter import probe_paper_search_mcp
 from epi.paper_search_adapter import probe_paper_search_mcp_server
 from epi.run_mineru_parse import _command_tokens
@@ -225,6 +227,27 @@ def _check_easyscholar() -> dict:
     )
 
 
+def _check_paper_search_provider_readiness() -> dict:
+    providers = paper_search_provider_readiness()
+    actionable = [
+        provider
+        for provider, state in providers.items()
+        if str(state.get("status", "")).startswith("missing_required")
+        or str(state.get("status", "")).startswith("missing_recommended")
+    ]
+    return {
+        "name": "paper_search_provider_readiness",
+        "status": "warning" if actionable else "ok",
+        "message": (
+            "optional paper-search provider env gaps may limit OA fallback or source stability"
+            if actionable
+            else "paper-search provider env readiness checked"
+        ),
+        "providers": providers,
+        "capabilities": paper_search_source_capabilities(),
+    }
+
+
 def _check_epi_config(vault_path: Path) -> dict:
     status = config_status(vault_path)
     configured = bool(status["configured"])
@@ -388,6 +411,7 @@ def collect_doctor_report(
     checks.append(_check_epi_config(vault_path))
     checks.append(_check_paper_search_mcp_server())
     checks.append(_check_paper_search(paper_search_command))
+    checks.append(_check_paper_search_provider_readiness())
     checks.append(_check_mineru_command(plugin_root, mineru_command))
     checks.append(_check_mineru_token())
     checks.append(_check_easyscholar())

@@ -203,6 +203,17 @@ def test_acquire_paper_from_candidate_prefers_paper_search_cli_download(tmp_path
     ]
     vault = tmp_path / "vault"
 
+    monkeypatch.setattr(
+        "epi.acquire_papers.read_paper_preview",
+        lambda **kwargs: {
+            "status": "skipped",
+            "mode": "paper_search_cli_read_preview",
+            "authoritative": False,
+            "replaces_mineru": False,
+            "error": "not under test",
+        },
+    )
+
     record = acquire_paper_from_candidate(vault, candidate)
 
     paper_root = vault / "_epi" / "raw" / "papers" / "paper-search-cli-paper"
@@ -220,7 +231,20 @@ def test_acquire_paper_from_candidate_prefers_paper_search_cli_download(tmp_path
 
 
 def test_acquire_paper_from_candidate_records_paper_search_mcp_download_mode(tmp_path, monkeypatch):
-    def _fake_download_paper_pdf(*, source, paper_id, output_dir, command=None, timeout_seconds=120):
+    seen_preview = {}
+
+    def _fake_download_paper_pdf(
+        *,
+        source,
+        paper_id,
+        output_dir,
+        doi="",
+        title="",
+        use_scihub=False,
+        scihub_base_url="https://sci-hub.se",
+        command=None,
+        timeout_seconds=120,
+    ):
         output_dir.mkdir(parents=True, exist_ok=True)
         pdf_path = output_dir / "mcp.pdf"
         pdf_path.write_bytes(b"%PDF-1.4 mcp acquire fixture")
@@ -234,7 +258,32 @@ def test_acquire_paper_from_candidate_records_paper_search_mcp_download_mode(tmp
             "upstream": {"package": "paper-search-mcp", "transport": "stdio", "tool": "download_arxiv"},
         }
 
+    def _fake_read_paper_preview(*, source, paper_id, output_path, save_dir=None, command=None, timeout_seconds=120):
+        seen_preview.update(
+            {
+                "source": source,
+                "paper_id": paper_id,
+                "output_path": output_path,
+                "save_dir": save_dir,
+                "timeout_seconds": timeout_seconds,
+            }
+        )
+        output_path.write_text("MCP extracted preview text.\n", encoding="utf-8")
+        return {
+            "status": "success",
+            "mode": "paper_search_mcp_read_preview",
+            "source": source,
+            "paper_id": paper_id,
+            "tool": f"read_{source}_paper",
+            "output_path": str(output_path),
+            "char_count": len("MCP extracted preview text."),
+            "authoritative": False,
+            "replaces_mineru": False,
+            "mcp_probe": {"available": True, "transport": "stdio"},
+        }
+
     monkeypatch.setattr("epi.acquire_papers.download_paper_pdf", _fake_download_paper_pdf)
+    monkeypatch.setattr("epi.acquire_papers.read_paper_preview", _fake_read_paper_preview)
     candidate = _candidate("https://example.org/fallback.pdf", slug="paper-search-mcp-paper")
     candidate["sources"] = ["arxiv"]
     candidate["raw_records"] = [
@@ -253,6 +302,168 @@ def test_acquire_paper_from_candidate_records_paper_search_mcp_download_mode(tmp
     assert record["mode"] == "paper_search_mcp_download"
     assert record["upstream"]["tool"] == "download_arxiv"
     assert (paper_root / "paper.pdf").read_bytes().startswith(b"%PDF-1.4")
+    assert seen_preview["source"] == "arxiv"
+    assert seen_preview["paper_id"] == "2401.12345"
+    assert seen_preview["output_path"] == paper_root / "paper-search-read-preview.txt"
+    assert seen_preview["save_dir"].name.startswith("epi-paper-search-")
+    assert record["retrieval_preview"]["status"] == "success"
+    assert record["retrieval_preview"]["output_path"] == str(paper_root / "paper-search-read-preview.txt")
+    assert record["retrieval_preview"]["authoritative"] is False
+    assert record["retrieval_preview"]["replaces_mineru"] is False
+    assert record["output_artifact_hashes"]["paper-search-read-preview.txt"]
+    assert (paper_root / "paper-search-read-preview.txt").read_text(encoding="utf-8") == (
+        "MCP extracted preview text.\n"
+    )
+
+
+def test_acquire_paper_from_candidate_soft_fails_retrieval_preview(tmp_path, monkeypatch):
+    def _fake_download_paper_pdf(
+        *,
+        source,
+        paper_id,
+        output_dir,
+        doi="",
+        title="",
+        use_scihub=False,
+        scihub_base_url="https://sci-hub.se",
+        command=None,
+        timeout_seconds=120,
+    ):
+        output_dir.mkdir(parents=True, exist_ok=True)
+        pdf_path = output_dir / "mcp.pdf"
+        pdf_path.write_bytes(b"%PDF-1.4 mcp acquire fixture")
+        return {
+            "status": "success",
+            "mode": "paper_search_mcp_download",
+            "source": source,
+            "paper_id": paper_id,
+            "mcp_probe": {"available": True, "transport": "stdio"},
+            "downloaded_pdf": str(pdf_path),
+            "upstream": {"package": "paper-search-mcp", "transport": "stdio", "tool": "download_arxiv"},
+        }
+
+    def _failing_read_paper_preview(**kwargs):
+        raise RuntimeError("preview extraction crashed")
+
+    monkeypatch.setattr("epi.acquire_papers.download_paper_pdf", _fake_download_paper_pdf)
+    monkeypatch.setattr("epi.acquire_papers.read_paper_preview", _failing_read_paper_preview)
+    candidate = _candidate("https://example.org/fallback.pdf", slug="preview-soft-fail-paper")
+    candidate["sources"] = ["arxiv"]
+    candidate["raw_records"] = [
+        {
+            "source": "arxiv",
+            "arxiv_id": "2401.12345",
+            "raw_record": {"paper_id": "2401.12345", "source": "arxiv"},
+        }
+    ]
+    vault = tmp_path / "vault"
+
+    record = acquire_paper_from_candidate(vault, candidate)
+
+    paper_root = vault / "_epi" / "raw" / "papers" / "preview-soft-fail-paper"
+    assert record["status"] == "success"
+    assert record["retrieval_preview"]["status"] == "failed"
+    assert record["retrieval_preview"]["error"] == "preview extraction crashed"
+    assert record["retrieval_preview"]["authoritative"] is False
+    assert record["retrieval_preview"]["replaces_mineru"] is False
+    assert "paper-search-read-preview.txt" not in record["output_artifact_hashes"]
+    assert (paper_root / "paper.pdf").read_bytes().startswith(b"%PDF-1.4")
+    assert not (paper_root / "paper-search-read-preview.txt").exists()
+
+
+def test_acquire_paper_from_candidate_uses_oa_identity_and_fallback_metadata(tmp_path, monkeypatch):
+    seen = {}
+
+    def _fake_download_paper_pdf(
+        *,
+        source,
+        paper_id,
+        output_dir,
+        doi="",
+        title="",
+        use_scihub=False,
+        scihub_base_url="https://sci-hub.se",
+        command=None,
+        timeout_seconds=120,
+    ):
+        seen.update(
+            {
+                "source": source,
+                "paper_id": paper_id,
+                "doi": doi,
+                "title": title,
+                "use_scihub": use_scihub,
+                "scihub_base_url": scihub_base_url,
+            }
+        )
+        output_dir.mkdir(parents=True, exist_ok=True)
+        pdf_path = output_dir / "fallback.pdf"
+        pdf_path.write_bytes(b"%PDF-1.4 fallback acquire fixture")
+        return {
+            "status": "success",
+            "mode": "paper_search_mcp_fallback_download",
+            "source": source,
+            "paper_id": paper_id,
+            "doi": doi,
+            "title": title,
+            "use_scihub": use_scihub,
+            "mcp_probe": {"available": True, "transport": "stdio"},
+            "downloaded_pdf": str(pdf_path),
+            "upstream": {
+                "package": "paper-search-mcp",
+                "transport": "stdio",
+                "tool": "download_with_fallback",
+                "fallback_chain": ["source-native", "openaire", "core", "europepmc", "pmc", "unpaywall"],
+                "use_scihub": use_scihub,
+            },
+        }
+
+    monkeypatch.setattr("epi.acquire_papers.download_paper_pdf", _fake_download_paper_pdf)
+    candidate = _candidate("https://doi.org/10.1000/downloaded", slug="oa-priority-paper")
+    candidate["title"] = "OA Priority Paper"
+    candidate["doi"] = "10.1000/downloaded"
+    candidate["sources"] = ["semantic", "arxiv"]
+    candidate["raw_records"] = [
+        {
+            "source": "semantic",
+            "paper_id": "semantic-123",
+            "raw_record": {"paper_id": "semantic-123", "source": "semantic"},
+        },
+        {
+            "source": "arxiv",
+            "arxiv_id": "2401.12345",
+            "raw_record": {"paper_id": "2401.12345", "source": "arxiv"},
+        },
+    ]
+    vault = tmp_path / "vault"
+
+    monkeypatch.setattr(
+        "epi.acquire_papers.read_paper_preview",
+        lambda **kwargs: {
+            "status": "skipped",
+            "mode": "paper_search_cli_read_preview",
+            "authoritative": False,
+            "replaces_mineru": False,
+            "error": "not under test",
+        },
+    )
+
+    record = acquire_paper_from_candidate(vault, candidate)
+
+    assert seen == {
+        "source": "arxiv",
+        "paper_id": "2401.12345",
+        "doi": "10.1000/downloaded",
+        "title": "OA Priority Paper",
+        "use_scihub": False,
+        "scihub_base_url": "https://sci-hub.se",
+    }
+    assert record["status"] == "success"
+    assert record["mode"] == "paper_search_mcp_fallback_download"
+    assert record["fallback_chain"] == ["source-native", "openaire", "core", "europepmc", "pmc", "unpaywall"]
+    assert record["use_scihub"] is False
+    assert record["doi"] == "10.1000/downloaded"
+    assert record["title"] == "OA Priority Paper"
 
 
 def test_acquire_paper_from_candidate_uses_vault_slug_boundary(tmp_path):

@@ -7,6 +7,7 @@ from epi.paper_search_adapter import SEARCH_TIMEOUT_SECONDS
 from epi.paper_search_adapter import download_paper_pdf
 from epi.paper_search_adapter import discover
 from epi.paper_search_adapter import probe_paper_search_mcp
+import epi.paper_search_adapter as paper_search_adapter
 
 
 def _write_fake_paper_search(tmp_path, payload: dict, version: str = "paper-search 0.1.4") -> str:
@@ -232,18 +233,26 @@ def test_discovery_unwraps_mcp_structured_content_result(tmp_path, monkeypatch):
     assert result["records"][0]["title"] == "Robotics Foundation Model Survey"
 
 
-def test_download_prefers_paper_search_mcp_server_over_cli(tmp_path, monkeypatch):
+def test_download_prefers_paper_search_mcp_fallback_chain(tmp_path, monkeypatch):
     output_dir = tmp_path / "downloads"
 
     def _unexpected_cli(*args, **kwargs):
         raise AssertionError("CLI fallback should not run when MCP download succeeds")
 
     def _fake_mcp_tool(tool_name, arguments, timeout_seconds):
-        assert tool_name == "download_semantic"
-        assert arguments == {"paper_id": "semantic-123", "save_path": str(output_dir)}
+        assert tool_name == "download_with_fallback"
+        assert arguments == {
+            "source": "semantic",
+            "paper_id": "semantic-123",
+            "doi": "10.1234/semantic",
+            "title": "Semantic Fallback Paper",
+            "save_path": str(output_dir),
+            "use_scihub": False,
+            "scihub_base_url": "https://sci-hub.se",
+        }
         output_dir.mkdir(parents=True, exist_ok=True)
         pdf_path = output_dir / "paper.pdf"
-        pdf_path.write_bytes(b"%PDF-1.4 mcp fixture")
+        pdf_path.write_bytes(b"%PDF-1.4 mcp fallback fixture")
         return {
             "payload": {"text": str(pdf_path)},
             "probe": {
@@ -258,14 +267,75 @@ def test_download_prefers_paper_search_mcp_server_over_cli(tmp_path, monkeypatch
     monkeypatch.setattr("epi.paper_search_adapter._call_mcp_tool", _fake_mcp_tool)
     monkeypatch.setattr("epi.paper_search_adapter._run_command", _unexpected_cli)
 
-    result = download_paper_pdf(source="semantic", paper_id="semantic-123", output_dir=output_dir)
+    result = download_paper_pdf(
+        source="semantic",
+        paper_id="semantic-123",
+        doi="10.1234/semantic",
+        title="Semantic Fallback Paper",
+        output_dir=output_dir,
+    )
 
     assert result["status"] == "success"
-    assert result["mode"] == "paper_search_mcp_download"
+    assert result["mode"] == "paper_search_mcp_fallback_download"
     assert result["mcp_probe"]["available"] is True
+    assert result["mcp_server_probe"]["available"] is True
     assert result["upstream"]["transport"] == "stdio"
-    assert result["upstream"]["tool"] == "download_semantic"
+    assert result["upstream"]["tool"] == "download_with_fallback"
+    assert result["upstream"]["fallback_chain"] == [
+        "source-native",
+        "openaire",
+        "core",
+        "europepmc",
+        "pmc",
+        "unpaywall",
+    ]
+    assert result["upstream"]["use_scihub"] is False
     assert result["downloaded_pdf"] == str(output_dir / "paper.pdf")
+
+
+def test_download_falls_back_to_source_native_mcp_when_fallback_tool_fails(tmp_path, monkeypatch):
+    output_dir = tmp_path / "downloads"
+    calls = []
+
+    def _unexpected_cli(*args, **kwargs):
+        raise AssertionError("CLI fallback should not run when source-native MCP download succeeds")
+
+    def _fake_mcp_tool(tool_name, arguments, timeout_seconds):
+        calls.append((tool_name, arguments))
+        if tool_name == "download_with_fallback":
+            raise MCPToolError(
+                "unknown tool: download_with_fallback",
+                probe={"available": False, "transport": "stdio", "error": "unknown_tool"},
+            )
+        assert tool_name == "download_arxiv"
+        assert arguments == {"paper_id": "2401.12345", "save_path": str(output_dir)}
+        output_dir.mkdir(parents=True, exist_ok=True)
+        pdf_path = output_dir / "arxiv.pdf"
+        pdf_path.write_bytes(b"%PDF-1.4 mcp source-native fixture")
+        return {
+            "payload": {"text": str(pdf_path)},
+            "probe": {"available": True, "transport": "stdio"},
+            "raw_response": {"result": {"content": [{"type": "text", "text": str(pdf_path)}]}},
+        }
+
+    monkeypatch.setattr("epi.paper_search_adapter._call_mcp_tool", _fake_mcp_tool)
+    monkeypatch.setattr("epi.paper_search_adapter._run_command", _unexpected_cli)
+
+    result = download_paper_pdf(
+        source="arxiv",
+        paper_id="2401.12345",
+        doi="10.1234/arxiv",
+        title="Arxiv Source Native Paper",
+        output_dir=output_dir,
+    )
+
+    assert [call[0] for call in calls] == ["download_with_fallback", "download_arxiv"]
+    assert result["status"] == "success"
+    assert result["mode"] == "paper_search_mcp_download"
+    assert result["mcp_server_probe"]["error"] == "unknown tool: download_with_fallback"
+    assert result["upstream"]["fallback_from"] == "paper_search_mcp_fallback_download"
+    assert result["upstream"]["tool"] == "download_arxiv"
+    assert result["downloaded_pdf"] == str(output_dir / "arxiv.pdf")
 
 
 def test_download_treats_cli_timeout_as_upstream_failure(tmp_path, monkeypatch):
@@ -304,6 +374,126 @@ def test_download_treats_cli_timeout_as_upstream_failure(tmp_path, monkeypatch):
     assert result["upstream"]["stdout"] == "partial stdout"
     assert result["upstream"]["stderr"] == "partial stderr"
     assert result["upstream"]["timeout_seconds"] == 7
+
+
+def test_read_preview_prefers_paper_search_mcp_read_tool(tmp_path, monkeypatch):
+    output_path = tmp_path / "paper-search-read-preview.txt"
+
+    def _fake_mcp_tool(tool_name, arguments, timeout_seconds):
+        assert tool_name == "read_arxiv_paper"
+        assert arguments == {"paper_id": "2401.12345", "save_path": str(tmp_path)}
+        return {
+            "payload": {"text": "Full extracted paper text from MCP."},
+            "probe": {"available": True, "transport": "stdio"},
+            "raw_response": {"result": {"content": [{"type": "text", "text": "Full extracted paper text from MCP."}]}},
+        }
+
+    monkeypatch.setattr("epi.paper_search_adapter._call_mcp_tool", _fake_mcp_tool)
+
+    result = paper_search_adapter.read_paper_preview(
+        source="arxiv",
+        paper_id="2401.12345",
+        output_path=output_path,
+    )
+
+    assert result["status"] == "success"
+    assert result["mode"] == "paper_search_mcp_read_preview"
+    assert result["tool"] == "read_arxiv_paper"
+    assert result["output_path"] == str(output_path)
+    assert result["char_count"] == len("Full extracted paper text from MCP.")
+    assert result["authoritative"] is False
+    assert result["replaces_mineru"] is False
+    assert output_path.read_text(encoding="utf-8") == "Full extracted paper text from MCP.\n"
+
+
+def test_read_preview_soft_fails_when_mcp_and_cli_are_unavailable(tmp_path, monkeypatch):
+    monkeypatch.setenv("EPI_PAPER_SEARCH_MCP_DISABLED", "1")
+
+    result = paper_search_adapter.read_paper_preview(
+        source="semantic",
+        paper_id="semantic-123",
+        output_path=tmp_path / "paper-search-read-preview.txt",
+        command=str(tmp_path / "missing-paper-search"),
+    )
+
+    assert result["status"] == "failed"
+    assert result["mode"] == "paper_search_cli_read_preview"
+    assert result["tool"] == "read_semantic_paper"
+    assert result["authoritative"] is False
+    assert result["replaces_mineru"] is False
+    assert "disabled" in result["mcp_server_probe"]["error"]
+    assert result["mcp_probe"]["error"] == "command_not_found"
+    assert not (tmp_path / "paper-search-read-preview.txt").exists()
+
+
+def test_read_preview_rejects_info_only_mcp_text(tmp_path, monkeypatch):
+    output_path = tmp_path / "paper-search-read-preview.txt"
+
+    def _info_only_mcp_tool(tool_name, arguments, timeout_seconds):
+        return {
+            "payload": {"text": "Info-only: read_semantic_paper is unsupported for this source."},
+            "probe": {"available": True, "transport": "stdio"},
+            "raw_response": {"result": {"content": [{"type": "text", "text": "unsupported"}]}},
+        }
+
+    monkeypatch.setattr("epi.paper_search_adapter._call_mcp_tool", _info_only_mcp_tool)
+
+    result = paper_search_adapter.read_paper_preview(
+        source="semantic",
+        paper_id="semantic-123",
+        output_path=output_path,
+        command=str(tmp_path / "missing-paper-search"),
+    )
+
+    assert result["status"] == "failed"
+    assert result["mode"] == "paper_search_cli_read_preview"
+    assert result["mcp_server_probe"]["error"] == "paper-search MCP read preview produced no meaningful text"
+    assert not output_path.exists()
+
+
+def test_read_preview_falls_back_to_cli_when_mcp_read_fails(tmp_path, monkeypatch):
+    output_path = tmp_path / "paper-search-read-preview.txt"
+    fake_command = tmp_path / "paper-search-read.ps1"
+    args_path = tmp_path / "read-args.json"
+    fake_command.write_text(
+        "$args_json = $args | ConvertTo-Json -Compress\n"
+        "if ($args -contains '--version') { Write-Output 'paper-search 0.1.4'; exit 0 }\n"
+        "Write-Output 'CLI extracted paper text.'\n"
+        f"$args_json | Set-Content -Encoding UTF8 -LiteralPath {json.dumps(str(args_path))}\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+
+    def _failing_mcp_tool(*args, **kwargs):
+        raise MCPToolError(
+            "read tool unavailable",
+            probe={"available": False, "transport": "stdio", "error": "unknown_tool"},
+        )
+
+    monkeypatch.setattr("epi.paper_search_adapter._call_mcp_tool", _failing_mcp_tool)
+
+    result = paper_search_adapter.read_paper_preview(
+        source="semantic",
+        paper_id="semantic-123",
+        output_path=output_path,
+        command=str(fake_command),
+    )
+
+    assert result["status"] == "success"
+    assert result["mode"] == "paper_search_cli_read_preview"
+    assert result["tool"] == "read_semantic_paper"
+    assert result["mcp_server_probe"]["error"] == "read tool unavailable"
+    assert result["upstream"]["fallback_error"] == "read tool unavailable"
+    assert result["output_path"] == str(output_path)
+    assert result["char_count"] == len("CLI extracted paper text.")
+    assert output_path.read_text(encoding="utf-8") == "CLI extracted paper text.\n"
+    assert json.loads(args_path.read_text(encoding="utf-8-sig")) == [
+        "read",
+        "semantic",
+        "semantic-123",
+        "--save-path",
+        str(tmp_path),
+    ]
 
 
 def test_live_cli_discovery_invokes_paper_search_and_maps_records(tmp_path, monkeypatch):
@@ -414,7 +604,7 @@ def test_live_cli_discovery_treats_empty_stdout_with_stderr_as_upstream_failure(
     script = tmp_path / "paper-search-empty.ps1"
     script.write_text(
         "if ($args -contains '--version') { Write-Output 'paper-search 0.1.4'; exit 0 }\n"
-        "Write-Error 'Failed to resolve --with requirement: Git operation failed'\n"
+        "[Console]::Error.WriteLine('Failed to resolve --with requirement: Git operation failed')\n"
         "exit 0\n",
         encoding="utf-8",
     )

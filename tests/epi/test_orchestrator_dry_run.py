@@ -38,6 +38,7 @@ def _write_fake_paper_search(tmp_path, payload: dict) -> str:
 def _isolate_runtime_and_easyscholar_env(tmp_path, monkeypatch):
     monkeypatch.setenv("EPI_RUNTIME_CONFIG", str(tmp_path / "missing-runtime.json"))
     monkeypatch.delenv("EASYSCHOLAR_SECRET_KEY", raising=False)
+    monkeypatch.setenv("EPI_PAPER_SEARCH_MCP_DISABLED", "1")
 
 
 def test_write_json_uses_atomic_writer(tmp_path, monkeypatch):
@@ -321,8 +322,66 @@ def test_dry_run_query_plan_searches_variants_and_merges_candidate_pool(tmp_path
     assert report["budget_usage"]["accepted_count"] == 3
     assert report["discovery_context"]["query_strategy"] == "query_plan_multi_query"
     assert report["discovery_context"]["candidate_pool"]["accepted"] == 3
+    assert report["discovery_context"]["source_coverage"]["source_results"] == {"arxiv": 4}
+    assert report["discovery_context"]["source_coverage"]["raw_total"] == 4
+    assert report["discovery_context"]["source_coverage"]["deduped_total"] == 4
+    assert report["discovery_context"]["source_coverage"]["query_count"] == 4
     assert (run_dir / "paper-search-raw-01.json").is_file()
     assert (run_dir / "paper-search-raw.json").is_file()
+
+
+def test_dry_run_source_coverage_reports_normalized_dedupe_total_for_query_plan(tmp_path):
+    plugin_root = tmp_path / "plugin"
+    _write_minimal_plugin_template(plugin_root)
+    fake_command = tmp_path / "planned-duplicate-paper-search.ps1"
+    fake_command.write_text(
+        "if ($args -contains '--version') { Write-Output 'paper-search 0.1.4'; exit 0 }\n"
+        "$payload = [ordered]@{\n"
+        "  query = $args[1]\n"
+        "  sources_used = @('arxiv','semantic')\n"
+        "  source_results = @{ arxiv = 1; semantic = 1 }\n"
+        "  errors = @{}\n"
+        "  raw_total = 2\n"
+        "  total = 1\n"
+        "  papers = @(@{\n"
+        "    paper_id = '2401.12345'\n"
+        "    title = 'Shared AUV Reinforcement Learning Control Paper'\n"
+        "    authors = 'A. Researcher'\n"
+        "    abstract = 'AUV reinforcement learning control with ocean current and real AUV evidence.'\n"
+        "    doi = '10.1234/shared-auv'\n"
+        "    published_date = '2025-01-02T00:00:00'\n"
+        "    pdf_url = 'https://example.org/shared.pdf'\n"
+        "    url = 'https://example.org/shared'\n"
+        "    source = 'arxiv'\n"
+        "    citations = 3\n"
+        "    extra = @{}\n"
+        "  })\n"
+        "}\n"
+        "$payload | ConvertTo-Json -Depth 8 | Write-Output\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+
+    run_dir = run_dry_run(
+        plugin_root=plugin_root,
+        vault_path=tmp_path / "vault",
+        query="latest high quality AUV reinforcement learning control papers not review",
+        max_results=3,
+        paper_search_command=str(fake_command),
+        sources=["arxiv", "semantic"],
+        query_plan_domain="auv-control",
+        query_plan_max_queries=4,
+    )
+
+    search_record = json.loads((run_dir / "search-record.json").read_text(encoding="utf-8"))
+    normalized = json.loads((run_dir / "normalized.json").read_text(encoding="utf-8"))
+    report = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
+
+    assert len(search_record["records"]) == 4
+    assert len(normalized) == 1
+    assert report["discovery_context"]["source_coverage"]["raw_total"] == 8
+    assert report["discovery_context"]["source_coverage"]["deduped_total"] == 1
+    assert report["discovery_context"]["source_coverage"]["source_results"] == {"arxiv": 4, "semantic": 4}
 
 
 def test_dry_run_with_generic_config_derives_filter_terms_from_query_plan(tmp_path):
@@ -782,7 +841,9 @@ def test_dry_run_live_search_preserves_raw_upstream_response(tmp_path):
     assert json.loads(raw_response.read_text(encoding="utf-8"))["papers"][0]["paper_id"] == "2401.12345"
 
 
-def test_dry_run_uses_configured_paper_search_command_and_sources(tmp_path):
+def test_dry_run_uses_configured_paper_search_command_and_sources(tmp_path, monkeypatch):
+    monkeypatch.delenv("PAPER_SEARCH_MCP_UNPAYWALL_EMAIL", raising=False)
+    monkeypatch.delenv("PAPER_SEARCH_MCP_SEMANTIC_SCHOLAR_API_KEY", raising=False)
     plugin_root = tmp_path / "plugin"
     _write_minimal_plugin_template(plugin_root)
     fake_command = tmp_path / "configured-paper-search.ps1"
@@ -849,10 +910,28 @@ def test_dry_run_uses_configured_paper_search_command_and_sources(tmp_path):
     )
 
     search_record = json.loads((run_dir / "search-record.json").read_text(encoding="utf-8"))
+    report = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
+    report_md = (run_dir / "report.md").read_text(encoding="utf-8")
     invoked_args = json.loads(args_path.read_text(encoding="utf-8-sig"))
 
     assert search_record["upstream"]["cli_command"].endswith("configured-paper-search.ps1")
     assert search_record["upstream"]["sources_requested"] == ["arxiv", "semantic", "openalex"]
+    source_coverage = report["discovery_context"]["source_coverage"]
+    assert source_coverage["sources_used"] == ["arxiv", "semantic", "openalex"]
+    assert source_coverage["source_results"] == {"arxiv": 1, "semantic": 0, "openalex": 0}
+    assert source_coverage["errors"] == {}
+    assert source_coverage["raw_total"] == 1
+    assert source_coverage["deduped_total"] == 1
+    assert source_coverage["query_count"] == 1
+    assert source_coverage["capabilities"]["openalex"]["download"] == "unsupported"
+    assert source_coverage["capabilities"]["semantic"]["read"] == "oa"
+    assert source_coverage["provider_readiness"]["semantic"]["status"] == "missing_optional_env"
+    assert "## Source Coverage" in report_md
+    assert "- arxiv: 1" in report_md
+    assert "- semantic: 0" in report_md
+    assert "- openalex: 0" in report_md
+    assert "openalex capability: download=unsupported" in report_md
+    assert "semantic: missing_optional_env" in report_md
     assert invoked_args == ["search", "robotics survey", "-n", "10", "-s", "arxiv,semantic,openalex"]
 
 

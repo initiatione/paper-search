@@ -20,6 +20,94 @@ PROBE_TIMEOUT_SECONDS = 60
 SEARCH_TIMEOUT_SECONDS = 180
 MCP_PROTOCOL_VERSION = "2025-11-25"
 DEFAULT_MCP_COMMAND_ARGS = ["python", "-m", "paper_search_mcp.server"]
+OA_FALLBACK_CHAIN = ["source-native", "openaire", "core", "europepmc", "pmc", "unpaywall"]
+SOURCE_CAPABILITIES = {
+    "arxiv": {"search": "supported", "download": "supported", "read": "supported"},
+    "pubmed": {"search": "supported", "download": "unsupported", "read": "info-only"},
+    "biorxiv": {"search": "supported", "download": "supported", "read": "supported"},
+    "medrxiv": {"search": "supported", "download": "supported", "read": "supported"},
+    "google_scholar": {"search": "unstable", "download": "unsupported", "read": "unsupported"},
+    "iacr": {"search": "supported", "download": "supported", "read": "supported"},
+    "semantic": {"search": "supported", "download": "oa", "read": "oa"},
+    "crossref": {"search": "supported", "download": "unsupported", "read": "info-only"},
+    "openalex": {"search": "supported", "download": "unsupported", "read": "info-only"},
+    "pmc": {"search": "supported", "download": "oa", "read": "oa"},
+    "core": {"search": "supported", "download": "record-dependent", "read": "record-dependent"},
+    "europepmc": {"search": "supported", "download": "oa", "read": "oa"},
+    "dblp": {"search": "supported", "download": "unsupported", "read": "info-only"},
+    "openaire": {"search": "supported", "download": "unsupported", "read": "unsupported"},
+    "citeseerx": {"search": "unstable", "download": "record-dependent", "read": "record-dependent"},
+    "doaj": {"search": "supported", "download": "url-dependent", "read": "url-dependent"},
+    "base": {"search": "unstable", "download": "record-dependent", "read": "record-dependent"},
+    "zenodo": {"search": "supported", "download": "record-dependent", "read": "record-dependent"},
+    "hal": {"search": "supported", "download": "record-dependent", "read": "record-dependent"},
+    "ssrn": {"search": "unstable", "download": "best-effort", "read": "best-effort"},
+    "unpaywall": {"search": "doi-lookup", "download": "unsupported", "read": "unsupported"},
+    "scihub": {"search": "fallback-only", "download": "optional", "read": "unsupported"},
+}
+
+PROVIDER_ENV_REQUIREMENTS = {
+    "unpaywall": {
+        "env": "PAPER_SEARCH_MCP_UNPAYWALL_EMAIL",
+        "importance": "required",
+        "reason": "Unpaywall DOI lookup is skipped without an email.",
+    },
+    "core": {
+        "env": "PAPER_SEARCH_MCP_CORE_API_KEY",
+        "importance": "recommended",
+        "reason": "CORE works better with a free API key and may rate-limit keyless access.",
+    },
+    "semantic": {
+        "env": "PAPER_SEARCH_MCP_SEMANTIC_SCHOLAR_API_KEY",
+        "importance": "optional",
+        "reason": "Semantic Scholar works keyless but a key improves rate limits.",
+    },
+    "google_scholar": {
+        "env": "PAPER_SEARCH_MCP_GOOGLE_SCHOLAR_PROXY_URL",
+        "importance": "optional",
+        "reason": "Google Scholar is often blocked by bot detection without a proxy.",
+    },
+    "doaj": {
+        "env": "PAPER_SEARCH_MCP_DOAJ_API_KEY",
+        "importance": "optional",
+        "reason": "DOAJ key raises rate limits.",
+    },
+    "zenodo": {
+        "env": "PAPER_SEARCH_MCP_ZENODO_ACCESS_TOKEN",
+        "importance": "optional",
+        "reason": "Zenodo token is only needed for private records or higher limits.",
+    },
+}
+
+
+def paper_search_source_capabilities(sources: list[str] | None = None) -> dict[str, dict]:
+    selected = sources or sorted(SOURCE_CAPABILITIES)
+    return {
+        source: dict(SOURCE_CAPABILITIES[source])
+        for source in selected
+        if source in SOURCE_CAPABILITIES
+    }
+
+
+def paper_search_provider_readiness(sources: list[str] | None = None) -> dict[str, dict]:
+    selected = set(sources or PROVIDER_ENV_REQUIREMENTS)
+    selected.update({"unpaywall"} if not sources else set())
+    readiness = {}
+    for provider, requirement in PROVIDER_ENV_REQUIREMENTS.items():
+        if provider not in selected:
+            continue
+        env_name = requirement["env"]
+        present = bool(os.environ.get(env_name))
+        importance = requirement["importance"]
+        status = "set" if present else f"missing_{importance}_env"
+        readiness[provider] = {
+            "status": status,
+            "env": env_name,
+            "importance": importance,
+            "configured": present,
+            "reason": requirement["reason"],
+        }
+    return readiness
 
 
 class MCPToolError(RuntimeError):
@@ -571,6 +659,72 @@ def _timeout_text(value: object) -> str:
     return str(value)
 
 
+def _downloaded_pdf_paths(output_dir: Path) -> list[Path]:
+    return sorted(
+        path
+        for path in output_dir.rglob("*")
+        if path.is_file() and path.suffix.lower() == ".pdf" and path.stat().st_size > 0
+    )
+
+
+def _paper_read_tool_name(source: str) -> str:
+    return f"read_{source.strip().lower().replace('-', '_')}_paper"
+
+
+def _extract_preview_text(payload: object, raw_response: dict | None = None) -> str:
+    if isinstance(payload, str):
+        return payload.strip()
+    if isinstance(payload, dict):
+        for key in ("text", "content", "paper_text", "value"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        result = payload.get("result")
+        if result is not payload:
+            text = _extract_preview_text(result, raw_response)
+            if text:
+                return text
+    if raw_response:
+        result = raw_response.get("result")
+        text = _extract_mcp_text_content(result) if isinstance(result, dict) else ""
+        if text.strip():
+            return text.strip()
+    return ""
+
+
+def _meaningful_preview_text(text: str) -> str:
+    preview = text.strip()
+    if not preview:
+        return ""
+    lowered = " ".join(preview.lower().split())
+    unsupported_markers = (
+        "unsupported",
+        "not supported",
+        "not implemented",
+        "coming soon",
+        "info-only",
+        "information only",
+        "read mode is not available",
+        "no full text available",
+        "no text available",
+        "unable to extract",
+    )
+    if any(marker in lowered for marker in unsupported_markers):
+        return ""
+    return preview
+
+
+def _write_preview(output_path: Path, text: str) -> dict:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(text.rstrip() + "\n", encoding="utf-8")
+    return {
+        "output_path": str(output_path),
+        "char_count": len(text.rstrip()),
+        "authoritative": False,
+        "replaces_mineru": False,
+    }
+
+
 def discover(
     query: str,
     max_results: int,
@@ -634,6 +788,7 @@ def discover(
                     "sources_used": payload.get("sources_used", []),
                     "source_results": payload.get("source_results", {}),
                     "errors": payload.get("errors", {}),
+                    "raw_total": payload.get("raw_total"),
                     "total": payload.get("total"),
                     "raw_response": mcp_result.get("raw_response", {}),
                 },
@@ -753,6 +908,7 @@ def discover(
             "sources_used": payload.get("sources_used", []),
             "source_results": payload.get("source_results", {}),
             "errors": payload.get("errors", {}),
+            "raw_total": payload.get("raw_total"),
             "total": payload.get("total"),
             **_fallback_fields(mcp_failure),
         },
@@ -764,13 +920,69 @@ def download_paper_pdf(
     source: str,
     paper_id: str,
     output_dir: Path,
+    doi: str = "",
+    title: str = "",
+    use_scihub: bool = False,
+    scihub_base_url: str = "https://sci-hub.se",
     command: str | None = None,
     timeout_seconds: int = 120,
 ) -> dict:
     apply_runtime_config()
     output_dir.mkdir(parents=True, exist_ok=True)
-    tool_name = f"download_{source.strip().lower()}"
+    source_name = source.strip().lower()
+    fallback_arguments = {
+        "source": source_name,
+        "paper_id": paper_id,
+        "doi": doi or "",
+        "title": title or "",
+        "save_path": str(output_dir),
+        "use_scihub": bool(use_scihub),
+        "scihub_base_url": scihub_base_url,
+    }
     mcp_failure: dict | None = None
+    try:
+        mcp_result = _call_mcp_tool(
+            "download_with_fallback",
+            fallback_arguments,
+            timeout_seconds=timeout_seconds,
+        )
+    except MCPToolError as exc:
+        mcp_failure = _mcp_failure_payload(exc)
+    else:
+        pdf_paths = _downloaded_pdf_paths(output_dir)
+        if pdf_paths:
+            return {
+                "status": "success",
+                "mode": "paper_search_mcp_fallback_download",
+                "source": source_name,
+                "paper_id": paper_id,
+                "doi": doi or "",
+                "title": title or "",
+                "use_scihub": bool(use_scihub),
+                "mcp_probe": mcp_result["probe"],
+                "mcp_server_probe": mcp_result["probe"],
+                "downloaded_pdf": str(pdf_paths[0]),
+                "upstream": {
+                    "package": "paper-search-mcp",
+                    "transport": "stdio",
+                    "tool": "download_with_fallback",
+                    "fallback_chain": list(OA_FALLBACK_CHAIN)
+                    + (["scihub"] if use_scihub else []),
+                    "use_scihub": bool(use_scihub),
+                    "returncode": 0,
+                    "raw_response": mcp_result.get("raw_response", {}),
+                },
+            }
+        mcp_failure = {
+            **mcp_result["probe"],
+            "available": False,
+            "error": "paper-search MCP fallback download produced no PDF",
+            "raw_response": mcp_result.get("raw_response", {}),
+            "fallback_chain": list(OA_FALLBACK_CHAIN) + (["scihub"] if use_scihub else []),
+            "use_scihub": bool(use_scihub),
+        }
+
+    tool_name = f"download_{source_name}"
     try:
         mcp_result = _call_mcp_tool(
             tool_name,
@@ -778,20 +990,25 @@ def download_paper_pdf(
             timeout_seconds=timeout_seconds,
         )
     except MCPToolError as exc:
-        mcp_failure = _mcp_failure_payload(exc)
+        mcp_failure = mcp_failure or _mcp_failure_payload(exc)
     else:
-        pdf_paths = sorted(
-            path
-            for path in output_dir.rglob("*")
-            if path.is_file() and path.suffix.lower() == ".pdf" and path.stat().st_size > 0
-        )
+        pdf_paths = _downloaded_pdf_paths(output_dir)
         if pdf_paths:
+            upstream_fallback = (
+                {
+                    "fallback_from": "paper_search_mcp_fallback_download",
+                    "fallback_error": mcp_failure.get("error", "unavailable"),
+                }
+                if mcp_failure
+                else {}
+            )
             return {
                 "status": "success",
                 "mode": "paper_search_mcp_download",
-                "source": source,
+                "source": source_name,
                 "paper_id": paper_id,
                 "mcp_probe": mcp_result["probe"],
+                "mcp_server_probe": mcp_failure,
                 "downloaded_pdf": str(pdf_paths[0]),
                 "upstream": {
                     "package": "paper-search-mcp",
@@ -799,6 +1016,7 @@ def download_paper_pdf(
                     "tool": tool_name,
                     "returncode": 0,
                     "raw_response": mcp_result.get("raw_response", {}),
+                    **upstream_fallback,
                 },
             }
         mcp_failure = {
@@ -813,21 +1031,21 @@ def download_paper_pdf(
         return {
             "status": "failed",
             "mode": "paper_search_cli_download",
-            "source": source,
+            "source": source_name,
             "paper_id": paper_id,
             "mcp_probe": probe,
             "mcp_server_probe": mcp_failure,
             "error": COMMAND_UNAVAILABLE,
         }
     resolved_command = probe["command"]
-    args = ["download", source, paper_id, "--save-path", str(output_dir)]
+    args = ["download", source_name, paper_id, "--save-path", str(output_dir)]
     try:
         result = _run_command(resolved_command, args, timeout_seconds=timeout_seconds)
     except subprocess.TimeoutExpired as exc:
         return {
             "status": "failed",
             "mode": "paper_search_cli_download",
-            "source": source,
+            "source": source_name,
             "paper_id": paper_id,
             "mcp_probe": probe,
             "mcp_server_probe": mcp_failure,
@@ -842,16 +1060,12 @@ def download_paper_pdf(
             },
             "error": "paper-search download timed out",
         }
-    pdf_paths = sorted(
-        path
-        for path in output_dir.rglob("*")
-        if path.is_file() and path.suffix.lower() == ".pdf" and path.stat().st_size > 0
-    )
+    pdf_paths = _downloaded_pdf_paths(output_dir)
     if result.returncode != 0:
         return {
             "status": "failed",
             "mode": "paper_search_cli_download",
-            "source": source,
+            "source": source_name,
             "paper_id": paper_id,
             "mcp_probe": probe,
             "mcp_server_probe": mcp_failure,
@@ -869,7 +1083,7 @@ def download_paper_pdf(
         return {
             "status": "failed",
             "mode": "paper_search_cli_download",
-            "source": source,
+            "source": source_name,
             "paper_id": paper_id,
             "mcp_probe": probe,
             "mcp_server_probe": mcp_failure,
@@ -886,7 +1100,7 @@ def download_paper_pdf(
     return {
         "status": "success",
         "mode": "paper_search_cli_download",
-        "source": source,
+        "source": source_name,
         "paper_id": paper_id,
         "mcp_probe": probe,
         "mcp_server_probe": mcp_failure,
@@ -899,4 +1113,154 @@ def download_paper_pdf(
             "stderr": result.stderr.strip(),
             **_fallback_fields(mcp_failure),
         },
+    }
+
+
+def read_paper_preview(
+    *,
+    source: str,
+    paper_id: str,
+    output_path: Path,
+    save_dir: Path | None = None,
+    command: str | None = None,
+    timeout_seconds: int = 120,
+) -> dict:
+    apply_runtime_config()
+    source_name = source.strip().lower().replace("-", "_")
+    paper_id_text = str(paper_id or "").strip()
+    tool_name = _paper_read_tool_name(source_name)
+    if not source_name or not paper_id_text:
+        return {
+            "status": "skipped",
+            "mode": "paper_search_mcp_read_preview",
+            "source": source_name,
+            "paper_id": paper_id_text,
+            "tool": tool_name,
+            "output_path": str(output_path),
+            "authoritative": False,
+            "replaces_mineru": False,
+            "error": "source and paper_id are required",
+        }
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    preview_save_dir = save_dir or output_path.parent
+    preview_save_dir.mkdir(parents=True, exist_ok=True)
+    save_path = str(preview_save_dir)
+    mcp_failure: dict | None = None
+    try:
+        mcp_result = _call_mcp_tool(
+            tool_name,
+            {"paper_id": paper_id_text, "save_path": save_path},
+            timeout_seconds=timeout_seconds,
+        )
+    except MCPToolError as exc:
+        mcp_failure = _mcp_failure_payload(exc)
+    else:
+        preview_text = _meaningful_preview_text(
+            _extract_preview_text(mcp_result.get("payload"), mcp_result.get("raw_response"))
+        )
+        if preview_text:
+            return {
+                "status": "success",
+                "mode": "paper_search_mcp_read_preview",
+                "source": source_name,
+                "paper_id": paper_id_text,
+                "tool": tool_name,
+                "mcp_probe": mcp_result["probe"],
+                "upstream": {
+                    "package": "paper-search-mcp",
+                    "transport": "stdio",
+                    "tool": tool_name,
+                    "returncode": 0,
+                },
+                **_write_preview(output_path, preview_text),
+            }
+        mcp_failure = {
+            **mcp_result["probe"],
+            "available": False,
+            "error": "paper-search MCP read preview produced no meaningful text",
+        }
+
+    selected_command = command or os.environ.get("EPI_PAPER_SEARCH_COMMAND") or "paper-search"
+    probe = probe_paper_search_mcp(selected_command)
+    if not probe["available"]:
+        return {
+            "status": "failed",
+            "mode": "paper_search_cli_read_preview",
+            "source": source_name,
+            "paper_id": paper_id_text,
+            "tool": tool_name,
+            "mcp_probe": probe,
+            "mcp_server_probe": mcp_failure,
+            "output_path": str(output_path),
+            "authoritative": False,
+            "replaces_mineru": False,
+            "error": COMMAND_UNAVAILABLE,
+        }
+    resolved_command = probe["command"]
+    args = ["read", source_name, paper_id_text, "--save-path", save_path]
+    try:
+        result = _run_command(resolved_command, args, timeout_seconds=timeout_seconds)
+    except subprocess.TimeoutExpired as exc:
+        return {
+            "status": "failed",
+            "mode": "paper_search_cli_read_preview",
+            "source": source_name,
+            "paper_id": paper_id_text,
+            "tool": tool_name,
+            "mcp_probe": probe,
+            "mcp_server_probe": mcp_failure,
+            "output_path": str(output_path),
+            "authoritative": False,
+            "replaces_mineru": False,
+            "upstream": {
+                "package": "paper-search-mcp",
+                "cli_command": resolved_command,
+                "returncode": None,
+                "stdout_char_count": len(_timeout_text(exc.output).strip()),
+                "stderr": _timeout_text(exc.stderr).strip(),
+                "timeout_seconds": timeout_seconds,
+                **_fallback_fields(mcp_failure),
+            },
+            "error": "paper-search read timed out",
+        }
+    preview_text = _meaningful_preview_text(result.stdout)
+    if result.returncode != 0 or not preview_text:
+        return {
+            "status": "failed",
+            "mode": "paper_search_cli_read_preview",
+            "source": source_name,
+            "paper_id": paper_id_text,
+            "tool": tool_name,
+            "mcp_probe": probe,
+            "mcp_server_probe": mcp_failure,
+            "output_path": str(output_path),
+            "authoritative": False,
+            "replaces_mineru": False,
+            "upstream": {
+                "package": "paper-search-mcp",
+                "cli_command": resolved_command,
+                "returncode": result.returncode,
+                "stdout_char_count": len(preview_text),
+                "stderr": result.stderr.strip(),
+                **_fallback_fields(mcp_failure),
+            },
+            "error": "paper-search read failed" if result.returncode != 0 else "paper-search read produced no text",
+        }
+    return {
+        "status": "success",
+        "mode": "paper_search_cli_read_preview",
+        "source": source_name,
+        "paper_id": paper_id_text,
+        "tool": tool_name,
+        "mcp_probe": probe,
+        "mcp_server_probe": mcp_failure,
+        "upstream": {
+            "package": "paper-search-mcp",
+            "cli_command": resolved_command,
+            "returncode": result.returncode,
+            "stderr": result.stderr.strip(),
+            **_fallback_fields(mcp_failure),
+        },
+        **_write_preview(output_path, preview_text),
     }

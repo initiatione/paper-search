@@ -109,6 +109,7 @@ def _run_orchestrator_cli(monkeypatch, capsys, *args):
 def test_doctor_text_reports_ok_with_external_dependency_warnings(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("MINERU_TOKEN", raising=False)
     monkeypatch.delenv("EPI_PAPER_SEARCH_COMMAND", raising=False)
+    monkeypatch.setenv("EPI_PAPER_SEARCH_MCP_DISABLED", "1")
     plugin_root = _seed_plugin_root(tmp_path)
 
     exit_code, output = _run_orchestrator_cli(
@@ -143,6 +144,10 @@ def test_doctor_text_reports_ok_with_external_dependency_warnings(tmp_path, monk
 def test_doctor_json_reports_structured_checks(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("MINERU_TOKEN", raising=False)
     monkeypatch.delenv("EPI_PAPER_SEARCH_COMMAND", raising=False)
+    monkeypatch.delenv("PAPER_SEARCH_MCP_UNPAYWALL_EMAIL", raising=False)
+    monkeypatch.delenv("PAPER_SEARCH_MCP_CORE_API_KEY", raising=False)
+    monkeypatch.delenv("PAPER_SEARCH_MCP_GOOGLE_SCHOLAR_PROXY_URL", raising=False)
+    monkeypatch.setenv("EPI_PAPER_SEARCH_MCP_DISABLED", "1")
     plugin_root = _seed_plugin_root(tmp_path)
 
     exit_code, output = _run_orchestrator_cli(
@@ -181,6 +186,14 @@ def test_doctor_json_reports_structured_checks(tmp_path, monkeypatch, capsys):
     assert setup_by_check["paper_search_cli"]["url"] == "https://github.com/openags/paper-search-mcp"
     assert setup_by_check["mineru_token"]["summary"] == "Configure MINERU_TOKEN"
     assert setup_by_check["mineru_token"]["url"] == "https://mineru.net/apiManage/docs?openApplyModal=true"
+    readiness = {check["name"]: check for check in payload["checks"]}["paper_search_provider_readiness"]
+    assert readiness["status"] == "warning"
+    assert readiness["providers"]["unpaywall"]["status"] == "missing_required_env"
+    assert readiness["providers"]["unpaywall"]["env"] == "PAPER_SEARCH_MCP_UNPAYWALL_EMAIL"
+    assert readiness["providers"]["core"]["status"] == "missing_recommended_env"
+    assert readiness["providers"]["google_scholar"]["status"] == "missing_optional_env"
+    assert readiness["capabilities"]["crossref"]["read"] == "info-only"
+    assert readiness["capabilities"]["openalex"]["download"] == "unsupported"
 
 
 def test_doctor_reports_skill_agent_and_workflow_discovery_contract(tmp_path, monkeypatch, capsys):

@@ -10,10 +10,33 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 from epi.artifacts import file_sha256, json_sha256, utc_now, write_json_atomic
-from epi.paper_search_adapter import download_paper_pdf
+from epi.paper_search_adapter import download_paper_pdf, read_paper_preview
 
 
 PDF_MAGIC = b"%PDF-"
+OA_SOURCE_PRIORITY = {
+    "arxiv": 0,
+    "pmc": 1,
+    "europepmc": 2,
+    "core": 3,
+    "openaire": 4,
+    "biorxiv": 5,
+    "medrxiv": 6,
+    "iacr": 7,
+    "doaj": 8,
+    "base": 9,
+    "zenodo": 10,
+    "hal": 11,
+    "semantic": 20,
+    "pubmed": 21,
+    "crossref": 22,
+    "openalex": 23,
+    "dblp": 24,
+    "google_scholar": 25,
+    "citeseerx": 26,
+    "ssrn": 27,
+    "unpaywall": 28,
+}
 
 
 def _metadata_from_candidate(candidate: dict) -> dict:
@@ -33,7 +56,31 @@ def _metadata_from_candidate(candidate: dict) -> dict:
     }
 
 
-def _candidate_download_identity(candidate: dict) -> tuple[str, str] | None:
+def _source_priority(source: str) -> int:
+    return OA_SOURCE_PRIORITY.get(source.strip().lower(), 100)
+
+
+def _paper_search_use_scihub() -> bool:
+    return os.environ.get("EPI_PAPER_SEARCH_MCP_USE_SCIHUB", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _candidate_download_identities(candidate: dict) -> list[tuple[str, str]]:
+    identities: list[tuple[str, str]] = []
+
+    def add(source: object, paper_id: object) -> None:
+        source_text = str(source or "").strip().lower()
+        paper_id_text = str(paper_id or "").strip()
+        if not source_text or not paper_id_text:
+            return
+        identity = (source_text, paper_id_text)
+        if identity not in identities:
+            identities.append(identity)
+
     for record in candidate.get("raw_records") or []:
         if not isinstance(record, dict):
             continue
@@ -42,14 +89,20 @@ def _candidate_download_identity(candidate: dict) -> tuple[str, str] | None:
         paper_id = raw_record.get("paper_id") or record.get("paper_id")
         if not paper_id and source == "arxiv":
             paper_id = record.get("arxiv_id") or candidate.get("arxiv_id")
-        if source and paper_id:
-            return source, str(paper_id)
+        add(source, paper_id)
     sources = candidate.get("sources") or []
     if isinstance(sources, str):
         sources = [sources]
     normalized_sources = [str(source).strip().lower() for source in sources]
     if "arxiv" in normalized_sources and candidate.get("arxiv_id"):
-        return "arxiv", str(candidate["arxiv_id"])
+        add("arxiv", candidate["arxiv_id"])
+    return sorted(identities, key=lambda item: (_source_priority(item[0]), identities.index(item)))
+
+
+def _candidate_download_identity(candidate: dict) -> tuple[str, str] | None:
+    identities = _candidate_download_identities(candidate)
+    if identities:
+        return identities[0]
     return None
 
 
@@ -302,10 +355,16 @@ def acquire_paper_from_url(
     download_identity = _candidate_download_identity(candidate)
     if download_identity is not None:
         source, paper_id = download_identity
+        use_scihub = _paper_search_use_scihub()
+        scihub_base_url = os.environ.get("EPI_PAPER_SEARCH_MCP_SCIHUB_BASE_URL", "https://sci-hub.se")
         with tempfile.TemporaryDirectory(prefix="epi-paper-search-") as temp_dir:
             download_record = download_paper_pdf(
                 source=source,
                 paper_id=paper_id,
+                doi=str(candidate.get("doi") or ""),
+                title=str(candidate.get("title") or ""),
+                use_scihub=use_scihub,
+                scihub_base_url=scihub_base_url,
                 output_dir=Path(temp_dir),
                 timeout_seconds=timeout_seconds,
             )
@@ -347,12 +406,41 @@ def acquire_paper_from_url(
                     "exit_status": 0,
                     "source": source,
                     "paper_id": paper_id,
+                    "doi": str(candidate.get("doi") or ""),
+                    "title": str(candidate.get("title") or ""),
+                    "use_scihub": use_scihub,
                     "pdf_url": pdf_url,
                     "output_path": str(target_pdf),
                     "size_bytes": target_pdf.stat().st_size,
                     "mcp_probe": download_record.get("mcp_probe"),
+                    "mcp_server_probe": download_record.get("mcp_server_probe"),
                     "upstream": download_record.get("upstream"),
                 }
+                upstream = record["upstream"] if isinstance(record.get("upstream"), dict) else {}
+                if upstream.get("fallback_chain"):
+                    record["fallback_chain"] = upstream.get("fallback_chain")
+                elif download_mode == "paper_search_mcp_fallback_download":
+                    record["fallback_chain"] = ["source-native", "openaire", "core", "europepmc", "pmc", "unpaywall"]
+                preview_path = paper_root / "paper-search-read-preview.txt"
+                try:
+                    record["retrieval_preview"] = read_paper_preview(
+                        source=source,
+                        paper_id=paper_id,
+                        output_path=preview_path,
+                        save_dir=Path(temp_dir),
+                        timeout_seconds=timeout_seconds,
+                    )
+                except Exception as exc:
+                    record["retrieval_preview"] = {
+                        "status": "failed",
+                        "mode": "paper_search_read_preview",
+                        "source": source,
+                        "paper_id": paper_id,
+                        "output_path": str(preview_path),
+                        "authoritative": False,
+                        "replaces_mineru": False,
+                        "error": str(exc),
+                    }
                 write_json_atomic(paper_root / "metadata.json", metadata)
                 record["input_artifact_hashes"] = {
                     "candidate_metadata": candidate_metadata_hash,
@@ -361,6 +449,8 @@ def acquire_paper_from_url(
                     "paper.pdf": file_sha256(target_pdf),
                     "metadata.json": file_sha256(paper_root / "metadata.json"),
                 }
+                if preview_path.is_file():
+                    record["output_artifact_hashes"]["paper-search-read-preview.txt"] = file_sha256(preview_path)
                 write_json_atomic(paper_root / "acquire-record.json", record)
                 return record
 

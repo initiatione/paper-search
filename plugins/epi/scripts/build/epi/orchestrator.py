@@ -27,7 +27,7 @@ from epi.generate_reader import generate_reader_outputs
 from epi.normalize_candidates import normalize_candidates
 from epi.paper_gate import build_paper_gate, render_paper_gate
 from epi.paper_library import load_existing_paper_index
-from epi.paper_search_adapter import discover
+from epi.paper_search_adapter import discover, paper_search_provider_readiness, paper_search_source_capabilities
 from epi.query_planner import build_query_plan, infer_research_mode, topic_focus_terms
 from epi.raw_cleanup import cleanup_failed_raw_paper
 from epi.rank_papers import rank_candidates
@@ -253,6 +253,156 @@ def _merged_source_mode(query_records: list[dict]) -> str:
     if len(modes) == 1:
         return modes[0]
     return "query_plan_mixed"
+
+
+def _int_or_none(value: object) -> int | None:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return None
+
+
+def _ordered_sources_from_upstream(upstream: dict) -> list[str]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+    source_candidates: list[object] = []
+    sources_used = upstream.get("sources_used")
+    if isinstance(sources_used, list):
+        source_candidates.extend(sources_used)
+    source_results = upstream.get("source_results")
+    if isinstance(source_results, dict):
+        source_candidates.extend(source_results)
+    errors = upstream.get("errors")
+    if isinstance(errors, dict):
+        source_candidates.extend(errors)
+    for source in source_candidates:
+        source_name = str(source)
+        if not source_name or source_name in seen:
+            continue
+        seen.add(source_name)
+        ordered.append(source_name)
+    return ordered
+
+
+def _source_coverage_from_single_record(search_record: dict, deduped_total: int | None = None) -> dict:
+    upstream = search_record.get("upstream")
+    if not isinstance(upstream, dict) or not upstream:
+        return {}
+
+    source_results: dict[str, int] = {}
+    upstream_results = upstream.get("source_results")
+    if isinstance(upstream_results, dict):
+        for source, count in upstream_results.items():
+            source_results[str(source)] = _int_or_none(count) or 0
+
+    errors: dict[str, str] = {}
+    upstream_errors = upstream.get("errors")
+    if isinstance(upstream_errors, dict):
+        errors = {str(source): str(error) for source, error in upstream_errors.items() if str(error)}
+
+    raw_total = (
+        _int_or_none(upstream.get("raw_total"))
+        if upstream.get("raw_total") is not None
+        else _int_or_none(upstream.get("total"))
+    )
+    if raw_total is None:
+        raw_total = len(search_record.get("records") or [])
+    if deduped_total is None:
+        deduped_total = _int_or_none(upstream.get("total"))
+    if deduped_total is None:
+        deduped_total = len(search_record.get("records") or [])
+
+    sources_used = _ordered_sources_from_upstream(upstream)
+
+    return {
+        "sources_used": sources_used,
+        "source_results": source_results,
+        "errors": errors,
+        "raw_total": raw_total,
+        "deduped_total": deduped_total,
+        "query_count": 1,
+        "capabilities": paper_search_source_capabilities(sources_used),
+        "provider_readiness": paper_search_provider_readiness(sources_used),
+    }
+
+
+def _merge_source_error(errors: dict[str, str], source: str, error: object) -> None:
+    error_text = str(error)
+    if not error_text:
+        return
+    existing = errors.get(source)
+    if not existing:
+        errors[source] = error_text
+    elif error_text not in existing.split("; "):
+        errors[source] = f"{existing}; {error_text}"
+
+
+def _source_coverage_from_search_record(search_record: dict, deduped_total: int | None = None) -> dict:
+    query_records = search_record.get("query_records")
+    if not isinstance(query_records, list) or not query_records:
+        return _source_coverage_from_single_record(search_record, deduped_total=deduped_total)
+
+    sources_used: list[str] = []
+    seen_sources: set[str] = set()
+    source_results: dict[str, int] = {}
+    errors: dict[str, str] = {}
+    raw_total = 0
+
+    for query_record in query_records:
+        if not isinstance(query_record, dict):
+            continue
+        upstream = query_record.get("upstream")
+        upstream = upstream if isinstance(upstream, dict) else {}
+        for source in _ordered_sources_from_upstream(upstream):
+            if source not in seen_sources:
+                seen_sources.add(source)
+                sources_used.append(source)
+
+        upstream_results = upstream.get("source_results")
+        if isinstance(upstream_results, dict):
+            for source, count in upstream_results.items():
+                source_name = str(source)
+                source_results[source_name] = source_results.get(source_name, 0) + (_int_or_none(count) or 0)
+                if source_name not in seen_sources:
+                    seen_sources.add(source_name)
+                    sources_used.append(source_name)
+
+        upstream_errors = upstream.get("errors")
+        if isinstance(upstream_errors, dict):
+            for source, error in upstream_errors.items():
+                source_name = str(source)
+                _merge_source_error(errors, source_name, error)
+                if source_name not in seen_sources:
+                    seen_sources.add(source_name)
+                    sources_used.append(source_name)
+
+        record_raw_total = (
+            _int_or_none(upstream.get("raw_total"))
+            if upstream.get("raw_total") is not None
+            else _int_or_none(upstream.get("total"))
+        )
+        if record_raw_total is None:
+            record_raw_total = _int_or_none(query_record.get("record_count")) or 0
+        raw_total += record_raw_total
+
+    if not sources_used and not source_results and not errors and raw_total == 0:
+        return {}
+
+    return {
+        "sources_used": sources_used,
+        "source_results": source_results,
+        "errors": errors,
+        "raw_total": raw_total,
+        "deduped_total": deduped_total if deduped_total is not None else len(search_record.get("records") or []),
+        "query_count": len(query_records),
+        "capabilities": paper_search_source_capabilities(sources_used),
+        "provider_readiness": paper_search_provider_readiness(sources_used),
+    }
 
 
 def _run_query_plan_discovery(
@@ -768,6 +918,7 @@ def run_dry_run(
             "rejected": len(rejected),
         },
         "query_records": search_record.get("query_records", []),
+        "source_coverage": _source_coverage_from_search_record(search_record, deduped_total=len(normalized)),
         "warnings": search_record.get("warnings", []),
         "easyscholar": {
             "enabled": easyscholar_record.get("enabled"),

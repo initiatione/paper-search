@@ -14,6 +14,17 @@ Use `--max-papers 10 --skip-existing` for real testing. Use `--max-papers 1` onl
 
 `--skip-existing` skips only papers that already have complete source artifacts and a matching source-staging `promotion-plan.json`; parsed-only papers still need staging and a report.
 
+Acquisition order is OA-first:
+
+1. Try paper-search MCP `download_with_fallback` using source id, DOI, and title.
+2. Keep Sci-Hub disabled by default. Only include it when the user explicitly sets `EPI_PAPER_SEARCH_MCP_USE_SCIHUB=1`; `EPI_PAPER_SEARCH_MCP_SCIHUB_BASE_URL` only changes the configured base URL.
+3. If the fallback tool fails or produces no PDF, try source-native MCP `download_<source>`.
+4. If MCP cannot produce a usable PDF, fall back to CLI/direct URL behavior and keep the same failure recording rules.
+
+Successful MCP fallback acquisition writes `fallback_chain`, `use_scihub=false` by default, `doi`, `title`, `mcp_server_probe`, and `upstream.tool` into `acquire-record.json`. Treat those fields as acquisition provenance, not as proof that the paper itself was read.
+
+After acquire success, EPI may call MCP `read_<source>_paper` or CLI read and write `paper-search-read-preview.txt`. The matching `acquire-record.json.retrieval_preview` is a non-authoritative retrieval preview sidecar for checking upstream text extraction depth; it is not replacing MinerU, and final wiki ingest must still use `paper.pdf` plus MinerU Markdown/TeX/images/manifest.
+
 ## Reviewed Or Audited Mode
 
 ```powershell
@@ -60,6 +71,7 @@ The handoff must require source artifacts:
 
 Optional evidence aids when generated:
 
+- `paper-search-read-preview.txt`
 - `reader/evidence-map.json`
 - `reader/claim-support.json`
 - `reader/figures.md`
