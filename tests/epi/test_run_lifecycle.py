@@ -129,3 +129,18 @@ def test_run_lifecycle_can_prune_failed_invalid_and_stale_running_runs(tmp_path)
     assert active.exists()
     assert protected.exists()
 
+
+def test_repository_cleanup_does_not_remove_review_sessions(tmp_path):
+    from epi.epi_repository import cleanup_epi_repository
+
+    vault = tmp_path / "vault"
+    review_dir = vault / "_epi" / "reviews" / "robotics-abc"
+    review_dir.mkdir(parents=True)
+    (review_dir / "state.json").write_text('{"schema_version":"epi-review-session-v1"}', encoding="utf-8")
+
+    result = cleanup_epi_repository(vault)
+
+    assert result["status"] == "cleaned"
+    assert review_dir.is_dir()
+    assert (review_dir / "state.json").is_file()
+

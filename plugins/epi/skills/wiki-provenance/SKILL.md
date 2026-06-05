@@ -22,6 +22,7 @@ Before writing or reviewing final pages, load:
 - `wiki-agent-trigger.json` when the handoff has already been approved and EPI has generated the resume package.
 - `wiki-ingest-brief.json`.
 - `paper.pdf`, `metadata.json`, `mineru/<slug>.md`, `mineru/paper.tex`, `mineru/images/*`, `mineru/mineru-manifest.json`.
+- `evidence-index.json` and `_epi/meta/evidence-index.json` when present.
 - `reader/evidence-map.json` and `reader/claim-support.json`.
 - `critic/*.json` and `briefs/reading-report.md`.
 - Target vault `AGENTS.md` and `_meta/*` contract files.
@@ -41,11 +42,12 @@ If a source-grounded claim is only the paper author's assertion, keep the suppor
 
 1. Run `wiki-ingest-handoff --slug <slug>` and stop if the handoff is not ready; after human approval, `wiki-ingest-trigger --slug <slug>` may provide the current agent's resume package.
 2. Read the source bundle before final prose. Reader summaries are navigation aids, not source authority.
-3. For each durable claim, choose a support status and cite the evidence address from `evidence-map.json`, `claim-support.json`, source artifacts, or PDF fallback review.
-4. Embed evidence addresses in the page or in a page-local provenance block; do not leave them only in EPI sidecar JSON.
-5. Put agent inferences in a clearly labeled section such as `Inferences`, `Hypotheses`, or `Open Questions`.
-6. Add synthesis hooks for later retrieval: method family, task, benchmark, metric, dataset, limitation, conflict candidate, and related paper slugs.
-7. After final page writing, create `final-source-review.json`, then run `record-wiki-ingest` with the same approved identity used for pre-write human approval.
+3. Use `evidence-index.json` as a page/section/chunk locator aid when present, then verify important claims against MinerU Markdown, TeX, images, manifest, and `paper.pdf` before final prose.
+4. For each durable claim, choose a support status and cite the evidence address from `evidence-map.json`, `claim-support.json`, `evidence-index.json` locator follow-up, source artifacts, or PDF fallback review.
+5. Embed evidence addresses in the page or in a page-local provenance block; do not leave them only in EPI sidecar JSON.
+6. Put agent inferences in a clearly labeled section such as `Inferences`, `Hypotheses`, or `Open Questions`.
+7. Add synthesis hooks for later retrieval: method family, task, benchmark, metric, dataset, limitation, conflict candidate, and related paper slugs.
+8. After final page writing, create `final-source-review.json`, then run `record-wiki-ingest` with the same approved identity used for pre-write human approval.
 
 ## Page Pattern
 
@@ -72,6 +74,7 @@ Load `references/page-provenance.md` for a fuller page and final-source-review c
 - Do not flatten `inferred` or `metadata-only` statements into source-grounded claims.
 - Do not let unsupported claims enter main factual sections.
 - Do not omit evidence addresses from final pages just because `record-wiki-ingest` stores hashes.
+- Do not treat `evidence-index.json` chunks as sufficient verification; use them to locate evidence, then reread source artifacts before marking claims source-grounded or pages verified.
 - Do not write final pages from EPI suggested routes directly; the target vault contract decides paths, links, tags, merge policy, and staged writes.
 
 ## Literature Wiki Contract
