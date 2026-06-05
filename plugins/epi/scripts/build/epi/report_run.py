@@ -196,6 +196,9 @@ def _append_source_coverage_section(report: list[str], source_coverage: dict) ->
     for key in ("raw_total", "deduped_total", "query_count"):
         if source_coverage.get(key) is not None:
             report.append(f"- {key}: {source_coverage.get(key)}")
+    for key in ("timeout_budget_seconds", "search_duration_ms"):
+        if source_coverage.get(key) is not None:
+            report.append(f"- {key}: {source_coverage.get(key)}")
     source_results = source_coverage.get("source_results")
     source_results = source_results if isinstance(source_results, dict) else {}
     source_errors = source_coverage.get("errors")
@@ -221,6 +224,27 @@ def _append_source_coverage_section(report: list[str], source_coverage: dict) ->
             download = capability.get("download", "unknown")
             read = capability.get("read", "unknown")
             report.append(f"  - {source_name} capability: download={download}, read={read}")
+    source_health = source_coverage.get("source_health")
+    source_health = source_health if isinstance(source_health, dict) else {}
+    if source_health:
+        report.append("- source_health:")
+        for source in sources_used:
+            source_name = str(source)
+            state = source_health.get(source_name)
+            if not isinstance(state, dict):
+                continue
+            status = state.get("status", "unknown")
+            result_count = state.get("result_count", 0)
+            timeout_seconds = state.get("timeout_budget_seconds")
+            parts = [f"{source_name}: {status}", f"results={result_count}"]
+            if timeout_seconds is not None:
+                parts.append(f"timeout={timeout_seconds}s")
+            duration_ms = state.get("duration_ms")
+            if duration_ms is not None:
+                parts.append(f"duration_ms={duration_ms}")
+            if state.get("error"):
+                parts.append(f"error={state['error']}")
+            report.append("  - " + ", ".join(parts))
     provider_readiness = source_coverage.get("provider_readiness")
     provider_readiness = provider_readiness if isinstance(provider_readiness, dict) else {}
     if provider_readiness:
@@ -232,6 +256,66 @@ def _append_source_coverage_section(report: list[str], source_coverage: dict) ->
             env_name = state.get("env")
             suffix = f" ({env_name})" if env_name else ""
             report.append(f"  - {provider}: {status}{suffix}")
+
+
+def _append_source_routing_section(report: list[str], discovery_context: dict) -> None:
+    source_coverage = discovery_context.get("source_coverage") if isinstance(discovery_context, dict) else {}
+    source_coverage = source_coverage if isinstance(source_coverage, dict) else {}
+    source_routing = source_coverage.get("source_routing")
+    source_routing = source_routing if isinstance(source_routing, dict) else {}
+    if not source_routing:
+        return
+    report.append("")
+    report.append("## Source Routing")
+    selected_sources = source_routing.get("selected_sources")
+    if isinstance(selected_sources, list):
+        report.append("- selected_sources: " + (", ".join(str(source) for source in selected_sources) or "None"))
+    demoted_sources = source_routing.get("demoted_sources")
+    if isinstance(demoted_sources, list) and demoted_sources:
+        for item in demoted_sources:
+            if not isinstance(item, dict):
+                continue
+            source = item.get("source")
+            reason = item.get("reason")
+            if source:
+                suffix = f" ({reason})" if reason else ""
+                report.append(f"- demoted: {source}{suffix}")
+    provider_risks = source_routing.get("provider_risks")
+    if isinstance(provider_risks, list) and provider_risks:
+        for item in provider_risks:
+            if not isinstance(item, dict):
+                continue
+            provider = item.get("provider")
+            status = item.get("status")
+            env_name = item.get("env")
+            if provider and status:
+                suffix = f" ({env_name})" if env_name else ""
+                report.append(f"- risk: {provider} {status}{suffix}")
+
+
+def _append_manual_downloads_section(report: list[str], manual_downloads: list[dict]) -> None:
+    if not manual_downloads:
+        return
+    report.append("")
+    report.append("## Manual Downloads")
+    for index, card in enumerate(manual_downloads, start=1):
+        title = card.get("title") or card.get("slug") or "Untitled paper"
+        report.append(f"{index}. {title} - manual-download-required")
+        doi_url = card.get("doi_url")
+        if doi_url:
+            report.append(f"   - doi: {doi_url}")
+        elif card.get("doi"):
+            report.append(f"   - doi: {card['doi']}")
+        for item in card.get("candidate_manual_urls") or []:
+            if not isinstance(item, dict):
+                continue
+            url = item.get("url")
+            if not url or url == doi_url:
+                continue
+            report.append(f"   - manual link: {url}")
+        action = card.get("preferred_next_step") or card.get("recommended_action")
+        if action:
+            report.append(f"   - recommended_action: {action}")
 
 
 def write_report(
@@ -258,6 +342,7 @@ def write_report(
     reader_revision_plans: list[dict] | None = None,
     reproduction_plans: list[dict] | None = None,
     discovery_context: dict | None = None,
+    manual_downloads: list[dict] | None = None,
 ) -> None:
     rejected = rejected or []
     quarantined = quarantined or []
@@ -275,6 +360,7 @@ def write_report(
     reader_revision_plans = reader_revision_plans or []
     reproduction_plans = reproduction_plans or []
     discovery_context = discovery_context or {}
+    manual_downloads = manual_downloads or []
     easyscholar_context = discovery_context.get("easyscholar") if isinstance(discovery_context, dict) else {}
     easyscholar_context = easyscholar_context if isinstance(easyscholar_context, dict) else {}
     research_queue = _research_queue(ranked)
@@ -318,6 +404,7 @@ def write_report(
             source_coverage = discovery_context.get("source_coverage") or {}
             if source_coverage:
                 _append_source_coverage_section(report, source_coverage)
+            _append_source_routing_section(report, discovery_context)
         _append_easyscholar_section(report, easyscholar_context)
         report.append("")
         report.append("## Next Actions")
@@ -397,6 +484,8 @@ def write_report(
                 report.append(f"   - next_action: {paper.get('next_action')}")
         else:
             report.append("- No failed papers recorded.")
+        _append_manual_downloads_section(report, manual_downloads)
+        _append_source_routing_section(report, discovery_context)
         if wiki_pages_written:
             report.append("")
             report.append("## Wiki Pages Written")
@@ -454,6 +543,7 @@ def write_report(
             "reader_revision_plans": reader_revision_plans,
             "reproduction_plans": reproduction_plans,
             "discovery_context": discovery_context,
+            "manual_downloads": manual_downloads,
             "easyscholar": easyscholar_context,
             "research_queue": research_queue,
             "accepted_count": len(ranked),

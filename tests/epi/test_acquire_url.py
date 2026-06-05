@@ -1,6 +1,7 @@
 import json
 import os
 import threading
+import urllib.error
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
@@ -102,6 +103,36 @@ def test_acquire_paper_from_url_records_http_failure_without_pdf(tmp_path):
     assert record["output_artifact_hashes"]["metadata.json"]
     assert not (paper_root / "paper.pdf").exists()
     assert json.loads((paper_root / "acquire-record.json").read_text(encoding="utf-8")) == record
+
+
+def test_acquire_paper_from_url_quarantines_identity_mismatch_before_success(tmp_path):
+    server_root = tmp_path / "server"
+    server_root.mkdir()
+    (server_root / "wrong.pdf").write_bytes(
+        b"%PDF-1.4\nTitle: Wrong Publisher Paper\nDOI: 10.9999/wrong.paper\n"
+    )
+    vault = tmp_path / "vault"
+    paper_root = vault / "_epi" / "raw" / "identity-mismatch-paper"
+    candidate = _candidate(None, slug="identity-mismatch-paper")
+    candidate["title"] = "Target AUV PINN RL Control Paper"
+    candidate["doi"] = "10.1000/target.paper"
+
+    with _LocalServer(server_root) as base_url:
+        candidate["pdf_url"] = f"{base_url}/wrong.pdf"
+        record = acquire_paper_from_url(candidate, paper_root)
+
+    identity_path = paper_root / "identity-check.json"
+    quarantine_pdf = vault / "_epi" / "quarantine" / "papers" / "identity-mismatch-paper" / "paper.pdf"
+
+    assert record["status"] == "failed"
+    assert record["failure_class"] == "identity-mismatch"
+    assert record["identity_check"]["status"] == "failed"
+    assert record["identity_check"]["reason"] == "doi_mismatch"
+    assert record["quarantine_path"] == str(quarantine_pdf)
+    assert identity_path.is_file()
+    assert json.loads(identity_path.read_text(encoding="utf-8"))["status"] == "failed"
+    assert quarantine_pdf.read_bytes().startswith(b"%PDF-1.4")
+    assert not (paper_root / "paper.pdf").exists()
 
 
 def test_acquire_paper_from_url_follows_landing_page_citation_pdf_url(tmp_path):
@@ -242,6 +273,7 @@ def test_acquire_paper_from_candidate_records_paper_search_mcp_download_mode(tmp
         title="",
         use_scihub=False,
         scihub_base_url="https://sci-hub.se",
+        stop_after_oa_fallback=False,
         command=None,
         timeout_seconds=120,
     ):
@@ -326,6 +358,7 @@ def test_acquire_paper_from_candidate_soft_fails_retrieval_preview(tmp_path, mon
         title="",
         use_scihub=False,
         scihub_base_url="https://sci-hub.se",
+        stop_after_oa_fallback=False,
         command=None,
         timeout_seconds=120,
     ):
@@ -383,6 +416,7 @@ def test_acquire_paper_from_candidate_uses_oa_identity_and_fallback_metadata(tmp
         title="",
         use_scihub=False,
         scihub_base_url="https://sci-hub.se",
+        stop_after_oa_fallback=False,
         command=None,
         timeout_seconds=120,
     ):
@@ -394,6 +428,7 @@ def test_acquire_paper_from_candidate_uses_oa_identity_and_fallback_metadata(tmp
                 "title": title,
                 "use_scihub": use_scihub,
                 "scihub_base_url": scihub_base_url,
+                "stop_after_oa_fallback": stop_after_oa_fallback,
             }
         )
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -457,6 +492,7 @@ def test_acquire_paper_from_candidate_uses_oa_identity_and_fallback_metadata(tmp
         "title": "OA Priority Paper",
         "use_scihub": False,
         "scihub_base_url": "https://sci-hub.se",
+        "stop_after_oa_fallback": False,
     }
     assert record["status"] == "success"
     assert record["mode"] == "paper_search_mcp_fallback_download"
@@ -464,6 +500,126 @@ def test_acquire_paper_from_candidate_uses_oa_identity_and_fallback_metadata(tmp
     assert record["use_scihub"] is False
     assert record["doi"] == "10.1000/downloaded"
     assert record["title"] == "OA Priority Paper"
+
+
+def test_acquire_paper_from_candidate_records_manual_download_when_oa_fallback_has_no_pdf(tmp_path, monkeypatch):
+    seen = {}
+
+    def _fake_download_paper_pdf(
+        *,
+        source,
+        paper_id,
+        output_dir,
+        doi="",
+        title="",
+        use_scihub=False,
+        scihub_base_url="https://sci-hub.se",
+        stop_after_oa_fallback=False,
+        command=None,
+        timeout_seconds=120,
+    ):
+        seen.update(
+            {
+                "source": source,
+                "paper_id": paper_id,
+                "doi": doi,
+                "title": title,
+                "use_scihub": use_scihub,
+                "stop_after_oa_fallback": stop_after_oa_fallback,
+            }
+        )
+        output_dir.mkdir(parents=True, exist_ok=True)
+        return {
+            "status": "failed",
+            "mode": "paper_search_mcp_fallback_download",
+            "source": source,
+            "paper_id": paper_id,
+            "doi": doi,
+            "title": title,
+            "mcp_probe": {"available": True, "transport": "stdio"},
+            "mcp_server_probe": {
+                "available": False,
+                "transport": "stdio",
+                "error": "no OA URL found",
+                "fallback_chain": ["source-native", "openaire", "core", "europepmc", "pmc", "unpaywall"],
+            },
+            "upstream": {
+                "package": "paper-search-mcp",
+                "transport": "stdio",
+                "tool": "download_with_fallback",
+                "fallback_chain": ["source-native", "openaire", "core", "europepmc", "pmc", "unpaywall"],
+                "use_scihub": False,
+            },
+            "error": "Download failed after OA fallback chain: no OA URL found",
+        }
+
+    monkeypatch.setattr("epi.acquire_papers.download_paper_pdf", _fake_download_paper_pdf)
+    candidate = _candidate(None, slug="manual-download-paper")
+    candidate["title"] = "Publisher Only AUV PINN RL Paper"
+    candidate["doi"] = "10.1016/j.oceaneng.2024.119432"
+    candidate["url"] = "https://www.sciencedirect.com/science/article/abs/pii/S0029801824027707"
+    candidate["sources"] = ["semantic", "crossref"]
+    candidate["raw_records"] = [
+        {
+            "source": "semantic",
+            "paper_id": "semantic-123",
+            "raw_record": {
+                "paper_id": "semantic-123",
+                "source": "semantic",
+                "url": "https://www.sciencedirect.com/science/article/abs/pii/S0029801824027707",
+            },
+        }
+    ]
+    vault = tmp_path / "vault"
+
+    record = acquire_paper_from_candidate(vault, candidate)
+
+    assert seen == {
+        "source": "semantic",
+        "paper_id": "semantic-123",
+        "doi": "10.1016/j.oceaneng.2024.119432",
+        "title": "Publisher Only AUV PINN RL Paper",
+        "use_scihub": False,
+        "stop_after_oa_fallback": True,
+    }
+    assert record["status"] == "failed"
+    assert record["failure_class"] == "manual-download-required"
+    assert record["retryable"] is False
+    assert "organization/institution" in record["recovery_hint"]
+    assert record["manual_download"]["required"] is True
+    assert record["manual_download"]["doi"] == "10.1016/j.oceaneng.2024.119432"
+    assert record["manual_download"]["doi_url"] == "https://doi.org/10.1016/j.oceaneng.2024.119432"
+    assert record["manual_download"]["preferred_next_step"].startswith("Download the PDF through your organization")
+    assert {
+        "kind": "publisher",
+        "url": "https://www.sciencedirect.com/science/article/abs/pii/S0029801824027707",
+    } in record["manual_download"]["candidate_manual_urls"]
+    assert record["mcp_server_probe"]["error"] == "no OA URL found"
+    assert record["upstream"]["tool"] == "download_with_fallback"
+    assert not (vault / "_epi" / "raw" / "manual-download-paper" / "paper.pdf").exists()
+
+
+def test_acquire_paper_from_url_attaches_manual_download_links_on_access_denied(tmp_path, monkeypatch):
+    paper_root = tmp_path / "vault" / "_epi" / "raw" / "publisher-blocked-paper"
+    candidate = _candidate("https://publisher.example/article.pdf", slug="publisher-blocked-paper")
+    candidate["doi"] = "10.5555/publisher.blocked"
+    candidate["url"] = "https://publisher.example/article"
+
+    def _blocked_download(url, temp_pdf, timeout_seconds):
+        raise urllib.error.HTTPError(url, 403, "Forbidden", hdrs=None, fp=None)
+
+    monkeypatch.setattr("epi.acquire_papers._download_url_to_temp", _blocked_download)
+
+    record = acquire_paper_from_url(candidate, paper_root)
+
+    assert record["status"] == "failed"
+    assert record["failure_class"] == "manual-download-required"
+    assert record["manual_download"]["required"] is True
+    assert record["manual_download"]["doi_url"] == "https://doi.org/10.5555/publisher.blocked"
+    assert {
+        "kind": "publisher",
+        "url": "https://publisher.example/article",
+    } in record["manual_download"]["candidate_manual_urls"]
 
 
 def test_acquire_paper_from_candidate_uses_vault_slug_boundary(tmp_path):

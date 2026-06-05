@@ -345,8 +345,8 @@ def test_docs_document_paper_search_mcp_fallback_and_source_coverage():
         ]
     )
 
-    assert manifest["version"] == "0.1.10"
-    assert "v0.1.10" in manifest["interface"]["shortDescription"]
+    assert manifest["version"] == "0.1.11"
+    assert "v0.1.11" in manifest["interface"]["shortDescription"]
     for phrase in [
         "search_papers",
         "source_coverage",
@@ -373,12 +373,26 @@ def test_docs_document_paper_search_mcp_fallback_and_source_coverage():
         "non-authoritative",
         "not replacing MinerU",
         "sidecar",
+        "manual_download",
+        "manual-download-required",
+        "candidate_manual_urls",
+        "organization/institution",
         "paper_search_provider_readiness",
         "provider_readiness",
+        "source_routing",
+        "provider_gaps",
+        "unpaywall_email_missing",
         "capabilities",
         "PAPER_SEARCH_MCP_CORE_API_KEY",
         "PAPER_SEARCH_MCP_GOOGLE_SCHOLAR_PROXY_URL",
+        "Google Scholar",
+        "unstable",
+        "identity-check.json",
+        "identity-mismatch",
+        "_epi/quarantine/papers",
+        "quarantine",
         "source capability matrix",
+        "0.1.11",
         "0.1.10",
         "0.1.8",
         "installed cache",

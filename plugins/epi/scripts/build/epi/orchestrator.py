@@ -27,7 +27,12 @@ from epi.generate_reader import generate_reader_outputs
 from epi.normalize_candidates import normalize_candidates
 from epi.paper_gate import build_paper_gate, render_paper_gate
 from epi.paper_library import load_existing_paper_index
-from epi.paper_search_adapter import discover, paper_search_provider_readiness, paper_search_source_capabilities
+from epi.paper_search_adapter import (
+    discover,
+    paper_search_provider_readiness,
+    paper_search_source_capabilities,
+    plan_source_routing,
+)
 from epi.query_planner import build_query_plan, infer_research_mode, topic_focus_terms
 from epi.raw_cleanup import cleanup_failed_raw_paper
 from epi.rank_papers import rank_candidates
@@ -139,6 +144,31 @@ def _cleanup_failed_prepare_raw_results(vault_path: Path, results: list[dict]) -
         result["raw_cleanup"] = cleanup
         cleanup_records.append(cleanup)
     return cleanup_records
+
+
+def _manual_downloads_from_results(results: list[dict]) -> list[dict]:
+    cards: list[dict] = []
+    seen: set[tuple[str, str, str]] = set()
+    for result in results:
+        stage_record = result.get("stage_record")
+        if not isinstance(stage_record, dict):
+            continue
+        manual_download = stage_record.get("manual_download")
+        if not isinstance(manual_download, dict):
+            continue
+        card = dict(manual_download)
+        card.setdefault("slug", result.get("paper_slug"))
+        card.setdefault("paper_slug", result.get("paper_slug"))
+        key = (
+            str(card.get("slug") or ""),
+            str(card.get("doi") or ""),
+            str(card.get("doi_url") or ""),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        cards.append(card)
+    return cards
 
 
 def _hash_existing_outputs(paths: dict[str, Path]) -> dict[str, str]:
@@ -319,7 +349,7 @@ def _source_coverage_from_single_record(search_record: dict, deduped_total: int 
 
     sources_used = _ordered_sources_from_upstream(upstream)
 
-    return {
+    coverage = {
         "sources_used": sources_used,
         "source_results": source_results,
         "errors": errors,
@@ -329,6 +359,18 @@ def _source_coverage_from_single_record(search_record: dict, deduped_total: int 
         "capabilities": paper_search_source_capabilities(sources_used),
         "provider_readiness": paper_search_provider_readiness(sources_used),
     }
+    if isinstance(upstream.get("source_health"), dict):
+        coverage["source_health"] = upstream["source_health"]
+    if upstream.get("timeout_budget_seconds") is not None:
+        coverage["timeout_budget_seconds"] = upstream.get("timeout_budget_seconds")
+    if upstream.get("search_duration_ms") is not None:
+        coverage["search_duration_ms"] = upstream.get("search_duration_ms")
+    if isinstance(search_record.get("source_routing"), dict):
+        coverage["source_routing"] = search_record["source_routing"]
+        coverage["provider_readiness"] = search_record["source_routing"].get(
+            "provider_readiness", coverage["provider_readiness"]
+        )
+    return coverage
 
 
 def _merge_source_error(errors: dict[str, str], source: str, error: object) -> None:
@@ -350,8 +392,11 @@ def _source_coverage_from_search_record(search_record: dict, deduped_total: int 
     sources_used: list[str] = []
     seen_sources: set[str] = set()
     source_results: dict[str, int] = {}
+    source_health: dict[str, dict] = {}
     errors: dict[str, str] = {}
     raw_total = 0
+    timeout_budget_seconds: int | None = None
+    search_duration_ms = 0
 
     for query_record in query_records:
         if not isinstance(query_record, dict):
@@ -368,6 +413,16 @@ def _source_coverage_from_search_record(search_record: dict, deduped_total: int 
             for source, count in upstream_results.items():
                 source_name = str(source)
                 source_results[source_name] = source_results.get(source_name, 0) + (_int_or_none(count) or 0)
+                if source_name not in seen_sources:
+                    seen_sources.add(source_name)
+                    sources_used.append(source_name)
+
+        upstream_health = upstream.get("source_health")
+        if isinstance(upstream_health, dict):
+            for source, state in upstream_health.items():
+                source_name = str(source)
+                if isinstance(state, dict):
+                    source_health[source_name] = dict(state)
                 if source_name not in seen_sources:
                     seen_sources.add(source_name)
                     sources_used.append(source_name)
@@ -389,11 +444,14 @@ def _source_coverage_from_search_record(search_record: dict, deduped_total: int 
         if record_raw_total is None:
             record_raw_total = _int_or_none(query_record.get("record_count")) or 0
         raw_total += record_raw_total
+        if upstream.get("timeout_budget_seconds") is not None:
+            timeout_budget_seconds = _int_or_none(upstream.get("timeout_budget_seconds"))
+        search_duration_ms += _int_or_none(upstream.get("search_duration_ms")) or 0
 
     if not sources_used and not source_results and not errors and raw_total == 0:
         return {}
 
-    return {
+    coverage = {
         "sources_used": sources_used,
         "source_results": source_results,
         "errors": errors,
@@ -403,6 +461,18 @@ def _source_coverage_from_search_record(search_record: dict, deduped_total: int 
         "capabilities": paper_search_source_capabilities(sources_used),
         "provider_readiness": paper_search_provider_readiness(sources_used),
     }
+    if source_health:
+        coverage["source_health"] = source_health
+    if timeout_budget_seconds is not None:
+        coverage["timeout_budget_seconds"] = timeout_budget_seconds
+    if search_duration_ms:
+        coverage["search_duration_ms"] = search_duration_ms
+    if isinstance(search_record.get("source_routing"), dict):
+        coverage["source_routing"] = search_record["source_routing"]
+        coverage["provider_readiness"] = search_record["source_routing"].get(
+            "provider_readiness", coverage["provider_readiness"]
+        )
+    return coverage
 
 
 def _run_query_plan_discovery(
@@ -414,19 +484,27 @@ def _run_query_plan_discovery(
     command: str | None,
     sources: list[str],
     run_dir: Path,
+    source_routing: dict | None = None,
 ) -> dict:
+    effective_sources = (
+        source_routing.get("selected_sources")
+        if isinstance(source_routing, dict) and source_routing.get("selected_sources")
+        else sources
+    )
     if fixture_path is not None or not query_plan:
         search_record = discover(
             query=query,
             max_results=max_results,
             fixture_path=fixture_path,
             command=command,
-            sources=sources,
+            sources=effective_sources,
             raw_response_path=run_dir / "paper-search-raw.json",
         )
         if query_plan:
             search_record["query_plan"] = query_plan
             search_record["query_strategy"] = "fixture_single_query" if fixture_path is not None else "single_query"
+        if source_routing:
+            search_record["source_routing"] = source_routing
         return search_record
 
     query_variants = query_plan.get("query_variants") or [query]
@@ -440,7 +518,7 @@ def _run_query_plan_discovery(
             max_results=max_results,
             fixture_path=None,
             command=command,
-            sources=sources,
+            sources=effective_sources,
             raw_response_path=raw_path,
         )
         if search_record.get("error"):
@@ -485,6 +563,8 @@ def _run_query_plan_discovery(
         "raw_response_path": str(aggregate_raw_path),
         "records": combined_records,
     }
+    if source_routing:
+        combined["source_routing"] = source_routing
     if query_errors and not combined_records:
         combined["error"] = "; ".join(query_errors)
     elif query_errors:
@@ -779,7 +859,9 @@ def run_dry_run(
         config.paper_search_command if config.paper_search_command not in {None, "", "paper-search"} else None
     )
     effective_paper_search_command = paper_search_command or configured_paper_search_command
-    effective_sources = sources or config.paper_search_sources
+    requested_sources = sources or config.paper_search_sources
+    source_routing = plan_source_routing(requested_sources)
+    effective_sources = source_routing.get("selected_sources") or requested_sources
     run_id, run_dir = _new_run_dir(config.vault_path)
     started_at = utc_now()
     query_plan = (
@@ -794,6 +876,7 @@ def run_dry_run(
     )
     research_mode = (query_plan or {}).get("research_mode") or infer_research_mode(query)
     if query_plan:
+        query_plan["source_routing"] = source_routing
         _write_json(run_dir / "query-plan.json", query_plan)
 
     state = {
@@ -807,6 +890,9 @@ def run_dry_run(
         "research_mode": research_mode,
         "query_strategy": "query_plan_multi_query" if query_plan and fixture_path is None else "single_query",
         "profile": config.profile,
+        "requested_sources": requested_sources,
+        "sources": effective_sources,
+        "source_routing": source_routing,
         "vault_path": str(config.vault_path),
         "started_at": started_at,
         "tool_versions": _tool_versions(
@@ -835,6 +921,7 @@ def run_dry_run(
         command=effective_paper_search_command,
         sources=effective_sources,
         run_dir=run_dir,
+        source_routing=source_routing,
     )
     _write_json(run_dir / "search-record.json", search_record)
     state["state"] = "discovered"
@@ -956,8 +1043,10 @@ def run_dry_run(
                 "query": query,
                 "max_results": config.max_results,
                 "sources": effective_sources,
+                "requested_sources": requested_sources,
                 "profile": config.profile,
                 "query_plan": query_plan,
+                "source_routing": source_routing,
             }
         )
     }
@@ -1890,6 +1979,7 @@ def prepare_ranked_papers_from_run(
     ]
     failed_papers = [state for state in paper_states if state["state"].endswith("_failed")]
     report_failed_papers = [state for state in report_paper_states if state["state"].endswith("_failed")]
+    manual_downloads = _manual_downloads_from_results(results)
     accepted = [
         {
             "slug": state["slug"],
@@ -1962,6 +2052,7 @@ def prepare_ranked_papers_from_run(
         wiki_pages_written=[],
         zotero_results={"status": "not_run", "records": []},
         next_actions=next_actions,
+        manual_downloads=manual_downloads,
     )
     report_json_path = batch_run_dir / "report.json"
     report_payload = json.loads(report_json_path.read_text(encoding="utf-8"))
@@ -1974,6 +2065,7 @@ def prepare_ranked_papers_from_run(
     report_payload["paper_states"] = paper_states
     report_payload["failed_papers"] = failed_papers
     report_payload["raw_cleanup"] = raw_cleanup_records
+    report_payload["manual_downloads"] = manual_downloads
     report_payload["next_actions"] = next_actions
     report_payload["wiki_pages_written"] = []
     report_payload["source_run_id"] = run_id

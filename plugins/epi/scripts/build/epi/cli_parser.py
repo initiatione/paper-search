@@ -265,6 +265,7 @@ def build_parser() -> argparse.ArgumentParser:
     runs_query_group.add_argument("--latest-success")
     runs_query.add_argument("--workflow", default=None)
     runs_query.add_argument("--limit", type=int, default=10)
+    runs_query.add_argument("--json", action="store_true")
 
     report = subparsers.add_parser("report")
     _add_common_vault(report)

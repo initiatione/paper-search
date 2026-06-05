@@ -673,6 +673,51 @@ def test_runs_query_failed_filters_failed_runs_only(tmp_path, monkeypatch, capsy
     assert "20260528T100000Z-promote" not in output
 
 
+def test_runs_query_json_surfaces_manual_download_cards_for_failed_runs(tmp_path, monkeypatch, capsys):
+    vault = tmp_path / "vault"
+    runs_root = vault / "_epi/runs"
+    manual_card = {
+        "slug": "publisher-only",
+        "title": "Publisher Only Paper",
+        "doi": "10.5555/publisher.only",
+        "doi_url": "https://doi.org/10.5555/publisher.only",
+        "candidate_manual_urls": [{"kind": "publisher", "url": "https://publisher.example/article"}],
+    }
+    _seed_run(
+        runs_root,
+        "20260528T101500Z-manual",
+        workflow_type="prepare-ranked",
+        state="prepare_failed",
+        status="failed",
+        paper_slug=None,
+        next_actions=["manual-download"],
+        report_extra={
+            "failed_papers": [
+                {"paper_slug": "publisher-only", "state": "acquire_failed", "next_action": "manual-download"}
+            ],
+            "manual_downloads": [manual_card],
+        },
+    )
+    refresh_run_index(vault)
+
+    exit_code, output = _run_orchestrator_cli(
+        monkeypatch,
+        capsys,
+        "runs-query",
+        "--vault",
+        str(vault),
+        "--failed",
+        "--json",
+    )
+
+    payload = json.loads(output)
+    assert exit_code == 0
+    assert payload["runs"][0]["manual_downloads"] == [manual_card]
+    assert payload["runs"][0]["failed_papers"] == [
+        {"paper_slug": "publisher-only", "state": "acquire_failed", "next_action": "manual-download"}
+    ]
+
+
 def test_runs_query_human_gate_filters_pending_runs(tmp_path, monkeypatch, capsys):
     vault = tmp_path / "vault"
     runs_root = vault / "_epi/runs"

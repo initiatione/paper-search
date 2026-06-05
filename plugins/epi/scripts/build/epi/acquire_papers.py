@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import tempfile
 import urllib.error
@@ -9,11 +10,12 @@ import urllib.request
 from html.parser import HTMLParser
 from pathlib import Path
 
-from epi.artifacts import file_sha256, json_sha256, utc_now, write_json_atomic
+from epi.artifacts import file_sha256, json_sha256, quarantine_root, utc_now, write_json_atomic
 from epi.paper_search_adapter import download_paper_pdf, read_paper_preview
 
 
 PDF_MAGIC = b"%PDF-"
+DOI_PATTERN = re.compile(r"\b10\.\d{4,9}/[-._;()/:A-Z0-9]+\b", re.IGNORECASE)
 OA_SOURCE_PRIORITY = {
     "arxiv": 0,
     "pmc": 1,
@@ -132,6 +134,94 @@ def _candidate_pdf_urls(candidate: dict) -> list[str]:
     return urls
 
 
+def _candidate_doi(candidate: dict) -> str:
+    return str(candidate.get("doi") or "").strip()
+
+
+def _candidate_doi_url(candidate: dict) -> str | None:
+    doi = _candidate_doi(candidate)
+    if not doi:
+        return None
+    if doi.lower().startswith(("http://", "https://")):
+        return doi
+    return f"https://doi.org/{doi}"
+
+
+def _candidate_manual_urls(candidate: dict) -> list[dict]:
+    urls: list[dict] = []
+    seen: set[str] = set()
+
+    def add(kind: str, value: object) -> None:
+        if not value:
+            return
+        text = str(value).strip()
+        if not text or text in seen:
+            return
+        seen.add(text)
+        urls.append({"kind": kind, "url": text})
+
+    doi_url = _candidate_doi_url(candidate)
+    if doi_url:
+        add("doi", doi_url)
+    for key in ("publisher_url", "landing_page_url", "article_url", "url"):
+        add("publisher", candidate.get(key))
+    for pdf_url in _candidate_pdf_urls(candidate):
+        add("publisher_pdf", pdf_url)
+    for record in candidate.get("raw_records") or []:
+        if not isinstance(record, dict):
+            continue
+        for key in ("publisher_url", "landing_page_url", "article_url", "url"):
+            add("publisher", record.get(key))
+        raw_record = record.get("raw_record") if isinstance(record.get("raw_record"), dict) else {}
+        for key in ("publisher_url", "landing_page_url", "article_url", "url"):
+            add("publisher", raw_record.get(key))
+    return urls
+
+
+def _manual_download_context(candidate: dict) -> dict | None:
+    doi = _candidate_doi(candidate)
+    manual_urls = _candidate_manual_urls(candidate)
+    if not doi and not manual_urls:
+        return None
+    return {
+        "required": True,
+        "title": str(candidate.get("title") or ""),
+        "doi": doi or None,
+        "doi_url": _candidate_doi_url(candidate),
+        "candidate_manual_urls": manual_urls,
+        "preferred_next_step": (
+            "Download the PDF through your organization/institution from the DOI or publisher page, "
+            "then provide the local PDF or a direct open-access PDF URL to EPI."
+        ),
+        "tmp_manual_pdf_dir": "_epi/tmp-manual-pdfs",
+        "avoid_exhaustive_fallbacks": True,
+    }
+
+
+def _manual_download_failure_hint() -> str:
+    return (
+        "No direct open PDF was available; use the DOI/publisher link and download through "
+        "your organization/institution, then provide a local PDF or direct open-access PDF URL."
+    )
+
+
+def _should_mark_manual_download(
+    candidate: dict,
+    failure_class: str,
+    http_status: int | None,
+    error_kind: str | None,
+) -> bool:
+    if not _manual_download_context(candidate):
+        return False
+    if error_kind == "manual-download-required":
+        return True
+    if error_kind == "no-url":
+        return True
+    if http_status in (401, 403):
+        return True
+    return failure_class == "access-denied"
+
+
 def _classify_acquire_failure(http_status: int | None, error_kind: str | None = None) -> tuple[str, bool, str]:
     """Map an acquisition failure to (failure_class, retryable, recovery_hint).
 
@@ -148,6 +238,8 @@ def _classify_acquire_failure(http_status: int | None, error_kind: str | None = 
         return "empty-pdf", True, "Downloaded PDF was empty; retry or try an open-access/arXiv source."
     if error_kind == "not-pdf":
         return "not-pdf", True, "Downloaded URL was not a PDF; use the publisher PDF link, arXiv, or an open-access source."
+    if error_kind == "manual-download-required":
+        return "manual-download-required", False, _manual_download_failure_hint()
     if http_status is not None:
         if http_status in (401, 403):
             return "access-denied", False, "Source denied access; try arXiv/open-access source or a mirror."
@@ -199,6 +291,154 @@ def _downloaded_file_is_pdf(path: Path) -> bool:
     return preview.lstrip().startswith(PDF_MAGIC)
 
 
+def _normalize_doi(value: object) -> str:
+    text = str(value or "").strip()
+    text = re.sub(r"^https?://(dx\.)?doi\.org/", "", text, flags=re.IGNORECASE)
+    text = text.strip().strip(".")
+    return text.lower()
+
+
+def _normalize_title_tokens(value: object) -> set[str]:
+    text = str(value or "").lower()
+    return {token for token in re.findall(r"[a-z0-9]+", text) if len(token) >= 3}
+
+
+def _pdf_identity_preview(path: Path) -> str:
+    try:
+        data = path.read_bytes()[:262144]
+    except OSError:
+        return ""
+    return data.decode("latin-1", errors="ignore")
+
+
+def _extract_pdf_identity(path: Path) -> dict:
+    text = _pdf_identity_preview(path)
+    dois = []
+    for match in DOI_PATTERN.findall(text):
+        normalized = _normalize_doi(match)
+        if normalized and normalized not in dois:
+            dois.append(normalized)
+    title = None
+    title_match = re.search(r"(?im)^\s*Title\s*:\s*(.+?)\s*$", text)
+    if title_match:
+        title = " ".join(title_match.group(1).split())
+    return {
+        "dois": dois,
+        "title": title,
+        "text_preview_chars": min(len(text), 262144),
+    }
+
+
+def _check_pdf_identity(candidate: dict, pdf_path: Path) -> dict:
+    extracted = _extract_pdf_identity(pdf_path)
+    candidate_doi = _normalize_doi(candidate.get("doi"))
+    extracted_dois = extracted.get("dois") or []
+    if candidate_doi and extracted_dois:
+        if candidate_doi in extracted_dois:
+            return {
+                "status": "passed",
+                "reason": "doi_match",
+                "candidate_doi": candidate_doi,
+                "extracted": extracted,
+            }
+        return {
+            "status": "failed",
+            "reason": "doi_mismatch",
+            "candidate_doi": candidate_doi,
+            "extracted": extracted,
+        }
+
+    candidate_title_tokens = _normalize_title_tokens(candidate.get("title"))
+    extracted_title_tokens = _normalize_title_tokens(extracted.get("title"))
+    if candidate_title_tokens and extracted_title_tokens:
+        overlap = len(candidate_title_tokens & extracted_title_tokens)
+        score = overlap / max(1, len(candidate_title_tokens))
+        if score >= 0.6:
+            return {
+                "status": "passed",
+                "reason": "title_match",
+                "title_match_score": round(score, 4),
+                "extracted": extracted,
+            }
+        return {
+            "status": "failed",
+            "reason": "title_mismatch",
+            "title_match_score": round(score, 4),
+            "extracted": extracted,
+        }
+
+    return {
+        "status": "inconclusive",
+        "reason": "insufficient_pdf_identity_text",
+        "extracted": extracted,
+    }
+
+
+def _quarantine_identity_mismatch(
+    paper_root: Path,
+    candidate: dict,
+    temp_pdf: Path,
+    identity_check: dict,
+    *,
+    mode: str,
+    started_at: str,
+    candidate_metadata_hash: str,
+    http_status: int | None = None,
+    acquire_attempts: list[dict] | None = None,
+    extra_record_fields: dict | None = None,
+) -> dict:
+    paper_root.mkdir(parents=True, exist_ok=True)
+    write_json_atomic(paper_root / "metadata.json", _metadata_from_candidate(candidate))
+    vault_root = paper_root.parents[2]
+    slug = str(candidate.get("slug") or paper_root.name)
+    quarantine_dir = quarantine_root(vault_root) / "papers" / slug
+    quarantine_dir.mkdir(parents=True, exist_ok=True)
+    quarantine_pdf = quarantine_dir / "paper.pdf"
+    os.replace(temp_pdf, quarantine_pdf)
+    identity_record = {
+        **identity_check,
+        "candidate_title": str(candidate.get("title") or ""),
+        "candidate_doi": _normalize_doi(candidate.get("doi")),
+        "quarantine_path": str(quarantine_pdf),
+        "checked_at": utc_now(),
+    }
+    write_json_atomic(paper_root / "identity-check.json", identity_record)
+    record = {
+        "stage": "acquire",
+        "mode": mode,
+        "status": "failed",
+        "started_at": started_at,
+        "finished_at": utc_now(),
+        "retrieved_at": utc_now(),
+        "exit_status": 1,
+        "pdf_url": candidate.get("pdf_url"),
+        "candidate_pdf_urls": _candidate_pdf_urls(candidate),
+        "http_status": http_status,
+        "failure_class": "identity-mismatch",
+        "retryable": False,
+        "recovery_hint": "Downloaded PDF identity did not match the candidate DOI/title; verify the source URL or provide the correct PDF.",
+        "output_path": str(paper_root / "paper.pdf"),
+        "quarantine_path": str(quarantine_pdf),
+        "error": f"downloaded PDF identity mismatch: {identity_check.get('reason')}",
+        "identity_check": identity_record,
+        "acquire_attempts": acquire_attempts or [],
+        "input_artifact_hashes": {
+            "candidate_metadata": candidate_metadata_hash,
+        },
+        "output_artifact_hashes": {
+            "metadata.json": file_sha256(paper_root / "metadata.json"),
+            "identity-check.json": file_sha256(paper_root / "identity-check.json"),
+            "quarantine/paper.pdf": file_sha256(quarantine_pdf),
+        },
+    }
+    if extra_record_fields:
+        for key, value in extra_record_fields.items():
+            if value is not None:
+                record[key] = value
+    write_json_atomic(paper_root / "acquire-record.json", record)
+    return record
+
+
 def _extract_pdf_url_from_landing_page(page_url: str, body: bytes, content_type: str | None) -> str | None:
     preview = body[:256].lstrip().lower()
     looks_like_html = preview.startswith((b"<html", b"<!doctype")) or b"<html" in preview
@@ -245,10 +485,17 @@ def _write_failed_acquire_record(
     http_status: int | None = None,
     error_kind: str | None = None,
     acquire_attempts: list[dict] | None = None,
+    extra_record_fields: dict | None = None,
 ) -> dict:
     paper_root.mkdir(parents=True, exist_ok=True)
     write_json_atomic(paper_root / "metadata.json", _metadata_from_candidate(candidate))
     failure_class, retryable, recovery_hint = _classify_acquire_failure(http_status, error_kind)
+    manual_download = _manual_download_context(candidate)
+    manual_download_required = _should_mark_manual_download(candidate, failure_class, http_status, error_kind)
+    if manual_download_required:
+        failure_class = "manual-download-required"
+        retryable = False
+        recovery_hint = _manual_download_failure_hint()
     record = {
         "stage": "acquire",
         "mode": mode,
@@ -273,6 +520,12 @@ def _write_failed_acquire_record(
             "metadata.json": file_sha256(paper_root / "metadata.json"),
         },
     }
+    if manual_download_required and manual_download:
+        record["manual_download"] = manual_download
+    if extra_record_fields:
+        for key, value in extra_record_fields.items():
+            if value is not None:
+                record[key] = value
     write_json_atomic(paper_root / "acquire-record.json", record)
     return record
 
@@ -330,16 +583,6 @@ def acquire_paper_from_url(
     started_at = utc_now()
     metadata = _metadata_from_candidate(candidate)
     candidate_metadata_hash = json_sha256(metadata)
-    if not pdf_url:
-        return _write_failed_acquire_record(
-            paper_root,
-            candidate,
-            mode="url",
-            error="candidate pdf_url is required",
-            started_at=started_at,
-            candidate_metadata_hash=candidate_metadata_hash,
-            error_kind="no-url",
-        )
     if target_pdf.exists() and not redo:
         return _write_failed_acquire_record(
             paper_root,
@@ -365,6 +608,7 @@ def acquire_paper_from_url(
                 title=str(candidate.get("title") or ""),
                 use_scihub=use_scihub,
                 scihub_base_url=scihub_base_url,
+                stop_after_oa_fallback=not bool(pdf_url) and bool(_manual_download_context(candidate)),
                 output_dir=Path(temp_dir),
                 timeout_seconds=timeout_seconds,
             )
@@ -395,6 +639,27 @@ def acquire_paper_from_url(
                         candidate_metadata_hash=candidate_metadata_hash,
                         error_kind="not-pdf",
                     )
+                identity_check = _check_pdf_identity(candidate, temp_pdf)
+                if identity_check.get("status") == "failed":
+                    return _quarantine_identity_mismatch(
+                        paper_root,
+                        candidate,
+                        temp_pdf,
+                        identity_check,
+                        mode=download_mode,
+                        started_at=started_at,
+                        candidate_metadata_hash=candidate_metadata_hash,
+                        extra_record_fields={
+                            "source": source,
+                            "paper_id": paper_id,
+                            "doi": str(candidate.get("doi") or ""),
+                            "title": str(candidate.get("title") or ""),
+                            "use_scihub": use_scihub,
+                            "mcp_probe": download_record.get("mcp_probe"),
+                            "mcp_server_probe": download_record.get("mcp_server_probe"),
+                            "upstream": download_record.get("upstream"),
+                        },
+                    )
                 os.replace(temp_pdf, target_pdf)
                 record = {
                     "stage": "acquire",
@@ -415,6 +680,7 @@ def acquire_paper_from_url(
                     "mcp_probe": download_record.get("mcp_probe"),
                     "mcp_server_probe": download_record.get("mcp_server_probe"),
                     "upstream": download_record.get("upstream"),
+                    "identity_check": identity_check,
                 }
                 upstream = record["upstream"] if isinstance(record.get("upstream"), dict) else {}
                 if upstream.get("fallback_chain"):
@@ -453,6 +719,44 @@ def acquire_paper_from_url(
                     record["output_artifact_hashes"]["paper-search-read-preview.txt"] = file_sha256(preview_path)
                 write_json_atomic(paper_root / "acquire-record.json", record)
                 return record
+            if not pdf_url:
+                return _write_failed_acquire_record(
+                    paper_root,
+                    candidate,
+                    mode=download_record.get("mode", "paper_search_download"),
+                    error=download_record.get("error", "paper-search fallback did not produce a PDF"),
+                    started_at=started_at,
+                    candidate_metadata_hash=candidate_metadata_hash,
+                    error_kind=(
+                        "manual-download-required" if _manual_download_context(candidate) else "no-url"
+                    ),
+                    extra_record_fields={
+                        "source": source,
+                        "paper_id": paper_id,
+                        "doi": str(candidate.get("doi") or ""),
+                        "title": str(candidate.get("title") or ""),
+                        "use_scihub": use_scihub,
+                        "mcp_probe": download_record.get("mcp_probe"),
+                        "mcp_server_probe": download_record.get("mcp_server_probe"),
+                        "upstream": download_record.get("upstream"),
+                        "fallback_chain": (
+                            download_record.get("upstream", {}).get("fallback_chain")
+                            if isinstance(download_record.get("upstream"), dict)
+                            else None
+                        ),
+                    },
+                )
+
+    if not pdf_url:
+        return _write_failed_acquire_record(
+            paper_root,
+            candidate,
+            mode="url",
+            error="candidate pdf_url is required",
+            started_at=started_at,
+            candidate_metadata_hash=candidate_metadata_hash,
+            error_kind="no-url",
+        )
 
     http_status: int | None = None
     candidate_pdf_url = str(pdf_url)
@@ -521,6 +825,19 @@ def acquire_paper_from_url(
                         "http_status": http_status,
                     }
                 )
+                identity_check = _check_pdf_identity(candidate, temp_pdf)
+                if identity_check.get("status") == "failed":
+                    return _quarantine_identity_mismatch(
+                        paper_root,
+                        candidate,
+                        temp_pdf,
+                        identity_check,
+                        mode="url",
+                        started_at=started_at,
+                        candidate_metadata_hash=candidate_metadata_hash,
+                        http_status=http_status,
+                        acquire_attempts=acquire_attempts,
+                    )
                 os.replace(temp_pdf, target_pdf)
                 record = {
                     "stage": "acquire",
@@ -536,6 +853,7 @@ def acquire_paper_from_url(
                     "resolved_pdf_url": current_url,
                     "http_status": http_status,
                     "acquire_attempts": acquire_attempts,
+                    "identity_check": identity_check,
                     "output_path": str(target_pdf),
                     "size_bytes": target_pdf.stat().st_size,
                 }

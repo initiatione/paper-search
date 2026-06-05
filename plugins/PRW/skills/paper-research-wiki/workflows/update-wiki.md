@@ -16,6 +16,24 @@ Read `../../../rules/wiki-writing-standard.md` first. For repairs that touch for
 8. Preserve EPI boundaries for human approval and `record-wiki-ingest`.
 9. Run `workflows/check-wiki.md` after writing as the post-task check.
 
+## Graph-Aware Rewrite
+
+Use this path when the user asks to 重写某页, 重写页面, rewrite formal page, rewrite page, or when an update is a material rewrite of a formal page. A graph-aware rewrite treats the target page and its dependent formal pages as one transaction.
+
+1. Verify the required pre-rewrite snapshot exists before editing formal pages.
+2. Read the target page, its frontmatter `relationships:`, `sources:`, outgoing wikilinks, backlinks, manifest or `.manifest.json` entries, previous `final-source-review.json`, previous `wiki-ingest-record.json`, `index.md`, `log.md`, and `hot.md`.
+3. Build the reverse dependencies: pages that cite, link to, derive from, summarize, compare, or list the target page.
+4. Treat references/ pages are evidence source nodes. If a `references/` page changes, inspect dependent `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/` pages.
+5. Update dependent formal pages when any trigger applies:
+   - Claim/evidence boundary changes.
+   - Formula or figure/table evidence changes.
+   - Evidence-tier changes, such as simulation, pool-trial, lake/field-like experiment, or sea-trial wording.
+   - Relationship or reusable-knowledge changes, including new formulas, mechanisms, metrics, datasets, or distinctions.
+   - Hash/provenance drift after markdown edits.
+6. Create a new `derivations/` or `concepts/` node when reusable knowledge would otherwise remain trapped inside one reference page.
+7. Refresh manifest or `.manifest.json`, `final-source-review.json`, staging/raw `wiki-ingest-record.json`, `index.md`, `log.md`, and `hot.md` in the same run.
+8. Run or report `qmd update` and `qmd embed`; confirm `_epi/` remains outside the formal graph/index when the vault contract requires that boundary.
+
 ## Relink And Maintenance
 
 Use these internal patterns:

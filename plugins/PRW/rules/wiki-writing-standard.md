@@ -18,6 +18,20 @@ The default decision is merge before create:
 4. Update an existing page when it already owns the concept, method, experiment, dataset, or synthesis question.
 5. Create a new page only when the knowledge has a distinct durable identity and belongs in an allowed formal page family.
 
+## Graph-Aware Rewrite
+
+Any material rewrite of a formal page is a graph-aware rewrite, not a single-file edit. A material rewrite is any change to claims, formulas, figure/table evidence, evidence tier, relationships, aliases, lifecycle, source support labels, or reusable knowledge.
+
+For a graph-aware rewrite:
+
+1. Take or verify the target vault's required pre-rewrite snapshot before editing formal pages.
+2. Identify changed pages, dependent formal pages, and reverse dependencies by wikilinks, backlinks, `relationships:`, `sources:`, manifest or `.manifest.json` records, `final-source-review.json`, `wiki-ingest-record.json`, `index.md`, `log.md`, `hot.md`, and direct search.
+3. Treat references/ pages are evidence source nodes: when a reference page changes, inspect dependent `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/` pages for stale claims or missing reusable knowledge.
+4. Update dependent formal pages when the rewrite changes claim/evidence boundaries, formula or figure/table evidence, evidence-tier wording, relationships, or downstream synthesis.
+5. Create a new `derivations/` or `concepts/` page when the rewrite exposes a reusable formula chain, mechanism, dataset, metric, or distinction that should not stay buried in a reference page.
+6. Refresh manifest or `.manifest.json`, `final-source-review.json`, staging/raw `wiki-ingest-record.json`, `index.md`, `log.md`, and `hot.md` in the same run as the markdown rewrite.
+7. Run `qmd update` and `qmd embed` when QMD is in scope, or report the fallback to direct Markdown inventory.
+
 ## Page Families
 
 Formal paper pages may be written only to:

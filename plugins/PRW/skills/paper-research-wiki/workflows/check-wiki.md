@@ -24,6 +24,8 @@ Check:
 - duplicate concept owners
 - forbidden internal links from formal pages into `_epi/`, `_raw/`, `_staging/`, `_runs/`, `_quarantine/`, or `.obsidian/`
 - relationship direction and relationship type mistakes
+- changed pages and their reverse dependencies after graph-aware rewrite work
+- sidecar hashes in `final-source-review.json` and staging/raw `wiki-ingest-record.json`
 - staged writes waiting for review
 - stale core pages
 - fragmented tag clusters
@@ -69,7 +71,7 @@ Use QMD only as an accelerator. If it is available and fast enough, use it to ch
 
 ## Post-Task Check
 
-As a post-task check, re-read the changed page set, tracking files, and any touched EPI sidecars. Confirm broken wikilinks, ambiguous aliases, duplicate concept owners, forbidden internal links, relationship direction issues, frontmatter, provenance, QMD refresh status, and `final-source-review.json` before reporting completion.
+As a post-task check, re-read the changed page set, changed pages and their reverse dependencies, tracking files, and any touched EPI sidecars. Confirm broken wikilinks, ambiguous aliases, duplicate concept owners, forbidden internal links, relationship direction issues, frontmatter, provenance, sidecar hashes, QMD refresh status, and `final-source-review.json` before reporting completion.
 
 ## Completion Report
 

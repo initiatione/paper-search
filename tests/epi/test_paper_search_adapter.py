@@ -6,6 +6,7 @@ from epi.paper_search_adapter import MCPToolError
 from epi.paper_search_adapter import SEARCH_TIMEOUT_SECONDS
 from epi.paper_search_adapter import download_paper_pdf
 from epi.paper_search_adapter import discover
+from epi.paper_search_adapter import plan_source_routing
 from epi.paper_search_adapter import probe_paper_search_mcp
 import epi.paper_search_adapter as paper_search_adapter
 
@@ -24,6 +25,35 @@ def _write_fake_paper_search(tmp_path, payload: dict, version: str = "paper-sear
         encoding="utf-8",
     )
     return str(script)
+
+
+def test_plan_source_routing_demotes_unstable_sources_and_reports_provider_risks(monkeypatch):
+    monkeypatch.delenv("PAPER_SEARCH_MCP_CORE_API_KEY", raising=False)
+    monkeypatch.delenv("PAPER_SEARCH_MCP_GOOGLE_SCHOLAR_PROXY_URL", raising=False)
+    monkeypatch.setenv("PAPER_SEARCH_MCP_UNPAYWALL_EMAIL", "research@example.org")
+
+    plan = plan_source_routing(
+        ["google_scholar", "semantic", "core", "unpaywall", "base"],
+        include_unstable=False,
+    )
+
+    assert plan["requested_sources"] == ["google_scholar", "semantic", "core", "unpaywall", "base"]
+    assert plan["selected_sources"] == ["semantic", "core", "unpaywall"]
+    assert plan["demoted_sources"] == [
+        {"source": "google_scholar", "reason": "unstable_source"},
+        {"source": "base", "reason": "unstable_source"},
+    ]
+    assert plan["provider_readiness"]["unpaywall"]["status"] == "set"
+    assert plan["provider_readiness"]["core"]["status"] == "missing_recommended_env"
+    assert plan["provider_risks"] == [
+        {
+            "provider": "core",
+            "status": "missing_recommended_env",
+            "env": "PAPER_SEARCH_MCP_CORE_API_KEY",
+            "importance": "recommended",
+            "reason": "CORE works better with a free API key and may rate-limit keyless access.",
+        }
+    ]
 
 
 def test_discovery_prefers_paper_search_mcp_server_over_cli(tmp_path, monkeypatch):
@@ -90,6 +120,65 @@ def test_discovery_prefers_paper_search_mcp_server_over_cli(tmp_path, monkeypatc
     assert json.loads((tmp_path / "raw-search.json").read_text(encoding="utf-8"))["total"] == 1
     assert result["records"][0]["title"] == "Embodied Control with Foundation Models"
     assert result["records"][0]["arxiv_id"] == "2401.12345"
+
+
+def test_discovery_records_source_health_for_mcp_search(tmp_path, monkeypatch):
+    perf_counter_values = iter([100.0, 102.5])
+
+    def _fake_mcp_tool(tool_name, arguments, timeout_seconds):
+        assert timeout_seconds == 180
+        return {
+            "payload": {
+                "query": "robotics control",
+                "sources_used": ["semantic", "openalex", "google_scholar"],
+                "source_results": {"semantic": 2, "openalex": 1, "google_scholar": 0},
+                "errors": {"google_scholar": "bot detection blocked request"},
+                "raw_total": 3,
+                "total": 3,
+                "papers": [
+                    {
+                        "paper_id": "semantic-123",
+                        "title": "Semantic Paper",
+                        "authors": "A. Researcher",
+                        "source": "semantic",
+                        "year": 2025,
+                    }
+                ],
+            },
+            "probe": {"available": True, "transport": "stdio"},
+            "raw_response": {"result": {"structuredContent": {"total": 3}}},
+        }
+
+    monkeypatch.setattr("epi.paper_search_adapter._call_mcp_tool", _fake_mcp_tool)
+    monkeypatch.setattr("epi.paper_search_adapter.time.perf_counter", lambda: next(perf_counter_values))
+
+    result = discover(
+        query="robotics control",
+        max_results=3,
+        command=str(tmp_path / "missing-cli"),
+        sources=["semantic", "openalex", "google_scholar"],
+        timeout_seconds=180,
+    )
+
+    source_health = result["upstream"]["source_health"]
+    assert result["upstream"]["timeout_budget_seconds"] == 180
+    assert source_health["semantic"] == {
+        "status": "ok",
+        "result_count": 2,
+        "error": None,
+        "duration_ms": None,
+        "timeout_budget_seconds": 180,
+    }
+    assert source_health["openalex"]["status"] == "ok"
+    assert source_health["openalex"]["result_count"] == 1
+    assert source_health["google_scholar"] == {
+        "status": "failed",
+        "result_count": 0,
+        "error": "bot detection blocked request",
+        "duration_ms": None,
+        "timeout_budget_seconds": 180,
+    }
+    assert result["upstream"]["search_duration_ms"] == 2500
 
 
 def test_discovery_falls_back_to_cli_when_paper_search_mcp_server_fails(tmp_path, monkeypatch):
@@ -336,6 +425,50 @@ def test_download_falls_back_to_source_native_mcp_when_fallback_tool_fails(tmp_p
     assert result["upstream"]["fallback_from"] == "paper_search_mcp_fallback_download"
     assert result["upstream"]["tool"] == "download_arxiv"
     assert result["downloaded_pdf"] == str(output_dir / "arxiv.pdf")
+
+
+def test_download_can_stop_after_oa_fallback_without_source_native_or_cli(tmp_path, monkeypatch):
+    output_dir = tmp_path / "downloads"
+    calls = []
+
+    def _unexpected_cli(*args, **kwargs):
+        raise AssertionError("CLI fallback should not run after OA fallback is exhausted")
+
+    def _fake_mcp_tool(tool_name, arguments, timeout_seconds):
+        calls.append((tool_name, arguments))
+        assert tool_name == "download_with_fallback"
+        return {
+            "payload": {"text": "no OA URL found"},
+            "probe": {"available": True, "transport": "stdio"},
+            "raw_response": {"result": {"content": [{"type": "text", "text": "no OA URL found"}]}},
+        }
+
+    monkeypatch.setattr("epi.paper_search_adapter._call_mcp_tool", _fake_mcp_tool)
+    monkeypatch.setattr("epi.paper_search_adapter._run_command", _unexpected_cli)
+
+    result = download_paper_pdf(
+        source="semantic",
+        paper_id="semantic-123",
+        doi="10.1016/j.oceaneng.2024.119432",
+        title="Publisher Only Paper",
+        output_dir=output_dir,
+        stop_after_oa_fallback=True,
+    )
+
+    assert [call[0] for call in calls] == ["download_with_fallback"]
+    assert result["status"] == "failed"
+    assert result["mode"] == "paper_search_mcp_fallback_download"
+    assert result["mcp_server_probe"]["error"] == "paper-search MCP fallback download produced no PDF"
+    assert result["upstream"]["tool"] == "download_with_fallback"
+    assert result["upstream"]["fallback_chain"] == [
+        "source-native",
+        "openaire",
+        "core",
+        "europepmc",
+        "pmc",
+        "unpaywall",
+    ]
+    assert result["error"] == "paper-search OA fallback produced no PDF"
 
 
 def test_download_treats_cli_timeout_as_upstream_failure(tmp_path, monkeypatch):

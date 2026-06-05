@@ -67,6 +67,12 @@ def _normalize_run_entry(run_dir):
         zotero_results = run_state.get("zotero_results")
     if isinstance(zotero_results, dict):
         entry["zotero_results"] = zotero_results
+    failed_papers = report.get("failed_papers")
+    if isinstance(failed_papers, list) and failed_papers:
+        entry["failed_papers"] = failed_papers
+    manual_downloads = report.get("manual_downloads")
+    if isinstance(manual_downloads, list) and manual_downloads:
+        entry["manual_downloads"] = manual_downloads
     research_decisions = report.get("research_decisions") or []
     if research_decisions:
         entry["research_decisions"] = research_decisions

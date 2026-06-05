@@ -50,6 +50,17 @@ Before writing, compare existing pages against the source reread:
 
 Use `staged patch` by default when the redo changes page identity, removes existing claims, changes lifecycle, or affects more than one formal page family.
 
+## Graph-Aware Rewrite
+
+Redo work that materially changes formal page claims is a material rewrite and a graph-aware rewrite. It must analyze the target pages and dependent formal pages together instead of rewriting one markdown file in isolation.
+
+1. Treat references/ pages are evidence source nodes. If a reference page changes, inspect dependent `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/` pages for stale claims, missing formula chains, wrong evidence tiers, or relationship drift.
+2. Find reverse dependencies through backlinks, outgoing wikilinks, `relationships:`, `sources:`, manifest or `.manifest.json`, prior `final-source-review.json`, prior `wiki-ingest-record.json`, `index.md`, `log.md`, `hot.md`, and direct search.
+3. Update dependent formal pages when the redo changes claim/evidence boundaries, formulas, figure/table evidence, evidence tiers, reusable mechanisms, synthesis conclusions, or opportunity wording.
+4. Create a new `derivations/` or `concepts/` page when the source reread exposes reusable knowledge that downstream pages need to cite.
+5. Refresh manifest or `.manifest.json`, `final-source-review.json`, staging/raw `wiki-ingest-record.json`, `index.md`, `log.md`, and `hot.md` in the same run as the markdown rewrite.
+6. Run or report `qmd update` and `qmd embed` after confirmed writes or staged patches.
+
 ## Deep Extraction Lenses
 
 For deep extraction, inspect the paper through these lenses:

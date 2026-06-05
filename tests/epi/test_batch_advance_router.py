@@ -524,6 +524,83 @@ def test_prepare_ranked_papers_cleans_raw_folder_after_acquire_failure(tmp_path)
     assert report_json["raw_cleanup"][0]["status"] == "deleted"
 
 
+def test_prepare_ranked_papers_reports_manual_download_cards_from_acquire_failure(tmp_path):
+    vault = tmp_path / "vault"
+    run_id = "20260527T122725Z"
+    run_dir = vault / "_epi" / "runs" / run_id
+    run_dir.mkdir(parents=True)
+    candidate = _candidate("manual-needed", "Manual Needed Paper", None)
+    candidate["doi"] = "10.1000/manual-needed"
+    candidate["url"] = "https://publisher.example/manual-needed"
+    candidate["ranking_protocol"] = {"decision": "advance-candidate"}
+    (run_dir / "rank.json").write_text(json.dumps([candidate]), encoding="utf-8")
+
+    batch = prepare_ranked_papers_from_run(
+        vault,
+        run_id,
+        mineru_command=_write_success_mineru_command(tmp_path),
+        max_papers=1,
+    )
+
+    report_path = vault / "_epi" / "runs" / batch["run_id"] / "report.json"
+    report_json = json.loads(report_path.read_text(encoding="utf-8"))
+    report_md = (vault / "_epi" / "runs" / batch["run_id"] / "report.md").read_text(encoding="utf-8")
+
+    assert report_json["manual_downloads"][0]["title"] == "Manual Needed Paper"
+    assert report_json["manual_downloads"][0]["doi_url"] == "https://doi.org/10.1000/manual-needed"
+    assert {
+        "kind": "publisher",
+        "url": "https://publisher.example/manual-needed",
+    } in report_json["manual_downloads"][0]["candidate_manual_urls"]
+    assert "## Manual Downloads" in report_md
+    assert "https://doi.org/10.1000/manual-needed" in report_md
+
+
+def test_prepare_ranked_papers_keeps_quarantined_identity_mismatch_and_skips_mineru(tmp_path):
+    server_root = tmp_path / "server"
+    server_root.mkdir()
+    (server_root / "wrong.pdf").write_bytes(
+        b"%PDF-1.4\nTitle: Wrong Publisher Paper\nDOI: 10.9999/wrong.paper\n"
+    )
+    vault = tmp_path / "vault"
+    run_id = "20260527T122750Z"
+    run_dir = vault / "_epi" / "runs" / run_id
+    run_dir.mkdir(parents=True)
+
+    with _LocalServer(server_root) as base_url:
+        failing_candidate = _candidate("identity-mismatch", "Target AUV PINN RL", f"{base_url}/wrong.pdf")
+        failing_candidate["doi"] = "10.1000/identity-mismatch"
+        failing_candidate["ranking_protocol"] = {"decision": "advance-candidate"}
+        (run_dir / "rank.json").write_text(json.dumps([failing_candidate]), encoding="utf-8")
+
+        batch = prepare_ranked_papers_from_run(
+            vault,
+            run_id,
+            mineru_command=_write_failing_mineru_command(tmp_path),
+            max_papers=1,
+        )
+
+    paper_root = vault / "_epi" / "raw" / "identity-mismatch"
+    quarantine_pdf = vault / "_epi" / "quarantine" / "papers" / "identity-mismatch" / "paper.pdf"
+    result = batch["results"][0]
+
+    assert result["state"] == "acquire_failed"
+    assert result["stage_record"]["failure_class"] == "identity-mismatch"
+    assert result["stage_record"]["identity_check"]["status"] == "failed"
+    assert result["raw_cleanup"]["status"] == "skipped"
+    assert result["raw_cleanup"]["skip_reason"] == "identity_mismatch_quarantined"
+    assert (paper_root / "identity-check.json").is_file()
+    assert not (paper_root / "paper.pdf").exists()
+    assert not (paper_root / "mineru").exists()
+    assert quarantine_pdf.is_file()
+
+    report_json = json.loads((vault / "_epi" / "runs" / batch["run_id"] / "report.json").read_text(encoding="utf-8"))
+    assert report_json["failed_papers"] == [
+        {"paper_slug": "identity-mismatch", "state": "acquire_failed", "next_action": None}
+    ]
+    assert report_json["raw_cleanup"][0]["skip_reason"] == "identity_mismatch_quarantined"
+
+
 def test_prepare_ranked_papers_cleans_raw_folder_after_parse_failure(tmp_path):
     server_root = tmp_path / "server"
     server_root.mkdir()

@@ -531,6 +531,59 @@ def test_update_wiki_has_controlled_link_repair_mechanism():
         assert phrase in update
 
 
+def test_prw_formal_page_rewrite_is_graph_aware_transaction():
+    routing = _load_prw_routing()
+    skill = _read(PUBLIC_SKILL / "SKILL.md")
+    standard = _read(PLUGIN / "rules" / "wiki-writing-standard.md")
+    update = _read(PUBLIC_SKILL / "workflows" / "update-wiki.md")
+    redo = _read(PUBLIC_SKILL / "workflows" / "redo-extraction.md")
+    check = _read(PUBLIC_SKILL / "workflows" / "check-wiki.md")
+
+    for phrase in ["重写某页", "重写页面", "rewrite formal page", "rewrite page"]:
+        assert phrase in skill
+        assert phrase in routing["routes"]["update_wiki"]["triggers"]
+
+    for text in [standard, update, redo]:
+        for phrase in [
+            "graph-aware rewrite",
+            "material rewrite",
+            "dependent formal pages",
+            "reverse dependencies",
+            "references/ pages are evidence source nodes",
+            "concepts/",
+            "derivations/",
+            "experiments/",
+            "synthesis/",
+            "reports/",
+            "opportunities/",
+            "final-source-review.json",
+            "wiki-ingest-record.json",
+            "manifest or `.manifest.json`",
+            "index.md",
+            "log.md",
+            "hot.md",
+            "qmd update",
+            "qmd embed",
+        ]:
+            assert phrase in text
+
+    for phrase in [
+        "Claim/evidence boundary changes",
+        "Formula or figure/table evidence changes",
+        "Evidence-tier changes",
+        "Relationship or reusable-knowledge changes",
+        "Hash/provenance drift",
+    ]:
+        assert phrase in update
+
+    for phrase in [
+        "changed pages and their reverse dependencies",
+        "sidecar hashes",
+        "QMD refresh status",
+    ]:
+        assert phrase in check
+
+
 def test_workflows_adapt_upstream_ingest_status_update_and_relink_patterns():
     extract = _read(PUBLIC_SKILL / "workflows" / "extract-papers.md")
     check = _read(PUBLIC_SKILL / "workflows" / "check-wiki.md")
@@ -797,6 +850,10 @@ def test_epi_bridge_points_to_plugin_level_experience():
     assert "检测" in skill
     assert "更新" in skill
     assert "重link" in skill
+    for text in [skill, workflow]:
+        assert "graph-aware rewrite" in text
+        assert "rewrite formal page" in text
+        assert "$paper-research-wiki" in text
 
 
 def test_epi_handoff_and_prw_routing_share_canonical_contract():

@@ -167,6 +167,140 @@ def test_write_report_surfaces_discovery_source_coverage(tmp_path):
     assert "google_scholar: missing_optional_env (PAPER_SEARCH_MCP_GOOGLE_SCHOLAR_PROXY_URL)" in report_md
 
 
+def test_write_report_surfaces_source_health_and_timeout_budget(tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir(parents=True)
+
+    write_report(
+        run_dir,
+        ranked=[],
+        errors=[],
+        workflow_type="paper-discovery-dry-run",
+        run_id="dry-run-health",
+        discovery_context={
+            "source_coverage": {
+                "sources_used": ["semantic", "google_scholar"],
+                "source_results": {"semantic": 2, "google_scholar": 0},
+                "errors": {"google_scholar": "bot detection blocked request"},
+                "raw_total": 2,
+                "deduped_total": 2,
+                "query_count": 1,
+                "source_health": {
+                    "semantic": {
+                        "status": "ok",
+                        "result_count": 2,
+                        "error": None,
+                        "duration_ms": None,
+                        "timeout_budget_seconds": 180,
+                    },
+                    "google_scholar": {
+                        "status": "failed",
+                        "result_count": 0,
+                        "error": "bot detection blocked request",
+                        "duration_ms": None,
+                        "timeout_budget_seconds": 45,
+                    },
+                },
+                "timeout_budget_seconds": 180,
+                "search_duration_ms": 2500,
+            },
+        },
+    )
+
+    report_json = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
+    report_md = (run_dir / "report.md").read_text(encoding="utf-8")
+
+    source_coverage = report_json["discovery_context"]["source_coverage"]
+    assert source_coverage["timeout_budget_seconds"] == 180
+    assert source_coverage["search_duration_ms"] == 2500
+    assert source_coverage["source_health"]["google_scholar"]["timeout_budget_seconds"] == 45
+    assert "- timeout_budget_seconds: 180" in report_md
+    assert "- search_duration_ms: 2500" in report_md
+    assert "- source_health:" in report_md
+    assert "semantic: ok, results=2, timeout=180s" in report_md
+    assert "google_scholar: failed, results=0, timeout=45s, error=bot detection blocked request" in report_md
+
+
+def test_write_report_surfaces_source_routing_and_manual_download_cards(tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir(parents=True)
+    manual_card = {
+        "slug": "publisher-only",
+        "title": "Publisher Only Paper",
+        "doi": "10.5555/publisher.only",
+        "doi_url": "https://doi.org/10.5555/publisher.only",
+        "candidate_manual_urls": [
+            {"kind": "publisher", "url": "https://publisher.example/article"},
+            {"kind": "doi", "url": "https://doi.org/10.5555/publisher.only"},
+        ],
+        "preferred_next_step": "Download the PDF through your organization/institution.",
+    }
+
+    write_report(
+        run_dir,
+        [],
+        [],
+        workflow_type="prepare-ranked",
+        run_id="prepare-manual",
+        paper_states=[
+            {
+                "slug": "publisher-only",
+                "paper_slug": "publisher-only",
+                "title": "Publisher Only Paper",
+                "state": "acquire_failed",
+                "last_action": "acquire",
+                "next_action": "manual-download",
+                "human_gate_required": True,
+            }
+        ],
+        failed_papers=[
+            {
+                "slug": "publisher-only",
+                "paper_slug": "publisher-only",
+                "title": "Publisher Only Paper",
+                "state": "acquire_failed",
+                "next_action": "manual-download",
+            }
+        ],
+        manual_downloads=[manual_card],
+        discovery_context={
+            "source_coverage": {
+                "sources_used": ["semantic", "google_scholar", "unpaywall"],
+                "source_routing": {
+                    "selected_sources": ["semantic", "unpaywall"],
+                    "demoted_sources": [{"source": "google_scholar", "reason": "unstable_source"}],
+                    "provider_risks": [
+                        {
+                            "provider": "core",
+                            "status": "missing_recommended_env",
+                            "env": "PAPER_SEARCH_MCP_CORE_API_KEY",
+                            "importance": "recommended",
+                            "reason": "CORE works better with a free API key and may rate-limit keyless access.",
+                        }
+                    ],
+                },
+            }
+        },
+    )
+
+    report_json = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
+    report_md = (run_dir / "report.md").read_text(encoding="utf-8")
+
+    assert report_json["manual_downloads"] == [manual_card]
+    assert report_json["discovery_context"]["source_coverage"]["source_routing"]["selected_sources"] == [
+        "semantic",
+        "unpaywall",
+    ]
+    assert "## Manual Downloads" in report_md
+    assert "Publisher Only Paper - manual-download-required" in report_md
+    assert "doi: https://doi.org/10.5555/publisher.only" in report_md
+    assert "manual link: https://publisher.example/article" in report_md
+    assert "## Source Routing" in report_md
+    assert "selected_sources: semantic, unpaywall" in report_md
+    assert "demoted: google_scholar (unstable_source)" in report_md
+    assert "risk: core missing_recommended_env (PAPER_SEARCH_MCP_CORE_API_KEY)" in report_md
+
+
 def test_write_report_surfaces_reader_revision_plans_for_routed_runs(tmp_path):
     run_dir = tmp_path / "run"
     run_dir.mkdir(parents=True)

@@ -102,6 +102,13 @@ def cleanup_failed_raw_paper(
         record["status"] = "skipped"
         record["skip_reason"] = "source_pdf_present"
         return record
+    if (
+        (isinstance(stage_record, dict) and stage_record.get("failure_class") == "identity-mismatch")
+        or (paper_root / "identity-check.json").is_file()
+    ):
+        record["status"] = "skipped"
+        record["skip_reason"] = "identity_mismatch_quarantined"
+        return record
     if _has_complete_parse(paper_root):
         record["status"] = "skipped"
         record["skip_reason"] = "complete_parse_present"

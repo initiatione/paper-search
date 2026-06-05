@@ -602,7 +602,10 @@ def _handle_runs_query(args: argparse.Namespace) -> int:
         latest_success=args.latest_success,
         limit=args.limit,
     )
-    print(workflows.render_runs_query(result))
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(workflows.render_runs_query(result))
     return 0
 
 

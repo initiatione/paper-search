@@ -50,31 +50,37 @@ PROVIDER_ENV_REQUIREMENTS = {
     "unpaywall": {
         "env": "PAPER_SEARCH_MCP_UNPAYWALL_EMAIL",
         "importance": "required",
+        "gap": "unpaywall_email_missing",
         "reason": "Unpaywall DOI lookup is skipped without an email.",
     },
     "core": {
         "env": "PAPER_SEARCH_MCP_CORE_API_KEY",
         "importance": "recommended",
+        "gap": "core_api_key_missing",
         "reason": "CORE works better with a free API key and may rate-limit keyless access.",
     },
     "semantic": {
         "env": "PAPER_SEARCH_MCP_SEMANTIC_SCHOLAR_API_KEY",
         "importance": "optional",
+        "gap": "semantic_scholar_api_key_missing",
         "reason": "Semantic Scholar works keyless but a key improves rate limits.",
     },
     "google_scholar": {
         "env": "PAPER_SEARCH_MCP_GOOGLE_SCHOLAR_PROXY_URL",
         "importance": "optional",
+        "gap": "google_scholar_proxy_missing",
         "reason": "Google Scholar is often blocked by bot detection without a proxy.",
     },
     "doaj": {
         "env": "PAPER_SEARCH_MCP_DOAJ_API_KEY",
         "importance": "optional",
+        "gap": "doaj_api_key_missing",
         "reason": "DOAJ key raises rate limits.",
     },
     "zenodo": {
         "env": "PAPER_SEARCH_MCP_ZENODO_ACCESS_TOKEN",
         "importance": "optional",
+        "gap": "zenodo_access_token_missing",
         "reason": "Zenodo token is only needed for private records or higher limits.",
     },
 }
@@ -105,9 +111,70 @@ def paper_search_provider_readiness(sources: list[str] | None = None) -> dict[st
             "env": env_name,
             "importance": importance,
             "configured": present,
+            "provider_gap": requirement.get("gap") if not present else None,
             "reason": requirement["reason"],
         }
     return readiness
+
+
+def plan_source_routing(sources: list[str] | None = None, *, include_unstable: bool = False) -> dict:
+    requested_sources = [str(source).strip() for source in (sources or DEFAULT_SOURCES) if str(source).strip()]
+    selected_sources: list[str] = []
+    demoted_sources: list[dict] = []
+    seen: set[str] = set()
+    for source in requested_sources:
+        source_name = source.strip().lower()
+        if not source_name or source_name in seen:
+            continue
+        seen.add(source_name)
+        capability = SOURCE_CAPABILITIES.get(source_name, {})
+        if capability.get("search") == "unstable" and not include_unstable:
+            demoted_sources.append({"source": source_name, "reason": "unstable_source"})
+            continue
+        selected_sources.append(source_name)
+
+    if not selected_sources:
+        selected_sources = [
+            source
+            for source in requested_sources
+            if source.lower() not in {item["source"] for item in demoted_sources}
+        ] or list(DEFAULT_SOURCES)
+
+    provider_readiness = paper_search_provider_readiness(selected_sources)
+    provider_risks = [
+        {
+            "provider": provider,
+            "status": state.get("status"),
+            "env": state.get("env"),
+            "importance": state.get("importance"),
+            "reason": state.get("reason"),
+        }
+        for provider, state in sorted(provider_readiness.items())
+        if isinstance(state, dict)
+        and state.get("status") not in {"set"}
+        and state.get("importance") in {"required", "recommended"}
+    ]
+    provider_gaps = [
+        {
+            "provider": risk["provider"],
+            "provider_gap": provider_readiness.get(risk["provider"], {}).get("provider_gap")
+            or f"{risk.get('provider')}_missing_env",
+            "status": risk.get("status"),
+            "env": risk.get("env"),
+            "importance": risk.get("importance"),
+            "reason": risk.get("reason"),
+        }
+        for risk in provider_risks
+    ]
+    return {
+        "requested_sources": requested_sources,
+        "selected_sources": selected_sources,
+        "demoted_sources": demoted_sources,
+        "provider_readiness": provider_readiness,
+        "provider_risks": provider_risks,
+        "provider_gaps": provider_gaps,
+        "include_unstable": include_unstable,
+    }
 
 
 class MCPToolError(RuntimeError):
@@ -659,6 +726,63 @@ def _timeout_text(value: object) -> str:
     return str(value)
 
 
+def _elapsed_ms(start: float) -> int:
+    return int(round((time.perf_counter() - start) * 1000))
+
+
+def _int_or_zero(value: object) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return 0
+
+
+def _source_health_payload(
+    *,
+    sources: list[str],
+    source_results: object,
+    errors: object,
+    timeout_seconds: int,
+) -> dict[str, dict]:
+    results = source_results if isinstance(source_results, dict) else {}
+    error_map = errors if isinstance(errors, dict) else {}
+    ordered: list[str] = []
+    seen: set[str] = set()
+
+    def add(source: object) -> None:
+        source_name = str(source or "").strip()
+        if not source_name or source_name in seen:
+            return
+        seen.add(source_name)
+        ordered.append(source_name)
+
+    for source in sources:
+        add(source)
+    for source in results:
+        add(source)
+    for source in error_map:
+        add(source)
+
+    health: dict[str, dict] = {}
+    for source in ordered:
+        error = str(error_map.get(source) or "").strip() or None
+        result_count = _int_or_zero(results.get(source))
+        status = "failed" if error else "ok" if result_count > 0 else "empty"
+        health[source] = {
+            "status": status,
+            "result_count": result_count,
+            "error": error,
+            "duration_ms": None,
+            "timeout_budget_seconds": timeout_seconds,
+        }
+    return health
+
+
 def _downloaded_pdf_paths(output_dir: Path) -> list[Path]:
     return sorted(
         path
@@ -746,6 +870,7 @@ def discover(
         }
     selected_sources = sources or DEFAULT_SOURCES
     mcp_failure: dict | None = None
+    mcp_search_started = time.perf_counter()
     try:
         mcp_result = _call_mcp_tool(
             "search_papers",
@@ -757,16 +882,32 @@ def discover(
             timeout_seconds=timeout_seconds,
         )
     except MCPToolError as exc:
+        mcp_search_duration_ms = _elapsed_ms(mcp_search_started)
         mcp_failure = _mcp_failure_payload(exc)
+        mcp_failure["search_duration_ms"] = mcp_search_duration_ms
     else:
+        mcp_search_duration_ms = _elapsed_ms(mcp_search_started)
         payload = _unwrap_mcp_payload(mcp_result["payload"])
+        source_results = payload.get("source_results", {})
+        source_errors = payload.get("errors", {})
+        sources_used = payload.get("sources_used", [])
+        health_sources = sources_used if isinstance(sources_used, list) and sources_used else selected_sources
+        source_health = _source_health_payload(
+            sources=health_sources,
+            source_results=source_results,
+            errors=source_errors,
+            timeout_seconds=timeout_seconds,
+        )
         if not payload.get("papers") and _mcp_empty_fallback_enabled():
             mcp_failure = {
                 **mcp_result["probe"],
                 "available": False,
                 "error": "paper-search MCP search returned no papers",
                 "raw_response": mcp_result.get("raw_response", {}),
-                "source_results": payload.get("source_results", {}),
+                "source_results": source_results,
+                "source_health": source_health,
+                "timeout_budget_seconds": timeout_seconds,
+                "search_duration_ms": mcp_search_duration_ms,
                 "total": payload.get("total"),
             }
         else:
@@ -785,9 +926,12 @@ def discover(
                     "version_probe": mcp_result["probe"],
                     "query": payload.get("query", query),
                     "sources_requested": selected_sources,
-                    "sources_used": payload.get("sources_used", []),
-                    "source_results": payload.get("source_results", {}),
-                    "errors": payload.get("errors", {}),
+                    "sources_used": sources_used,
+                    "source_results": source_results,
+                    "source_health": source_health,
+                    "errors": source_errors,
+                    "timeout_budget_seconds": timeout_seconds,
+                    "search_duration_ms": mcp_search_duration_ms,
                     "raw_total": payload.get("raw_total"),
                     "total": payload.get("total"),
                     "raw_response": mcp_result.get("raw_response", {}),
@@ -807,9 +951,11 @@ def discover(
         }
     resolved_command = probe["command"]
     args = ["search", query, "-n", str(max_results), "-s", ",".join(selected_sources)]
+    cli_search_started = time.perf_counter()
     try:
         result = _run_command(resolved_command, args, timeout_seconds=timeout_seconds)
     except subprocess.TimeoutExpired as exc:
+        cli_search_duration_ms = _elapsed_ms(cli_search_started)
         stdout = _timeout_text(exc.output)
         stderr = _timeout_text(exc.stderr)
         raw_path = _write_raw_response(
@@ -838,9 +984,18 @@ def discover(
                 "returncode": None,
                 "stderr": stderr.strip(),
                 "timeout_seconds": timeout_seconds,
+                "timeout_budget_seconds": timeout_seconds,
+                "search_duration_ms": cli_search_duration_ms,
+                "source_health": _source_health_payload(
+                    sources=selected_sources,
+                    source_results={},
+                    errors={source: "paper-search search timed out" for source in selected_sources},
+                    timeout_seconds=timeout_seconds,
+                ),
                 **_fallback_fields(mcp_failure),
             },
         }
+    cli_search_duration_ms = _elapsed_ms(cli_search_started)
     if result.returncode != 0 or not result.stdout.strip():
         raw_path = _write_raw_response(
             raw_response_path,
@@ -866,6 +1021,14 @@ def discover(
                 "sources_requested": selected_sources,
                 "returncode": result.returncode,
                 "stderr": result.stderr.strip(),
+                "timeout_budget_seconds": timeout_seconds,
+                "search_duration_ms": cli_search_duration_ms,
+                "source_health": _source_health_payload(
+                    sources=selected_sources,
+                    source_results={},
+                    errors={source: "paper-search search failed" for source in selected_sources},
+                    timeout_seconds=timeout_seconds,
+                ),
                 **_fallback_fields(mcp_failure),
             },
         }
@@ -889,8 +1052,35 @@ def discover(
             "raw_response_path": raw_path,
             "records": [],
             "error": f"paper-search search returned invalid JSON: {exc}",
+            "upstream": {
+                "package": "paper-search-mcp",
+                "cli_command": resolved_command,
+                "version_probe": probe,
+                "sources_requested": selected_sources,
+                "returncode": result.returncode,
+                "stderr": result.stderr.strip(),
+                "timeout_budget_seconds": timeout_seconds,
+                "search_duration_ms": cli_search_duration_ms,
+                "source_health": _source_health_payload(
+                    sources=selected_sources,
+                    source_results={},
+                    errors={source: "paper-search search returned invalid JSON" for source in selected_sources},
+                    timeout_seconds=timeout_seconds,
+                ),
+                **_fallback_fields(mcp_failure),
+            },
         }
     raw_path = _write_raw_response(raw_response_path, payload)
+    source_results = payload.get("source_results", {})
+    source_errors = payload.get("errors", {})
+    sources_used = payload.get("sources_used", [])
+    health_sources = sources_used if isinstance(sources_used, list) and sources_used else selected_sources
+    source_health = _source_health_payload(
+        sources=health_sources,
+        source_results=source_results,
+        errors=source_errors,
+        timeout_seconds=timeout_seconds,
+    )
     return {
         "query": query,
         "max_results": max_results,
@@ -905,9 +1095,12 @@ def discover(
             "version_probe": probe,
             "query": payload.get("query", query),
             "sources_requested": selected_sources,
-            "sources_used": payload.get("sources_used", []),
-            "source_results": payload.get("source_results", {}),
-            "errors": payload.get("errors", {}),
+            "sources_used": sources_used,
+            "source_results": source_results,
+            "source_health": source_health,
+            "errors": source_errors,
+            "timeout_budget_seconds": timeout_seconds,
+            "search_duration_ms": cli_search_duration_ms,
             "raw_total": payload.get("raw_total"),
             "total": payload.get("total"),
             **_fallback_fields(mcp_failure),
@@ -924,6 +1117,7 @@ def download_paper_pdf(
     title: str = "",
     use_scihub: bool = False,
     scihub_base_url: str = "https://sci-hub.se",
+    stop_after_oa_fallback: bool = False,
     command: str | None = None,
     timeout_seconds: int = 120,
 ) -> dict:
@@ -948,6 +1142,30 @@ def download_paper_pdf(
         )
     except MCPToolError as exc:
         mcp_failure = _mcp_failure_payload(exc)
+        if stop_after_oa_fallback:
+            return {
+                "status": "failed",
+                "mode": "paper_search_mcp_fallback_download",
+                "source": source_name,
+                "paper_id": paper_id,
+                "doi": doi or "",
+                "title": title or "",
+                "use_scihub": bool(use_scihub),
+                "mcp_probe": mcp_failure,
+                "mcp_server_probe": mcp_failure,
+                "upstream": {
+                    "package": "paper-search-mcp",
+                    "transport": "stdio",
+                    "tool": "download_with_fallback",
+                    "fallback_chain": list(OA_FALLBACK_CHAIN)
+                    + (["scihub"] if use_scihub else []),
+                    "use_scihub": bool(use_scihub),
+                    "returncode": None,
+                    "error": str(exc),
+                    "raw_response": exc.raw_response or {},
+                },
+                "error": "paper-search OA fallback failed",
+            }
     else:
         pdf_paths = _downloaded_pdf_paths(output_dir)
         if pdf_paths:
@@ -981,6 +1199,29 @@ def download_paper_pdf(
             "fallback_chain": list(OA_FALLBACK_CHAIN) + (["scihub"] if use_scihub else []),
             "use_scihub": bool(use_scihub),
         }
+        if stop_after_oa_fallback:
+            return {
+                "status": "failed",
+                "mode": "paper_search_mcp_fallback_download",
+                "source": source_name,
+                "paper_id": paper_id,
+                "doi": doi or "",
+                "title": title or "",
+                "use_scihub": bool(use_scihub),
+                "mcp_probe": mcp_result["probe"],
+                "mcp_server_probe": mcp_failure,
+                "upstream": {
+                    "package": "paper-search-mcp",
+                    "transport": "stdio",
+                    "tool": "download_with_fallback",
+                    "fallback_chain": list(OA_FALLBACK_CHAIN)
+                    + (["scihub"] if use_scihub else []),
+                    "use_scihub": bool(use_scihub),
+                    "returncode": None,
+                    "raw_response": mcp_result.get("raw_response", {}),
+                },
+                "error": "paper-search OA fallback produced no PDF",
+            }
 
     tool_name = f"download_{source_name}"
     try:

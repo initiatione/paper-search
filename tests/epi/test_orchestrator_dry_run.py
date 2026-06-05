@@ -935,6 +935,65 @@ def test_dry_run_uses_configured_paper_search_command_and_sources(tmp_path, monk
     assert invoked_args == ["search", "robotics survey", "-n", "10", "-s", "arxiv,semantic,openalex"]
 
 
+def test_dry_run_records_provider_aware_source_routing_in_query_plan_search_and_report(tmp_path, monkeypatch):
+    monkeypatch.delenv("PAPER_SEARCH_MCP_UNPAYWALL_EMAIL", raising=False)
+    monkeypatch.delenv("PAPER_SEARCH_MCP_GOOGLE_SCHOLAR_PROXY_URL", raising=False)
+    plugin_root = tmp_path / "plugin"
+    _write_minimal_plugin_template(plugin_root)
+    args_path = tmp_path / "args.json"
+    fake_command = tmp_path / "provider-aware-paper-search.ps1"
+    fake_payload = {
+        "query": "auv pinn rl control",
+        "sources_used": ["semantic", "unpaywall"],
+        "source_results": {"semantic": 0, "unpaywall": 0},
+        "errors": {},
+        "total": 0,
+        "papers": [],
+    }
+    fake_command.write_text(
+        "$args_json = $args | ConvertTo-Json -Compress\n"
+        "if ($args -contains '--version') { Write-Output 'paper-search 0.1.4'; exit 0 }\n"
+        f"$payload = @'\n{json.dumps(fake_payload)}\n'@\n"
+        "$payload | Write-Output\n"
+        f"$args_json | Set-Content -Encoding UTF8 -LiteralPath {json.dumps(str(args_path))}\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+
+    run_dir = run_dry_run(
+        plugin_root=plugin_root,
+        vault_path=tmp_path / "vault",
+        query="auv pinn rl control",
+        max_results=3,
+        paper_search_command=fake_command,
+        sources=["google_scholar", "semantic", "unpaywall"],
+        use_query_plan=True,
+        query_plan_max_queries=1,
+    )
+
+    query_plan = json.loads((run_dir / "query-plan.json").read_text(encoding="utf-8"))
+    search_record = json.loads((run_dir / "search-record.json").read_text(encoding="utf-8"))
+    report = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
+    report_md = (run_dir / "report.md").read_text(encoding="utf-8")
+    invoked_args = json.loads(args_path.read_text(encoding="utf-8-sig"))
+
+    assert query_plan["source_routing"]["selected_sources"] == ["semantic", "unpaywall"]
+    assert query_plan["source_routing"]["demoted_sources"] == [
+        {"source": "google_scholar", "reason": "unstable_source"}
+    ]
+    assert query_plan["source_routing"]["provider_readiness"]["unpaywall"]["status"] == "missing_required_env"
+    assert query_plan["source_routing"]["provider_gaps"][0]["provider_gap"] == "unpaywall_email_missing"
+    assert search_record["source_routing"]["provider_gaps"][0]["provider_gap"] == "unpaywall_email_missing"
+    source_coverage = report["discovery_context"]["source_coverage"]
+    assert source_coverage["source_routing"]["selected_sources"] == ["semantic", "unpaywall"]
+    assert source_coverage["source_routing"]["provider_gaps"][0]["provider_gap"] == "unpaywall_email_missing"
+    assert "## Source Routing" in report_md
+    assert "selected_sources: semantic, unpaywall" in report_md
+    assert "demoted: google_scholar (unstable_source)" in report_md
+    assert "risk: unpaywall missing_required_env (PAPER_SEARCH_MCP_UNPAYWALL_EMAIL)" in report_md
+    assert invoked_args[-1] == "semantic,unpaywall"
+
+
 def test_dry_run_keeps_environment_command_override_for_default_config_command(tmp_path, monkeypatch):
     plugin_root = tmp_path / "plugin"
     _write_minimal_plugin_template(plugin_root)

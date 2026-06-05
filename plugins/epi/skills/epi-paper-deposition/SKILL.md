@@ -14,6 +14,8 @@ Compatibility note: older EPI artifacts may say `epi-wiki-deposition`. Treat tha
 
 Canonical user experience: when the `prw` plugin package (`plugins/PRW`) is installed, route formal paper wiki work through `$paper-research-wiki`. Users should be able to ask it to `提取` EPI papers, `检测` the wiki library, `更新` the wiki library, or `重link` paper knowledge without choosing internal workflow names. This EPI skill remains a compatibility bridge for existing `wiki_deposition_task.json` artifacts and record provenance that expects the EPI adapter stack.
 
+Formal page rewrites are PRW maintenance work. If the user asks to rewrite formal page, rewrite page, 重写某页, or 重写页面, route to `$paper-research-wiki` so PRW runs its graph-aware rewrite flow for dependent pages, tracking files, provenance sidecars, and QMD refresh. This adapter must not turn a rewrite into a one-page EPI edit.
+
 ## Workflow Routing
 
 | Intent | Load |

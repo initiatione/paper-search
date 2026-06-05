@@ -112,7 +112,7 @@ python scripts\orchestrator.py parse-paper --slug <slug> --vault <vault>
 职责：
 
 - 对 ranked papers 执行 PDF 下载或本地复制。
-- 失败时写清楚 `failure_class`、`retryable`、`recovery_hint`，避免把 403/502 误判为论文不存在。
+- 失败时写清楚 `failure_class`、`retryable`、`recovery_hint`，避免把 403/502 误判为论文不存在；若无开放 PDF 且需要机构访问，写 `manual-download-required`、`manual_download.candidate_manual_urls`，让 agent 立即给用户 DOI/出版商链接和 organization/institution 手动下载提示。
 - 调用 MinerU 生成 Markdown、TeX、images、manifest。
 - 对已完整解析的论文使用 `--skip-existing`，避免补跑时浪费预算。
 

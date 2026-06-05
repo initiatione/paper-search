@@ -25,6 +25,8 @@ Use the PRW and obsidian-wiki layer explicitly:
 
 If the `prw` plugin package (`plugins/PRW`) is available, it is the plugin-level paper wiki assistant. Invoke `$paper-research-wiki` with natural actions such as `提取这些论文`, `检测 wiki 库`, `更新 wiki 库`, or `重link`; its internal workflows handle source-first deposition, provenance, lint, staged review, taxonomy, and relinking.
 
+For rewrite formal page, rewrite page, 重写某页, or 重写页面 requests, invoke `$paper-research-wiki` instead of continuing in this compatibility adapter. PRW owns the graph-aware rewrite flow: inspect dependent formal pages, refresh manifest/index/log/hot, refresh `final-source-review.json` and `wiki-ingest-record.json`, run or report QMD refresh, and keep source-grounded vs inferred boundaries visible.
+
 - `llm-wiki` for source-first knowledge compilation.
 - `wiki-context-pack` before writing, so related pages are read first.
 - `wiki-ingest` for staged page creation and merge decisions.

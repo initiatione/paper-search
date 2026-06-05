@@ -76,8 +76,12 @@ routes:
       - 更新 wiki 库
       - 继续上次的论文沉淀
       - 重link
+      - 重写某页
+      - 重写页面
       - relink
       - update wiki
+      - rewrite formal page
+      - rewrite page
       - repair paper wiki links
     skill: paper-research-wiki/SKILL.md
     workflows:
@@ -86,6 +90,7 @@ routes:
       - paper-research-wiki/references/upstream-obsidian-wiki-map.md
     notes:
       - repair links, aliases, tags, duplicate concept owners, and relationship drift in small batches
+      - treat material formal page rewrites as graph-aware rewrite transactions with dependent-page impact analysis
       - rerun check-wiki after writing
   language_gate:
     category: support
