@@ -85,9 +85,9 @@
 每次插件改动至少运行：
 
 ```powershell
-python -m pytest tests\paper_research_wiki\test_plugin_contract.py plugins\epi\tests\test_skill_bundle_contract.py -q
-python C:\Users\liuchf\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py D:\paper-search\plugins\epi
-python C:\Users\liuchf\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py D:\paper-search\plugins\PRW
+python -m pytest tests\paper_research_wiki\test_plugin_contract.py plugins\epi\tests\test_skill_bundle_contract.py tests\test_marketplace_manifest.py -q
+python -m json.tool plugins\epi\.codex-plugin\plugin.json > $null
+python -m json.tool plugins\PRW\.codex-plugin\plugin.json > $null
 git diff --check
 ```
 
@@ -96,7 +96,7 @@ git diff --check
 - EPI handoff/schema 生成物：`tests\epi\test_wiki_deposition_task.py`、`tests\epi\test_one_paper_ingest.py`、`tests\epi\test_wiki_ingest_handoff.py`、`tests\epi\test_wiki_ingest_record.py`。
 - EPI config/doctor/runtime：`tests\epi\test_runtime_config.py`、`tests\epi\test_doctor_cli.py`、`tests\epi\test_config_onboarding_docs.py`。
 - PRW 页面写入/语言/链接规则：`tests\paper_research_wiki\test_plugin_contract.py`。
-- Marketplace 或 manifest 改动：两个 plugin validator、根 marketplace contract tests、必要时安装缓存验证。
+- Marketplace 或 manifest 改动：根 marketplace contract tests、`plugin.json` JSON 解析检查、必要时安装缓存验证；如果当前机器配置了 `PLUGIN_VALIDATE_SCRIPT`，再分别运行 `python $env:PLUGIN_VALIDATE_SCRIPT plugins\epi` 和 `python $env:PLUGIN_VALIDATE_SCRIPT plugins\PRW`，不要引用不存在的固定 validator 路径。
 
 如果运行了安装缓存或真实 vault 验证，必须明确报告路径，例如 `C:\Users\liuchf\.codex\plugins\cache\paper-search\...` 或 `D:\paper-research-wiki`。不要把 source checkout 结果和 installed runtime 结果混为一谈。
 

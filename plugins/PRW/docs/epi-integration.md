@@ -11,3 +11,7 @@ PRW assumes an initialized vault contract. It may check for the core `_epi` boot
 Required inputs include `wiki_deposition_task.json`, `wiki-ingest-brief.json`, reading report, metadata, PDF, MinerU Markdown, TeX, images, and manifest.
 
 If source artifacts are missing, stop and send the user back to EPI `paper-gate`. Human approval remains an EPI record; this plugin must not write human approval state. After formal pages are written and `final-source-review.json` exists, EPI `record-wiki-ingest` records final paths and hashes.
+
+PRW may read previous `wiki-ingest-record.json` files to find affected formal pages, hashes, and reverse dependencies, but it must not refresh or replace those EPI record files. PRW records readiness; EPI writes or replaces `wiki-ingest-record.json` through `record-wiki-ingest`.
+
+Ask-mode automation uses `_epi/staging/papers/<paper-slug>/prw-record-request.json`. PRW writes the request artifact; EPI consumes it. The request uses `schema_version: prw-record-request-v1`, `automation_mode: ask`, final page paths and sha256 hashes, `final-source-review.json` path/hash, and the human approval identity. The next EPI command is `record-wiki-ingest --from-prw-request _epi/staging/papers/<paper-slug>/prw-record-request.json`; EPI validates the live vault again before writing or replacing `wiki-ingest-record.json`.

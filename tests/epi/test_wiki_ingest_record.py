@@ -439,6 +439,58 @@ def _approve_handoff(vault, slug, *, approved_by="codex-test"):
     )
 
 
+def _write_prw_record_request(
+    vault,
+    slug,
+    pages,
+    source_review,
+    *,
+    approved_by="codex-test",
+    page_hash_overrides=None,
+):
+    staging_root = vault / "_epi" / "staging" / "papers" / slug
+    request_path = staging_root / "prw-record-request.json"
+    final_pages = []
+    overrides = page_hash_overrides or {}
+    for page in pages:
+        relative_path = page.relative_to(vault).as_posix()
+        final_pages.append(
+            {
+                "relative_path": relative_path,
+                "sha256": overrides.get(relative_path, file_sha256(page)),
+            }
+        )
+    _write_json(
+        request_path,
+        {
+            "schema_version": "prw-record-request-v1",
+            "request_id": f"{slug}-fixture-request",
+            "status": "ready_for_epi_record",
+            "automation_mode": "ask",
+            "paper_slug": slug,
+            "final_pages": final_pages,
+            "final_source_review": {
+                "path": str(source_review),
+                "sha256": file_sha256(source_review),
+                "status": "verified",
+            },
+            "human_approval": {
+                "approved_by": approved_by,
+                "path": str(staging_root / "human-approval.json"),
+            },
+            "recommended_command": (
+                "record-wiki-ingest "
+                f"--from-prw-request _epi/staging/papers/{slug}/prw-record-request.json"
+            ),
+            "prw_task": {
+                "plugin": "paper-research-wiki",
+                "workflow": "extract-papers",
+            },
+        },
+    )
+    return request_path
+
+
 def _enable_zotero(vault, *, collection="EPI Lab"):
     config = vault / "_epi" / "meta" / "epi-config.yaml"
     config.parent.mkdir(parents=True, exist_ok=True)
@@ -553,6 +605,146 @@ def test_record_wiki_ingest_records_agent_pages_without_modifying_them(tmp_path)
     assert run_state["zotero_results"]["reason"] == "zotero_not_configured"
     assert paper_state["state"] == "wiki_ingest_recorded"
     assert paper_state["next_action"] == "review-recorded-wiki-pages"
+
+
+def test_record_wiki_ingest_replaces_prw_ready_corrected_premature_record(tmp_path):
+    vault = tmp_path / "vault"
+    slug = _seed_agent_handoff(vault)
+    reference = _write_final_page(
+        vault,
+        "references/fixture-paper.md",
+        _formal_page_content("references", "Fixture Paper"),
+    )
+    source_review = _write_final_source_review(vault, slug, [reference])
+    _approve_handoff(vault, slug)
+    paper_root = vault / "_epi" / "raw" / slug
+
+    _write_json(
+        paper_root / "wiki-ingest-record.json",
+        {
+            "schema_version": "epi-wiki-ingest-record-v1",
+            "stage": "record-wiki-ingest",
+            "status": "recorded",
+            "paper_slug": slug,
+            "recorded_at": "1999-01-01T00:00:00+00:00",
+            "human_gate_decision": {"status": "approved", "approved_by": "codex-test"},
+            "final_source_review": {
+                "status": "verified",
+                "path": str(source_review),
+            },
+            "page_records": [{"relative_path": "references/premature-fixture.md"}],
+        },
+    )
+    _write_json(
+        vault / "_epi" / "meta" / "record-corrections" / "20000101-premature.json",
+        {
+            "schema_version": "epi-record-correction-v1",
+            "correction_type": "premature-wiki-ingest-record",
+            "affected_papers": [
+                {
+                    "slug": slug,
+                    "premature_record": f"_epi/raw/{slug}/wiki-ingest-record.json",
+                }
+            ],
+            "status_after_correction": {
+                "wiki_quality_status": "prw-reviewed-ready-for-epi-record",
+                "record_status_interpretation": "PRW review complete; rerun record-wiki-ingest.",
+            },
+            "prw_repair": {
+                "status": "completed",
+                "completed_at": "2000-01-01T00:00:00+00:00",
+                "final_source_reviews_refreshed": [str(source_review)],
+            },
+        },
+    )
+
+    pre_gate = build_paper_gate(vault, slug)
+    pre_checks = {run["name"]: run for run in pre_gate["check_suite"]["check_runs"]}
+    assert pre_gate["check_suite"]["conclusion"] == "success"
+    assert pre_gate["next_action"] == "run-wiki-ingest-agent"
+    assert pre_checks["record-correction"]["conclusion"] == "success"
+
+    result = record_wiki_ingest(
+        vault,
+        slug,
+        [str(reference)],
+        approved_by="codex-test",
+        source_review_path=str(source_review),
+    )
+
+    assert result["record"]["status"] == "recorded"
+    after_gate = build_paper_gate(vault, slug)
+    after_checks = {run["name"]: run for run in after_gate["check_suite"]["check_runs"]}
+    assert after_gate["status"] == "wiki_ingest_recorded"
+    assert after_gate["next_action"] == "review-recorded-wiki-pages"
+    assert "record-correction" not in after_checks
+
+
+def test_record_wiki_ingest_consumes_prw_record_request(tmp_path):
+    vault = tmp_path / "vault"
+    slug = _seed_agent_handoff(vault)
+    reference = _write_final_page(
+        vault,
+        "references/fixture-paper.md",
+        _formal_page_content("references", "Fixture Paper"),
+    )
+    source_review = _write_final_source_review(vault, slug, [reference])
+    _approve_handoff(vault, slug)
+    request_path = _write_prw_record_request(vault, slug, [reference], source_review)
+
+    result = record_wiki_ingest(
+        vault,
+        None,
+        [],
+        approved_by=None,
+        from_prw_request=str(request_path),
+    )
+
+    record = result["record"]
+    assert record["status"] == "recorded"
+    assert record["paper_slug"] == slug
+    assert record["relative_page_paths"] == ["references/fixture-paper.md"]
+    assert record["source_request"]["schema_version"] == "prw-record-request-v1"
+    assert record["source_request"]["request_id"] == f"{slug}-fixture-request"
+    assert record["source_request"]["automation_mode"] == "ask"
+    assert record["source_request"]["path"] == str(request_path.resolve())
+    assert record["source_request"]["sha256"] == file_sha256(request_path)
+    assert record["human_gate_decision"]["approved_by"] == "codex-test"
+    assert record["paths"]["final_source_review"] == str(source_review)
+    raw_record = json.loads((vault / "_epi" / "raw" / slug / "wiki-ingest-record.json").read_text(encoding="utf-8"))
+    assert raw_record["source_request"]["request_id"] == f"{slug}-fixture-request"
+    run_state = json.loads((vault / "_epi" / "runs" / result["run_id"] / "run-state.json").read_text(encoding="utf-8"))
+    assert run_state["input_artifact_hashes"]["prw-record-request.json"] == file_sha256(request_path)
+
+
+def test_record_wiki_ingest_from_prw_request_rejects_stale_page_hash(tmp_path):
+    vault = tmp_path / "vault"
+    slug = _seed_agent_handoff(vault)
+    reference = _write_final_page(
+        vault,
+        "references/fixture-paper.md",
+        _formal_page_content("references", "Fixture Paper"),
+    )
+    source_review = _write_final_source_review(vault, slug, [reference])
+    _approve_handoff(vault, slug)
+    request_path = _write_prw_record_request(
+        vault,
+        slug,
+        [reference],
+        source_review,
+        page_hash_overrides={"references/fixture-paper.md": "stale-hash"},
+    )
+
+    with pytest.raises(ValueError, match="PRW record request final page sha256 mismatch"):
+        record_wiki_ingest(
+            vault,
+            None,
+            [],
+            approved_by=None,
+            from_prw_request=str(request_path),
+        )
+
+    assert not (vault / "_epi" / "raw" / slug / "wiki-ingest-record.json").exists()
 
 
 def test_create_wiki_ingest_record_accepts_wiki_skill_batch_distillation_plan(tmp_path):

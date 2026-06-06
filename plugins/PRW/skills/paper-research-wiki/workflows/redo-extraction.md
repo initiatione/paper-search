@@ -58,8 +58,9 @@ Redo work that materially changes formal page claims is a material rewrite and a
 2. Find reverse dependencies through backlinks, outgoing wikilinks, `relationships:`, `sources:`, manifest or `.manifest.json`, prior `final-source-review.json`, prior `wiki-ingest-record.json`, `index.md`, `log.md`, `hot.md`, and direct search.
 3. Update dependent formal pages when the redo changes claim/evidence boundaries, formulas, figure/table evidence, evidence tiers, reusable mechanisms, synthesis conclusions, or opportunity wording.
 4. Create a new `derivations/` or `concepts/` page when the source reread exposes reusable knowledge that downstream pages need to cite.
-5. Refresh manifest or `.manifest.json`, `final-source-review.json`, staging/raw `wiki-ingest-record.json`, `index.md`, `log.md`, and `hot.md` in the same run as the markdown rewrite.
-6. Run or report `qmd update` and `qmd embed` after confirmed writes or staged patches.
+5. Refresh manifest or `.manifest.json`, `final-source-review.json`, `index.md`, `log.md`, and `hot.md` in the same run as the markdown rewrite. Read prior `wiki-ingest-record.json` only as provenance and reverse-dependency evidence.
+6. Report EPI record readiness. PRW records readiness; EPI writes or replaces `wiki-ingest-record.json` through `record-wiki-ingest`. When the redo produces record-ready formal pages, write `_epi/staging/papers/<paper-slug>/prw-record-request.json` with `schema_version: prw-record-request-v1`, `automation_mode: ask`, current final page hashes, current `final-source-review.json` hash, and `record-wiki-ingest --from-prw-request ...`; PRW writes the request artifact; EPI consumes it.
+7. Run or report `qmd update` and `qmd embed` after confirmed writes or staged patches.
 
 ## Deep Extraction Lenses
 
@@ -112,7 +113,7 @@ Update the target vault tracking surface after the redo:
 
 PRW can prepare pages and source review, but do not write human approval. EPI owns human approval records and `record-wiki-ingest`.
 
-After redo, tell the user which `record-wiki-ingest` command remains, or say that staged review must happen first.
+After redo, tell the user which `record-wiki-ingest --from-prw-request _epi/staging/papers/<paper-slug>/prw-record-request.json` command remains, or say that staged review must happen first.
 
 ## QMD Compatibility
 

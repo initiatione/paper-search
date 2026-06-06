@@ -320,11 +320,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     record_wiki_ingest = subparsers.add_parser("record-wiki-ingest")
     _add_common_vault(record_wiki_ingest)
-    record_wiki_ingest.add_argument("--slug", required=True)
-    record_wiki_ingest.add_argument("--page", action="append", required=True)
-    record_wiki_ingest.add_argument("--approved-by", required=True)
+    record_wiki_ingest.add_argument("--slug", default=None)
+    record_wiki_ingest.add_argument("--page", action="append", default=None)
+    record_wiki_ingest.add_argument("--approved-by", default=None)
     record_wiki_ingest.add_argument("--notes", default=None)
     record_wiki_ingest.add_argument("--source-review", default=None)
+    record_wiki_ingest.add_argument("--from-prw-request", type=Path, default=None)
     record_wiki_ingest.add_argument("--json", action="store_true")
 
     paper_gate = subparsers.add_parser("paper-gate")

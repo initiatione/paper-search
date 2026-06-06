@@ -25,7 +25,7 @@ Check:
 - forbidden internal links from formal pages into `_epi/`, `_raw/`, `_staging/`, `_runs/`, `_quarantine/`, or `.obsidian/`
 - relationship direction and relationship type mistakes
 - changed pages and their reverse dependencies after graph-aware rewrite work
-- sidecar hashes in `final-source-review.json` and staging/raw `wiki-ingest-record.json`
+- sidecar hashes in `final-source-review.json` and previous `wiki-ingest-record.json` used as read-only provenance evidence
 - staged writes waiting for review
 - stale core pages
 - fragmented tag clusters

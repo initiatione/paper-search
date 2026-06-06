@@ -143,7 +143,7 @@ def test_plugin_manifest_exposes_simple_user_prompts():
     manifest = _read_json(PLUGIN / ".codex-plugin" / "plugin.json")
 
     assert manifest["name"] == "prw"
-    assert manifest["version"] == "0.1.5"
+    assert manifest["version"] == "0.1.7"
     assert manifest["skills"] == "./skills/"
     assert manifest["interface"]["displayName"] == "Paper Research Wiki"
     assert "academic paper knowledge" in manifest["description"]
@@ -484,6 +484,43 @@ def test_prw_declares_closed_loop_boundary_and_completion_definition():
             "final-source-review.json",
         ]:
             assert phrase in text
+
+
+def test_prw_does_not_claim_to_refresh_epi_record_files():
+    standard = _read(PLUGIN / "rules" / "wiki-writing-standard.md")
+    update = _read(PUBLIC_SKILL / "workflows" / "update-wiki.md")
+    redo = _read(PUBLIC_SKILL / "workflows" / "redo-extraction.md")
+    extract = _read(PUBLIC_SKILL / "workflows" / "extract-papers.md")
+    check = _read(PUBLIC_SKILL / "workflows" / "check-wiki.md")
+    integration = _read(PLUGIN / "docs" / "epi-integration.md")
+
+    combined = "\n".join([standard, update, redo, extract, check, integration])
+
+    assert "EPI owns human approval records and `record-wiki-ingest`" in combined
+    assert "previous `wiki-ingest-record.json`" in combined
+    assert "staging/raw `wiki-ingest-record.json`" not in combined
+    assert "Refresh manifest or `.manifest.json`, `final-source-review.json`, staging/raw `wiki-ingest-record.json`" not in combined
+    assert "PRW records readiness; EPI writes or replaces `wiki-ingest-record.json`" in combined
+
+
+def test_prw_documents_ask_mode_epi_record_request_handoff():
+    standard = _read(PLUGIN / "rules" / "wiki-writing-standard.md")
+    extract = _read(PUBLIC_SKILL / "workflows" / "extract-papers.md")
+    update = _read(PUBLIC_SKILL / "workflows" / "update-wiki.md")
+    redo = _read(PUBLIC_SKILL / "workflows" / "redo-extraction.md")
+    integration = _read(PLUGIN / "docs" / "epi-integration.md")
+    combined = "\n".join([standard, extract, update, redo, integration])
+
+    for phrase in [
+        "prw-record-request.json",
+        "schema_version: prw-record-request-v1",
+        "automation_mode: ask",
+        "record-wiki-ingest --from-prw-request",
+        "PRW writes the request artifact; EPI consumes it",
+    ]:
+        assert phrase in combined
+
+    assert "PRW writes or replaces `wiki-ingest-record.json`" not in combined
 
 
 def test_check_wiki_supports_layered_checks_and_completion_reports():

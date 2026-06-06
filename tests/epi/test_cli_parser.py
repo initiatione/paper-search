@@ -667,6 +667,24 @@ def test_record_wiki_ingest_parser_accepts_pages_approval_notes_and_json():
     assert args.json is True
 
 
+def test_record_wiki_ingest_parser_accepts_prw_record_request():
+    args = build_parser().parse_args(
+        [
+            "record-wiki-ingest",
+            "--from-prw-request",
+            "_epi/staging/papers/fixture-paper/prw-record-request.json",
+            "--json",
+        ]
+    )
+
+    assert args.command == "record-wiki-ingest"
+    assert args.from_prw_request.name == "prw-record-request.json"
+    assert args.slug is None
+    assert args.page is None
+    assert args.approved_by is None
+    assert args.json is True
+
+
 def test_record_human_approval_parser_accepts_scope_notes_and_json():
     args = build_parser().parse_args(
         [

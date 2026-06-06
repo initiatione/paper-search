@@ -46,7 +46,7 @@ Update the wiki tracking surface when the target vault contract expects it:
 - append a concise `log.md` entry
 - refresh `hot.md` with the conceptual change, not a file list
 
-Tell the user which EPI `record-wiki-ingest` command remains.
+Write `_epi/staging/papers/<paper-slug>/prw-record-request.json` when formal pages and `final-source-review.json` are ready for EPI record. The request must include `schema_version: prw-record-request-v1`, `automation_mode: ask`, final page relative paths and sha256 hashes, `final-source-review.json` path/hash, `human_approval.approved_by`, and the command `record-wiki-ingest --from-prw-request _epi/staging/papers/<paper-slug>/prw-record-request.json`. PRW writes the request artifact; EPI consumes it. Tell the user whether the current agent can continue with that EPI command or whether a safety gate still blocks it.
 
 Stop when source artifacts are missing and point back to EPI `paper-gate`.
 

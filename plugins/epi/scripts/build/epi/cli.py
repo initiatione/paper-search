@@ -821,10 +821,11 @@ def _handle_record_wiki_ingest(args: argparse.Namespace) -> int:
     result = workflows.record_wiki_ingest(
         args.vault.resolve(),
         args.slug,
-        args.page,
+        args.page or [],
         approved_by=args.approved_by,
         notes=args.notes,
         source_review_path=args.source_review,
+        from_prw_request=args.from_prw_request,
     )
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))

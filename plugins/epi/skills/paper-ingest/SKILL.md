@@ -52,4 +52,8 @@ Final Obsidian/LLM Wiki pages are agent-mediated under the target vault contract
 
 After the wiki ingest agent writes or stages final Markdown pages, create `final-source-review.json`, then record completion with `record-wiki-ingest`. This command is record-only and must not rewrite final pages or replace the target vault's ingest agent.
 
+For ask-mode automation after PRW completes formal pages, consume `_epi/staging/papers/<slug>/prw-record-request.json` with `record-wiki-ingest --from-prw-request <request>`. The request schema is `prw-record-request-v1` with `automation_mode=ask`. PRW writes the request artifact; EPI consumes it. EPI validates live page hashes, `final-source-review.json`, matching human approval, `paper-gate`, and formal-page rules before writing `wiki-ingest-record.json`.
+
+If EPI has a `_epi/meta/record-corrections/` entry with `correction_type=premature-wiki-ingest-record`, do not treat the old `wiki-ingest-record.json` as final. While the correction says `pending-prw-review`, route to PRW for formal page and `final-source-review.json` repair. After PRW repairs pages and `final-source-review.json`; EPI writes or replaces `wiki-ingest-record.json`: when PRW marks the correction `prw-reviewed-ready-for-epi-record` and `paper-gate` returns `ready_for_wiki_ingest_agent`, rerun `record-wiki-ingest` to replace the premature record.
+
 EPI owns vault bootstrap through `wiki-setup`. PRW consumes the initialized vault contract and should report missing vault structure back to EPI instead of creating or resetting the vault itself.

@@ -38,9 +38,21 @@ After the external wiki-ingest agent writes or stages final Markdown pages under
 python scripts\orchestrator.py record-wiki-ingest --slug <slug> --page <final-page.md> --approved-by <name> --source-review <final-source-review.json> --vault <vault>
 ```
 
+For PRW ask-mode automation, PRW writes the request artifact; EPI consumes it:
+
+```powershell
+python scripts\orchestrator.py record-wiki-ingest --from-prw-request _epi/staging/papers/<slug>/prw-record-request.json --vault <vault> --json
+```
+
+The request uses schema `prw-record-request-v1` and `automation_mode=ask`. EPI validates live page hashes, `final-source-review.json`, matching human approval, `paper-gate`, and formal-page rules before writing `wiki-ingest-record.json`.
+
 `record-wiki-ingest` is record-only. It rechecks `paper-gate`, requires matching pre-write `human-approval.json` and `approved-by`, validates `final-source-review.json`, verifies final pages are inside the vault and outside EPI internal folders, records sha256 hashes in raw/staging, and marks the paper `wiki_ingest_recorded`.
 
 When Zotero is enabled in vault config, the completion step also writes a local `zotero-record.json` sidecar and surfaces it in the routed report.
+
+## Corrected Premature Records
+
+If a prior `wiki-ingest-record.json` was corrected as `premature-wiki-ingest-record`, the correction entry is under `_epi/meta/record-corrections/`. While its wiki status is `pending-prw-review`, send the paper to PRW for formal page and `final-source-review.json` repair. After PRW repairs pages and `final-source-review.json`; EPI writes or replaces `wiki-ingest-record.json`: when the correction status is `prw-reviewed-ready-for-epi-record`, `paper-gate` returns `ready_for_wiki_ingest_agent`; rerun `record-wiki-ingest` to replace the premature record. PRW reports readiness but must not write the EPI replacement record.
 
 ## Queue Buckets
 

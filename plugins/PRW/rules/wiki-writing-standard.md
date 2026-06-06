@@ -29,8 +29,9 @@ For a graph-aware rewrite:
 3. Treat references/ pages are evidence source nodes: when a reference page changes, inspect dependent `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/` pages for stale claims or missing reusable knowledge.
 4. Update dependent formal pages when the rewrite changes claim/evidence boundaries, formula or figure/table evidence, evidence-tier wording, relationships, or downstream synthesis.
 5. Create a new `derivations/` or `concepts/` page when the rewrite exposes a reusable formula chain, mechanism, dataset, metric, or distinction that should not stay buried in a reference page.
-6. Refresh manifest or `.manifest.json`, `final-source-review.json`, staging/raw `wiki-ingest-record.json`, `index.md`, `log.md`, and `hot.md` in the same run as the markdown rewrite.
-7. Run `qmd update` and `qmd embed` when QMD is in scope, or report the fallback to direct Markdown inventory.
+6. Refresh manifest or `.manifest.json`, `final-source-review.json`, `index.md`, `log.md`, and `hot.md` in the same run as the markdown rewrite. Read previous `wiki-ingest-record.json` only as provenance and reverse-dependency evidence.
+7. Report EPI record readiness. PRW records readiness; EPI writes or replaces `wiki-ingest-record.json` through `record-wiki-ingest`. For ask-mode automation, write `_epi/staging/papers/<paper-slug>/prw-record-request.json` with `schema_version: prw-record-request-v1`, `automation_mode: ask`, final page hashes, `final-source-review.json` hash, and `record-wiki-ingest --from-prw-request ...`; PRW writes the request artifact; EPI consumes it.
+8. Run `qmd update` and `qmd embed` when QMD is in scope, or report the fallback to direct Markdown inventory.
 
 ## Page Families
 

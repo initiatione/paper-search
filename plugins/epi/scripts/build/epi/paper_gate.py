@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from pathlib import PurePosixPath
 from typing import Any
@@ -23,6 +24,11 @@ from epi.wiki_contracts import (
 
 
 _ALLOWED_COMPILED_TARGET_ROOTS = set(formal_page_family_names())
+_PRW_REVIEW_READY_STATUSES = {
+    "prw-reviewed-ready-for-epi-record",
+    "prw-reviewed-ready-for-record",
+    "ready-for-epi-record",
+}
 
 
 def _read_json(path: Path) -> dict[str, Any] | None:
@@ -435,6 +441,73 @@ def _normalized_record_path(value: Any) -> str:
     return str(value or "").replace("\\", "/").strip()
 
 
+def _parse_record_time(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _path_matches_any(path: str, candidates: list[Any]) -> bool:
+    normalized = _normalized_record_path(path)
+    if not normalized:
+        return False
+    for candidate in candidates:
+        candidate_normalized = _normalized_record_path(candidate)
+        if (
+            candidate_normalized
+            and (
+                normalized == candidate_normalized
+                or normalized.endswith(candidate_normalized)
+                or candidate_normalized.endswith(normalized)
+            )
+        ):
+            return True
+    return False
+
+
+def _correction_ready_for_record(correction: dict[str, Any]) -> bool:
+    status_after = (
+        correction.get("status_after_correction")
+        if isinstance(correction.get("status_after_correction"), dict)
+        else {}
+    )
+    prw_repair = correction.get("prw_repair") if isinstance(correction.get("prw_repair"), dict) else {}
+    return (
+        str(status_after.get("wiki_quality_status") or "").strip() in _PRW_REVIEW_READY_STATUSES
+        and str(prw_repair.get("status") or "").strip() == "completed"
+    )
+
+
+def _record_supersedes_correction_repair(wiki_record: dict[str, Any], correction: dict[str, Any]) -> bool:
+    prw_repair = correction.get("prw_repair") if isinstance(correction.get("prw_repair"), dict) else {}
+    if not prw_repair or str(prw_repair.get("status") or "").strip() != "completed":
+        return False
+    record_time = _parse_record_time(wiki_record.get("recorded_at"))
+    repair_time = _parse_record_time(prw_repair.get("completed_at"))
+    if record_time is None or repair_time is None or record_time <= repair_time:
+        return False
+    final_source_review = (
+        wiki_record.get("final_source_review")
+        if isinstance(wiki_record.get("final_source_review"), dict)
+        else {}
+    )
+    if final_source_review.get("status") != "verified":
+        return False
+    refreshed = prw_repair.get("final_source_reviews_refreshed")
+    if isinstance(refreshed, list) and refreshed:
+        return _path_matches_any(str(final_source_review.get("path") or ""), refreshed)
+    return True
+
+
 def _correction_affects_slug(correction: dict[str, Any], slug: str) -> tuple[bool, dict[str, Any]]:
     expected_record_suffix = f"_epi/raw/{slug}/wiki-ingest-record.json"
     if correction.get("paper_slug") == slug:
@@ -455,7 +528,7 @@ def _correction_affects_slug(correction: dict[str, Any], slug: str) -> tuple[boo
     return False, {}
 
 
-def _record_correction_check(vault_path: Path, slug: str) -> dict[str, Any] | None:
+def _record_correction_check(vault_path: Path, slug: str, paper_root: Path) -> dict[str, Any] | None:
     corrections_root = vault_path / "_epi" / "meta" / "record-corrections"
     matches: list[tuple[Path, dict[str, Any], dict[str, Any]]] = []
     try:
@@ -474,18 +547,25 @@ def _record_correction_check(vault_path: Path, slug: str) -> dict[str, Any] | No
     if not matches:
         return None
     path, correction, affected_paper = matches[-1]
+    wiki_record = _read_json(paper_root / "wiki-ingest-record.json") or {}
+    if _record_supersedes_correction_repair(wiki_record, correction):
+        return None
     status_after = (
         correction.get("status_after_correction")
         if isinstance(correction.get("status_after_correction"), dict)
         else {}
     )
     action_taken = correction.get("action_taken") if isinstance(correction.get("action_taken"), dict) else {}
+    prw_repair = correction.get("prw_repair") if isinstance(correction.get("prw_repair"), dict) else {}
     details = {
         "path": str(path),
         "correction_type": correction.get("correction_type"),
         "wiki_quality_status": status_after.get("wiki_quality_status"),
         "record_status_interpretation": status_after.get("record_status_interpretation"),
     }
+    if prw_repair:
+        details["prw_repair_status"] = prw_repair.get("status")
+        details["prw_repair_completed_at"] = prw_repair.get("completed_at")
     staging_location = (
         affected_paper.get("staging_location")
         or correction.get("staging_location")
@@ -495,6 +575,13 @@ def _record_correction_check(vault_path: Path, slug: str) -> dict[str, Any] | No
         details["staging_location"] = staging_location
     if len(matches) > 1:
         details["matching_correction_count"] = len(matches)
+    if _correction_ready_for_record(correction):
+        return _check_run(
+            "record-correction",
+            "success",
+            "Corrected wiki ingest record has completed PRW review; rerun EPI record-wiki-ingest to replace the premature record.",
+            details=details,
+        )
     return _check_run(
         "record-correction",
         "action_required",
@@ -608,7 +695,7 @@ def build_paper_gate(vault_path: Path, slug: str) -> dict[str, Any]:
     promotion_check = _completion_record_check(paper_root)
     if promotion_check is not None:
         check_runs.append(promotion_check)
-        correction_check = _record_correction_check(vault_path, slug)
+        correction_check = _record_correction_check(vault_path, slug, paper_root)
         if correction_check is not None:
             check_runs.append(correction_check)
     elif (critic_outcome == "pass" or not critic_required) and plan and _suite_conclusion(check_runs) == "success":
@@ -653,6 +740,10 @@ def _next_action(
     correction_check: dict[str, Any] | None = None,
 ) -> str:
     if correction_check is not None:
+        if correction_check.get("conclusion") == "success":
+            if plan and _is_agent_handoff_plan(plan):
+                return "run-wiki-ingest-agent"
+            return "repair-staging-to-wiki-handoff"
         return "run-prw-review"
     if promotion_check and promotion_check.get("conclusion") == "success":
         details = promotion_check.get("details") if isinstance(promotion_check.get("details"), dict) else {}
@@ -677,6 +768,8 @@ def _gate_status(
     correction_check: dict[str, Any] | None = None,
 ) -> str:
     if correction_check is not None:
+        if correction_check.get("conclusion") == "success" and next_action == "run-wiki-ingest-agent":
+            return "ready_for_wiki_ingest_agent"
         return "wiki_ingest_record_corrected"
     if promotion_check and promotion_check.get("conclusion") == "success":
         details = promotion_check.get("details") if isinstance(promotion_check.get("details"), dict) else {}

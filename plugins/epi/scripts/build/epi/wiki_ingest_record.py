@@ -41,6 +41,7 @@ _OBSIDIAN_URI_SOURCE_PDF_PATTERN = re.compile(
     r"\[[^\]]+\]\(obsidian://open\?[^)]*file=_epi%2Fraw%2F(?P<slug>[^%/)]+)%2Fpaper\.pdf(?:[&#][^)]*)?\)",
     re.IGNORECASE,
 )
+PRW_RECORD_REQUEST_SCHEMA_VERSION = "prw-record-request-v1"
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -470,6 +471,157 @@ def _resolve_final_source_review_path(
     return candidates[0] if candidates else None
 
 
+def _resolve_vault_file(vault_path: Path, value: str | Path, *, description: str) -> tuple[Path, str]:
+    text = str(value or "").strip()
+    if not text:
+        raise ValueError(f"{description} path must not be empty")
+    candidate = Path(text)
+    resolved = candidate.resolve() if candidate.is_absolute() else (vault_path / candidate).resolve()
+    try:
+        relative_path = resolved.relative_to(vault_path).as_posix()
+    except ValueError as exc:
+        raise ValueError(f"{description} path must stay inside vault: {value}") from exc
+    return resolved, relative_path
+
+
+def _load_prw_record_request(vault_path: Path, request_path: str | Path) -> tuple[dict[str, Any], Path, str]:
+    resolved, relative_path = _resolve_vault_file(vault_path, request_path, description="PRW record request")
+    try:
+        payload = json.loads(resolved.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"missing PRW record request: {resolved}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"PRW record request is invalid JSON: {resolved}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"PRW record request must be a JSON object: {resolved}")
+    return payload, resolved, relative_path
+
+
+def _request_dict(payload: dict[str, Any], key: str) -> dict[str, Any]:
+    value = payload.get(key)
+    if not isinstance(value, dict):
+        raise ValueError(f"PRW record request must include {key} object")
+    return value
+
+
+def _request_string(payload: dict[str, Any], key: str) -> str:
+    value = str(payload.get(key) or "").strip()
+    if not value:
+        raise ValueError(f"PRW record request must include {key}")
+    return value
+
+
+def _validate_prw_request_pages(vault_path: Path, payload: dict[str, Any]) -> list[str]:
+    final_pages = payload.get("final_pages")
+    if not isinstance(final_pages, list) or not final_pages:
+        raise ValueError("PRW record request must include final_pages[]")
+    pages: list[str] = []
+    seen: set[str] = set()
+    for index, item in enumerate(final_pages, start=1):
+        if not isinstance(item, dict):
+            raise ValueError(f"PRW record request final_pages[{index}] must be an object")
+        relative_path = str(item.get("relative_path") or item.get("path") or "").replace("\\", "/").strip()
+        if not relative_path:
+            raise ValueError(f"PRW record request final_pages[{index}] must include relative_path")
+        expected_hash = str(item.get("sha256") or "").strip()
+        if not expected_hash:
+            raise ValueError(f"PRW record request final_pages[{index}] must include sha256")
+        page_record = _resolve_page(vault_path, relative_path)
+        if page_record["relative_path"] in seen:
+            raise ValueError("PRW record request duplicate final page: " + page_record["relative_path"])
+        seen.add(page_record["relative_path"])
+        if page_record["sha256"] != expected_hash:
+            raise ValueError("PRW record request final page sha256 mismatch: " + page_record["relative_path"])
+        pages.append(page_record["relative_path"])
+    return pages
+
+
+def _validate_prw_request_source_review(
+    *,
+    vault_path: Path,
+    staging_root: Path,
+    payload: dict[str, Any],
+) -> Path:
+    final_source_review = _request_dict(payload, "final_source_review")
+    source_review_path = _resolve_review_candidate(
+        str(final_source_review.get("path") or ""),
+        vault_path=vault_path,
+        staging_root=staging_root,
+    )
+    if not source_review_path.is_file():
+        raise FileNotFoundError(f"missing PRW record request final source review: {source_review_path}")
+    expected_hash = str(final_source_review.get("sha256") or "").strip()
+    if not expected_hash:
+        raise ValueError("PRW record request final_source_review must include sha256")
+    actual_hash = file_sha256(source_review_path)
+    if actual_hash != expected_hash:
+        raise ValueError("PRW record request final-source-review sha256 mismatch: " + str(source_review_path))
+    return source_review_path
+
+
+def _prw_source_request_metadata(
+    *,
+    payload: dict[str, Any],
+    request_path: Path,
+    relative_path: str,
+) -> dict[str, Any]:
+    metadata = {
+        "schema_version": payload.get("schema_version"),
+        "request_id": payload.get("request_id"),
+        "status": payload.get("status"),
+        "automation_mode": payload.get("automation_mode") or "ask",
+        "path": str(request_path),
+        "relative_path": relative_path,
+        "sha256": file_sha256(request_path),
+    }
+    for key in ["recommended_command", "correction_id"]:
+        if payload.get(key):
+            metadata[key] = payload.get(key)
+    if isinstance(payload.get("prw_task"), dict):
+        metadata["prw_task"] = payload.get("prw_task")
+    return metadata
+
+
+def create_wiki_ingest_record_from_prw_request(
+    vault_path: Path,
+    request_path: str | Path,
+    *,
+    notes: str | None = None,
+) -> dict[str, Any]:
+    vault_path = vault_path.resolve()
+    payload, resolved_request_path, relative_request_path = _load_prw_record_request(vault_path, request_path)
+    if payload.get("schema_version") != PRW_RECORD_REQUEST_SCHEMA_VERSION:
+        raise ValueError("PRW record request has unsupported schema_version")
+    if payload.get("status") != "ready_for_epi_record":
+        raise ValueError("PRW record request status must be ready_for_epi_record")
+    slug = _request_string(payload, "paper_slug")
+    staging_root = staging_paper_root(vault_path, slug)
+    pages = _validate_prw_request_pages(vault_path, payload)
+    source_review_path = _validate_prw_request_source_review(
+        vault_path=vault_path,
+        staging_root=staging_root,
+        payload=payload,
+    )
+    human_approval = _request_dict(payload, "human_approval")
+    approved_by = str(human_approval.get("approved_by") or "").strip()
+    if not approved_by:
+        raise ValueError("PRW record request human_approval must include approved_by")
+    source_request = _prw_source_request_metadata(
+        payload=payload,
+        request_path=resolved_request_path,
+        relative_path=relative_request_path,
+    )
+    return create_wiki_ingest_record(
+        vault_path,
+        slug,
+        pages,
+        approved_by=approved_by,
+        notes=notes,
+        source_review_path=source_review_path,
+        source_request=source_request,
+    )
+
+
 def _read_required_json(path: Path) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -694,6 +846,7 @@ def create_wiki_ingest_record(
     approved_by: str,
     notes: str | None = None,
     source_review_path: str | Path | None = None,
+    source_request: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     vault_path = vault_path.resolve()
     if not str(approved_by or "").strip():
@@ -890,6 +1043,8 @@ def create_wiki_ingest_record(
         record_payload["paths"]["final_source_review"] = str(resolved_source_review_path)
     if notes:
         record_payload["notes"] = notes
+    if source_request is not None:
+        record_payload["source_request"] = source_request
 
     raw_record_path = paper_root / "wiki-ingest-record.json"
     staging_record_path = staging_root / "wiki-ingest-record.json"

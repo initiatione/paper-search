@@ -31,8 +31,9 @@ Use this path when the user asks to 重写某页, 重写页面, rewrite formal p
    - Relationship or reusable-knowledge changes, including new formulas, mechanisms, metrics, datasets, or distinctions.
    - Hash/provenance drift after markdown edits.
 6. Create a new `derivations/` or `concepts/` node when reusable knowledge would otherwise remain trapped inside one reference page.
-7. Refresh manifest or `.manifest.json`, `final-source-review.json`, staging/raw `wiki-ingest-record.json`, `index.md`, `log.md`, and `hot.md` in the same run.
-8. Run or report `qmd update` and `qmd embed`; confirm `_epi/` remains outside the formal graph/index when the vault contract requires that boundary.
+7. Refresh manifest or `.manifest.json`, `final-source-review.json`, `index.md`, `log.md`, and `hot.md` in the same run. Read previous `wiki-ingest-record.json` only as provenance and reverse-dependency evidence.
+8. Report EPI record readiness. PRW records readiness; EPI writes or replaces `wiki-ingest-record.json` through `record-wiki-ingest`. If the update leaves pages record-ready, write `_epi/staging/papers/<paper-slug>/prw-record-request.json` with `schema_version: prw-record-request-v1`, `automation_mode: ask`, current final page hashes, `final-source-review.json` hash, and `record-wiki-ingest --from-prw-request ...`; PRW writes the request artifact; EPI consumes it.
+9. Run or report `qmd update` and `qmd embed`; confirm `_epi/` remains outside the formal graph/index when the vault contract requires that boundary.
 
 ## Relink And Maintenance
 

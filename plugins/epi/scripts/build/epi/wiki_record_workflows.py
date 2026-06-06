@@ -20,7 +20,7 @@ from epi.promote_to_wiki import promote_paper, rollback_promotion
 from epi.report_run import write_report
 from epi.run_index import refresh_run_index
 from epi.wiki_ingest_approval import create_human_approval_record, human_approval_record_path
-from epi.wiki_ingest_record import create_wiki_ingest_record
+from epi.wiki_ingest_record import create_wiki_ingest_record, create_wiki_ingest_record_from_prw_request
 from epi.zotero_sync import sync_zotero_record
 
 _LOCAL_TOOL_VERSION = "epi-local"
@@ -342,23 +342,40 @@ def record_human_approval(
 
 def record_wiki_ingest(
     vault_path: Path,
-    slug: str,
-    pages: list[str],
+    slug: str | None,
+    pages: list[str] | None,
     *,
-    approved_by: str,
+    approved_by: str | None,
     notes: str | None = None,
     source_review_path: str | Path | None = None,
+    from_prw_request: str | Path | None = None,
 ) -> dict:
     vault_path = vault_path.resolve()
     started_at = utc_now()
-    record = create_wiki_ingest_record(
-        vault_path,
-        slug,
-        pages,
-        approved_by=approved_by,
-        notes=notes,
-        source_review_path=source_review_path,
-    )
+    if from_prw_request is not None:
+        record = create_wiki_ingest_record_from_prw_request(
+            vault_path,
+            from_prw_request,
+            notes=notes,
+        )
+        slug = str(record.get("paper_slug") or "").strip()
+    else:
+        if not str(slug or "").strip():
+            raise ValueError("record-wiki-ingest requires --slug unless --from-prw-request is used")
+        if not pages:
+            raise ValueError("record-wiki-ingest requires --page unless --from-prw-request is used")
+        if not str(approved_by or "").strip():
+            raise ValueError("record-wiki-ingest requires --approved-by unless --from-prw-request is used")
+        record = create_wiki_ingest_record(
+            vault_path,
+            str(slug),
+            pages,
+            approved_by=str(approved_by),
+            notes=notes,
+            source_review_path=source_review_path,
+        )
+    if not slug:
+        raise ValueError("record-wiki-ingest could not resolve paper slug")
     run_id, run_dir = _new_run_dir(vault_path, "record-wiki-ingest")
     paper_root = raw_paper_root(vault_path, slug)
     staging_root = staging_paper_root(vault_path, slug)
@@ -382,6 +399,9 @@ def record_wiki_ingest(
     }
     if final_source_review_path is not None:
         input_artifacts["final-source-review.json"] = final_source_review_path
+    source_request = record.get("source_request") if isinstance(record.get("source_request"), dict) else {}
+    if source_request.get("path"):
+        input_artifacts["prw-record-request.json"] = Path(str(source_request["path"]))
     zotero_results = _zotero_record_only(vault_path, paper_root)
     _write_wiki_ingest_record_report(
         run_dir,

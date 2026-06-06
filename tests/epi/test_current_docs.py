@@ -106,9 +106,10 @@ def test_root_plugin_development_rules_require_version_and_doc_sync():
         assert phrase in rules
 
     for command in [
-        "python -m pytest tests\\paper_research_wiki\\test_plugin_contract.py plugins\\epi\\tests\\test_skill_bundle_contract.py -q",
-        "validate_plugin.py D:\\paper-search\\plugins\\epi",
-        "validate_plugin.py D:\\paper-search\\plugins\\PRW",
+        "python -m pytest tests\\paper_research_wiki\\test_plugin_contract.py plugins\\epi\\tests\\test_skill_bundle_contract.py tests\\test_marketplace_manifest.py -q",
+        "python -m json.tool plugins\\epi\\.codex-plugin\\plugin.json",
+        "python -m json.tool plugins\\PRW\\.codex-plugin\\plugin.json",
+        "PLUGIN_VALIDATE_SCRIPT",
         "git diff --check",
     ]:
         assert command in rules
@@ -155,7 +156,7 @@ def test_progress_doc_records_status_verification_and_next_steps():
     text = _read("progress.md")
 
     assert "# EPI 插件进度说明" in text
-    assert "更新时间：2026-06-05" in text
+    assert "更新时间：2026-06-06" in text
     assert "高质量论文收集和整理" in text
     assert "config-setup" in text
     assert "paper-quality-critic" in text
@@ -345,8 +346,8 @@ def test_docs_document_paper_search_mcp_fallback_and_source_coverage():
         ]
     )
 
-    assert manifest["version"] == "0.1.12"
-    assert "v0.1.12" in manifest["interface"]["shortDescription"]
+    assert manifest["version"] == "0.1.14"
+    assert "v0.1.14" in manifest["interface"]["shortDescription"]
     for phrase in [
         "search_papers",
         "source_coverage",
@@ -392,7 +393,9 @@ def test_docs_document_paper_search_mcp_fallback_and_source_coverage():
         "_epi/quarantine/papers",
         "quarantine",
         "source capability matrix",
+        "0.1.14",
         "0.1.11",
+        "0.1.13",
         "0.1.12",
         "0.1.10",
         "0.1.8",
@@ -461,6 +464,60 @@ def test_human_approval_requires_single_readable_approval_report():
         assert "谨慎沉淀" in text
         assert "暂不沉淀" in text
         assert "raw JSON" in text
+
+
+def test_docs_document_prw_reviewed_record_correction_return_path():
+    workflow = _read("workflow.md")
+    linkage = _read("epi-linkage.md")
+    approval = (
+        PLUGIN_ROOT
+        / "skills"
+        / "paper-ingest"
+        / "workflows"
+        / "approval-and-trigger.md"
+    ).read_text(encoding="utf-8")
+    paper_ingest = (PLUGIN_ROOT / "skills" / "paper-ingest" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    combined = "\n".join([workflow, linkage, approval, paper_ingest])
+
+    for phrase in [
+        "premature-wiki-ingest-record",
+        "record-corrections",
+        "pending-prw-review",
+        "prw-reviewed-ready-for-epi-record",
+        "ready_for_wiki_ingest_agent",
+        "rerun `record-wiki-ingest`",
+        "replace the premature record",
+        "PRW repairs pages and `final-source-review.json`; EPI writes or replaces `wiki-ingest-record.json`",
+    ]:
+        assert phrase in combined
+
+
+def test_docs_document_prw_record_request_ask_mode_automation():
+    workflow = _read("workflow.md")
+    linkage = _read("epi-linkage.md")
+    approval = (
+        PLUGIN_ROOT
+        / "skills"
+        / "paper-ingest"
+        / "workflows"
+        / "approval-and-trigger.md"
+    ).read_text(encoding="utf-8")
+    paper_ingest = (PLUGIN_ROOT / "skills" / "paper-ingest" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    combined = "\n".join([workflow, linkage, approval, paper_ingest])
+
+    for phrase in [
+        "prw-record-request.json",
+        "prw-record-request-v1",
+        "automation_mode=ask",
+        "record-wiki-ingest --from-prw-request",
+        "EPI validates live page hashes",
+        "PRW writes the request artifact; EPI consumes it",
+    ]:
+        assert phrase in combined
 
 
 def test_epi_literature_wiki_contract_documents_seven_page_families_and_research_fields():
