@@ -666,3 +666,23 @@ def test_marketplace_and_readme_describe_profile_driven_generic_epi():
     assert "robotics embodied intelligence control" not in workflow
     assert "Claude" in overview
     assert "Codex" in overview
+
+
+def test_docs_document_resumable_reviews_and_evidence_index():
+    workflow = (ROOT / "plugins" / "epi" / "docs" / "workflow.md").read_text(encoding="utf-8")
+    structure = (ROOT / "plugins" / "epi" / "docs" / "structure.md").read_text(encoding="utf-8")
+    discovery = (
+        ROOT / "plugins" / "epi" / "skills" / "paper-discovery" / "workflows" / "run-discovery.md"
+    ).read_text(encoding="utf-8")
+    ingest = (
+        ROOT / "plugins" / "epi" / "skills" / "paper-ingest" / "workflows" / "prepare-ranked.md"
+    ).read_text(encoding="utf-8")
+    provenance = (
+        ROOT / "plugins" / "epi" / "skills" / "wiki-provenance" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    combined = "\n".join([workflow, structure, discovery, ingest, provenance])
+    assert "_epi/reviews" in combined
+    assert "default resume" in combined or "默认自动 resume" in combined
+    assert "--refresh" in combined
+    assert "evidence-index.json" in combined
+    assert "_epi/meta/evidence-index.json" in combined

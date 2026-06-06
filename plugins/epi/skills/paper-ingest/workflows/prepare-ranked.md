@@ -57,6 +57,8 @@ Failed acquire attempts that never downloaded `paper.pdf` are not library entrie
 
 For slow MinerU jobs, pass `--mineru-timeout <seconds>` or set `EPI_MINERU_TIMEOUT`. Complete parse reuse requires `parse-record.json status=success`, not just a Markdown file.
 
+After MinerU parse success, EPI writes `_epi/raw/<slug>/evidence-index.json` and refreshes `_epi/meta/evidence-index.json`. Treat `evidence-index.json` as a full-text page/section/chunk locator for later claim support and wiki provenance; it is generated from MinerU Markdown and does not replace `paper.pdf`, `mineru/<slug>.md`, `mineru/paper.tex`, `mineru/images/*`, or `mineru/mineru-manifest.json`.
+
 ## Source-First Handoff Check
 
 Before final wiki ingest, run:
@@ -77,6 +79,8 @@ The handoff must require source artifacts:
 
 Optional evidence aids when generated:
 
+- `evidence-index.json`
+- `_epi/meta/evidence-index.json`
 - `paper-search-read-preview.txt`
 - `reader/evidence-map.json`
 - `reader/claim-support.json`

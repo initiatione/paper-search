@@ -64,3 +64,14 @@ def test_epi_linkage_doc_matches_current_dry_run_artifact_names():
     assert "_epi/runs/<run-id>/rank.json" in text
     assert "_epi/runs/<run-id>/candidates.normalized.json" not in text
     assert "_epi/runs/<run-id>/candidates.ranked.json" not in text
+
+
+def test_epi_linkage_documents_review_sessions_and_evidence_index():
+    text = LINKAGE_DOC.read_text(encoding="utf-8")
+    assert "_epi/reviews/<review-id>/" in text
+    assert "candidates.json" in text
+    assert "shortlist.json" in text
+    assert "fetch_plan.json" in text
+    assert "coverage.json" in text
+    assert "_epi/raw/<slug>/evidence-index.json" in text
+    assert "_epi/meta/evidence-index.json" in text

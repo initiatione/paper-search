@@ -326,6 +326,36 @@ def test_build_wiki_ingest_handoff_resolves_contract_and_agent_checklist(tmp_pat
     assert any("Do not write final pages" in item for item in handoff["agent_checklist"])
 
 
+def test_wiki_ingest_handoff_exposes_evidence_index_locator(tmp_path):
+    vault = tmp_path / "vault"
+    slug = _seed_agent_handoff(vault)
+    paper_root = vault / "_epi" / "raw" / slug
+    evidence_index_path = paper_root / "evidence-index.json"
+    _write_json(
+        evidence_index_path,
+        {
+            "schema_version": "epi-paper-evidence-index-v1",
+            "paper_slug": slug,
+            "chunks": [{"chunk_id": f"{slug}:c0001", "text": "Fixture evidence"}],
+            "input_hashes": {"mineru_markdown": "abc"},
+            "warnings": [],
+        },
+    )
+    brief_path = vault / "_epi" / "staging" / "papers" / slug / "wiki-ingest-brief.json"
+    brief = json.loads(brief_path.read_text(encoding="utf-8"))
+    evidence = brief.setdefault("source_bundle", {}).setdefault("evidence", {})
+    evidence["full_text_evidence_index"] = "evidence-index.json"
+    evidence["full_text_chunk_count"] = 1
+    evidence["vault_evidence_index"] = "_epi/meta/evidence-index.json"
+    _write_json(brief_path, brief)
+
+    handoff = build_wiki_ingest_handoff(vault, slug)
+
+    assert handoff["evidence_index"]["paper"] == "evidence-index.json"
+    assert handoff["evidence_index"]["chunk_count"] == 1
+    assert any("evidence-index.json" in item for item in handoff["agent_checklist"])
+
+
 def test_build_wiki_ingest_handoff_is_ready_after_recorded_human_approval(tmp_path):
     vault = tmp_path / "vault"
     slug = _seed_agent_handoff(vault)

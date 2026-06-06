@@ -106,6 +106,7 @@ def _agent_checklist(
     evidence_bundle = source_bundle.get("evidence", {}) if isinstance(source_bundle.get("evidence"), dict) else {}
     claim_support_artifact = evidence_bundle.get("claim_support_artifact")
     evidence_map_artifact = evidence_bundle.get("exact_evidence_artifact")
+    full_text_evidence_index = evidence_bundle.get("full_text_evidence_index")
     optional_evidence_aids = source_bundle.get("optional_evidence_aids") or []
     formula_figure_review = source_bundle.get("formula_figure_review") or {}
     final_source_review_contract = (
@@ -174,6 +175,13 @@ def _agent_checklist(
         "Respect vault-local staged writes, link format, language policy, taxonomy, and frontmatter schema.",
         "Do not write final pages from EPI suggested routes directly; EPI must only write internal underscore artifacts.",
     ]
+    if full_text_evidence_index:
+        checklist.insert(
+            8,
+            "Use full-text evidence-index locator aid "
+            + str(full_text_evidence_index)
+            + " to find page/section/chunk evidence, then verify important claims against MinerU Markdown, TeX, images, manifest, and paper.pdf before final prose.",
+        )
     brand_neutrality = execution_agent_policy.get("brand_neutrality")
     if brand_neutrality:
         checklist.insert(1, "Executor policy: " + str(brand_neutrality))
@@ -246,6 +254,12 @@ def build_wiki_ingest_handoff(vault_path: Path, slug: str) -> dict[str, Any]:
         if isinstance(brief.get("final_source_review_contract"), dict)
         else {}
     )
+    source_bundle = brief.get("source_bundle") if isinstance(brief.get("source_bundle"), dict) else {}
+    evidence_bundle = (
+        source_bundle.get("evidence")
+        if isinstance(source_bundle.get("evidence"), dict)
+        else {}
+    )
     return {
         "title": "EPI Wiki Ingest Handoff",
         "paper_slug": slug,
@@ -298,6 +312,13 @@ def build_wiki_ingest_handoff(vault_path: Path, slug: str) -> dict[str, Any]:
             "agent_handoff_paths": plan.get("agent_handoff_paths") or [],
         },
         "final_source_review_contract": source_review_contract,
+        "evidence_index": {
+            "paper": evidence_bundle.get("full_text_evidence_index"),
+            "vault": evidence_bundle.get("vault_evidence_index"),
+            "chunk_count": evidence_bundle.get("full_text_chunk_count", 0),
+            "input_hashes": evidence_bundle.get("full_text_input_hashes", {}),
+            "warnings": evidence_bundle.get("full_text_warnings", []),
+        },
         "contract_files": _contract_file_status(vault_path),
         "framework_references": framework_references,
         "wiki_rule_source_model": rule_source_model,
