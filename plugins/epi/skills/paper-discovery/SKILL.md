@@ -1,14 +1,14 @@
 ---
 name: paper-discovery
 description: >
-  Use when the user asks to find academic papers with EPI, including "找最新论文",
+  Use when the user asks Paper Source / PS to find academic papers with EPI, including "找最新论文",
   "找高质量论文", "推荐优先阅读论文", one-off search/rank dry-runs, review
   exclusion, acquisition, MinerU parsing, or default fast source-staging preparation.
 ---
 
 # Academic Paper Discovery
 
-Use for EPI discovery and reading-priority ranking. This skill routes the research mode, search, normalize/filter/classify/rank, and report steps. It may hand off to source preparation, but it must not run reader, critic, or final wiki writing unless another routed skill explicitly takes over.
+Use for Paper Source / PS discovery and reading-priority ranking. This skill routes the research mode, search, normalize/filter/classify/rank, and report steps. It may hand off to source preparation, but it must not run reader, critic, or final wiki writing unless another routed skill explicitly takes over.
 
 For ongoing topic monitoring, "what is new since last run/date", backlog priority, breadth coverage, or systematic-review coverage, use `topic-tracking` as the outer workflow and keep this skill as the retrieval/ranking layer.
 

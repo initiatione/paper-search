@@ -94,13 +94,21 @@ def test_root_plugin_development_rules_require_version_and_doc_sync():
         "任何插件改动都必须同步版本信息",
         "plugins/<plugin>/.codex-plugin/plugin.json",
         "interface.shortDescription",
+        "PaperFlow",
+        "Paper Source",
+        "Paper Wiki",
+        "display name",
+        "machine-facing name",
+        "`epi`",
+        "`prw`",
+        "PS/PW",
         "开发完成后必须同步文档信息",
         "$skill-creator",
         "D:\\paper-search\\.codex_tmp_refs\\skill-based-architecture",
         "rules/workflows/references 分层",
         "禁止把安装 cache 当作开发源",
         "源码验证通过不等于用户运行态已更新",
-        "PRW 不初始化、修复、reset 或静默创建 vault 结构",
+        "Paper Wiki 不初始化、修复、reset 或静默创建 vault 结构",
         "每次插件开发收尾必须报告",
     ]:
         assert phrase in rules
@@ -115,10 +123,31 @@ def test_root_plugin_development_rules_require_version_and_doc_sync():
         assert command in rules
 
 
+def test_root_readme_documents_paperflow_stage1_names_and_legacy_aliases():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    for phrase in [
+        "PaperFlow",
+        "Paper Source (formerly EPI)",
+        "Paper Wiki (formerly PRW)",
+        "PS",
+        "PW",
+        "`paper-search`",
+        "`epi`",
+        "`prw`",
+        "machine-facing",
+        "legacy alias",
+    ]:
+        assert phrase in readme
+
+    assert "Paper Source 机器名" in readme
+    assert "Paper Wiki 机器名" in readme
+
+
 def test_structure_doc_covers_current_plugin_boundaries():
     text = _read("structure.md")
 
-    assert "# EPI 插件结构说明" in text
+    assert "# Paper Source / EPI 插件结构说明" in text
     assert "<plugin-root>" in text
     assert ".codex-plugin/plugin.json" in text
     assert "scripts/build/epi/" in text
@@ -721,16 +750,22 @@ def test_marketplace_and_readme_describe_profile_driven_generic_epi():
     overview = _read("overview.zh.md")
 
     manifest_text = json.dumps(manifest, ensure_ascii=False)
+    assert manifest["interface"]["displayName"] == "Paper Source"
+    assert "Paper Source" in manifest_text
+    assert "formerly EPI" in manifest_text
+    assert "Paper Wiki" in manifest_text
+    assert "Paper Source (formerly EPI)" in manifest["description"]
+    assert "Paper Source (formerly EPI)" in manifest["interface"]["shortDescription"]
     assert "profile-driven academic paper discovery" in manifest_text
     assert "user's config plus the current request" in manifest_text
     assert "reader/critic review" in manifest_text
     assert "low-burden reading reports" in manifest_text
-    assert "wiki handoff" in manifest_text
+    assert "Paper Wiki handoff" in manifest_text
     assert "quality evolution" in manifest_text
     assert "MinerU parsing" in manifest_text
-    assert "wiki handoff" in manifest_text
-    assert "EPI-compatible PRW wiki" in manifest["description"]
-    assert "brief-first hand off to PRW" in manifest["interface"]["shortDescription"]
+    assert "Paper Wiki handoff" in manifest_text
+    assert "Paper Wiki-compatible vault" in manifest["description"]
+    assert "hand off to Paper Wiki" in manifest["interface"]["shortDescription"]
     assert "robotics" not in manifest["keywords"]
     assert "embodied-intelligence" not in manifest["keywords"]
     assert "control" not in manifest["keywords"]
@@ -743,7 +778,7 @@ def test_marketplace_and_readme_describe_profile_driven_generic_epi():
     assert "not a separate marketplace plugin" in readme
     assert manifest["version"] in manifest["interface"]["shortDescription"]
 
-    assert "EPI 是通用论文插件，不默认任何学科方向" in workflow
+    assert "Paper Source (formerly EPI) 是通用论文插件，不默认任何学科方向" in workflow
     assert "Claude" in workflow
     assert "Codex" in workflow
     assert 'dry-run --query "<your topic>"' in workflow
@@ -782,6 +817,52 @@ def test_epi_plugin_description_reflects_full_pipeline():
 
     assert desc != "Search and rank academic papers for an EPI wiki."
     assert any(k in desc for k in ["parse", "MinerU", "critic", "handoff", "wiki ingest"])
+
+
+def test_epi_user_docs_use_paper_source_and_paper_wiki_stage1_names():
+    combined = "\n".join([
+        _read("workflow.md"),
+        _read("structure.md"),
+        _read("epi-linkage.md"),
+    ])
+
+    for phrase in [
+        "Paper Source",
+        "formerly EPI",
+        "Paper Wiki",
+        "formerly PRW",
+        "PS/PW",
+        "machine-facing name",
+        "`epi`",
+        "`prw`",
+    ]:
+        assert phrase in combined
+
+    for phrase in [
+        "wiki-ingest-brief.json",
+        "wiki_deposition_task.json is legacy",
+        "canonical EPI-to-PRW handoff",
+    ]:
+        assert phrase in combined
+
+
+def test_stage1_does_not_create_ps_pw_machine_entrypoints():
+    checked_files = [
+        ROOT / "marketplace.json",
+        ROOT / ".agents" / "plugins" / "marketplace.json",
+        ROOT / "plugins" / "epi" / ".codex-plugin" / "plugin.json",
+        ROOT / "plugins" / "PRW" / ".codex-plugin" / "plugin.json",
+        ROOT / "plugins" / "epi" / "skills" / "routing.yaml",
+        ROOT / "plugins" / "PRW" / "skills" / "routing.yaml",
+    ]
+    combined = "\n".join(path.read_text(encoding="utf-8") for path in checked_files)
+
+    assert ("$" + "PS") not in combined
+    assert ("$" + "PW") not in combined
+    assert ('"name": "' + "ps" + '"') not in combined.lower()
+    assert ('"name": "' + "pw" + '"') not in combined.lower()
+    assert ("name: " + "ps") not in combined.lower()
+    assert ("name: " + "pw") not in combined.lower()
 
 
 def test_orchestrator_uses_write_json_atomic_without_private_alias():

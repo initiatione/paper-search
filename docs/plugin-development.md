@@ -53,6 +53,18 @@
 - 需要运行的验证命令和结果。
 - 是否仍需安装缓存刷新或 marketplace 发布。
 
+## 命名边界
+
+PaperFlow 是 bundle/product 的 display name；当前 marketplace machine-facing name 仍是 `paper-search`。
+
+Paper Source 是 `plugins/epi` 的 display name；当前插件 machine-facing name 仍是 `epi`。EPI 是 legacy alias，至少保留一个 minor 版本周期。
+
+Paper Wiki 是 `plugins/PRW` 的 display name；当前插件 machine-facing name 仍是 `prw`。PRW 是 legacy alias，至少保留一个 minor 版本周期。
+
+PS/PW 只作为自然语言别名和触发短语使用，不新增 `$PS`、`$PW`、`ps`、`pw` 插件或 skill 入口。
+
+阶段 1 禁止改目录名、manifest `name`、artifact schema、CLI/MCP 名称、安装缓存路径或历史字段；只改用户可见 display/copy/routing trigger。凡是指机器名、路径、历史 artifact、legacy compatibility 的位置，保留 `epi` / `prw` / EPI / PRW 并解释清楚。
+
 ## Skill-Based Architecture
 
 插件 skill 结构遵守 skill-based architecture：
@@ -73,10 +85,10 @@
 
 当前两个插件的边界是：
 
-- EPI：论文发现、排序、PDF 获取、MinerU、source bundle、reader/critic、staging、approval/gate/record、`wiki-setup` vault bootstrap。
-- PRW：正式论文 wiki 页面写入、检查、更新、redo/deep extraction、relink、语言 gate、tracking/QMD 兼容和 post-task check。
-- `epi-paper-deposition`：EPI compatibility adapter，不是用户级正式写页主入口。
-- PRW 不初始化、修复、reset 或静默创建 vault 结构；缺 `_epi/`、`_meta/`、`.obsidian`、`.git` 或正式页面根目录时，指回 EPI `wiki-setup`。
+- Paper Source (`epi`, formerly EPI)：论文发现、排序、PDF 获取、MinerU、source bundle、reader/critic、staging、approval/gate/record、`wiki-setup` vault bootstrap。
+- Paper Wiki (`prw`, formerly PRW)：正式论文 wiki 页面写入、检查、更新、redo/deep extraction、relink、语言 gate、tracking/QMD 兼容和 post-task check。
+- `epi-paper-deposition`：Paper Source/EPI compatibility adapter，不是用户级正式写页主入口。
+- Paper Wiki 不初始化、修复、reset 或静默创建 vault 结构；缺 `_epi/`、`_meta/`、`.obsidian`、`.git` 或正式页面根目录时，指回 Paper Source/EPI `wiki-setup`。
 
 任何跨插件改动都必须同时检查 EPI 生成 handoff、EPI routing、PRW routing、PRW workflow 和相关测试，防止职责漂移。
 

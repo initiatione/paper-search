@@ -1,7 +1,7 @@
 ---
 name: wiki-setup
 description: >
-  Use when initializing, inspecting, repairing, or resetting an EPI paper wiki vault,
+  Use when initializing, inspecting, repairing, or resetting a Paper Source / EPI paper wiki vault,
   including "初始化 vault", "修复 vault", "重置 vault", graph visibility,
   destructive reset safety, or misdelete recovery.
 ---

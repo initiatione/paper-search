@@ -1,7 +1,7 @@
 {
   "name": "paper-search",
   "interface": {
-    "displayName": "Paper Search"
+    "displayName": "PaperFlow"
   },
   "plugins": [
     {

@@ -1,14 +1,14 @@
 ---
 name: paper-ingest
 description: >
-  Use when the user asks to advance selected EPI papers, such as "推进论文",
+  Use when the user asks Paper Source / PS to advance selected EPI papers, such as "推进论文",
   "生成阅读报告", "准备 wiki handoff", "沉淀前准备", source artifacts,
   optional readers/critics, source-staging reports, approval, or wiki-ingest handoff.
 ---
 
 # Paper Ingest
 
-Use after dry-run ranking selects papers. Chain goal in `docs\epi-linkage.md`: high-quality collection, LLM Wiki deposition, low-burden reading report.
+Use after dry-run ranking selects papers. Paper Source / PS chain goal in `docs\epi-linkage.md`: high-quality collection, LLM Wiki deposition, low-burden reading report.
 
 If config is missing, stop and use `config-setup`. See `docs\config.md`.
 

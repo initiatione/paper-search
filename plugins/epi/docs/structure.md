@@ -1,14 +1,14 @@
-# EPI 插件结构说明
+# Paper Source / EPI 插件结构说明
 
-本文档描述当前 EPI 插件的源代码结构、运行边界和主要产物位置。它回答“文件在哪里、谁负责什么、哪些目录不能被当成最终知识库写入入口”。文档权威分工（doc map）见 `docs/epi-linkage.md` 顶部；本文档只承担结构说明。若需要一份中文导航，先读 `docs/overview.zh.md`。
+本文档描述当前 Paper Source/EPI 插件的源代码结构、运行边界和主要产物位置。Paper Source 是用户可见名，EPI 是 legacy alias；当前 machine-facing name 仍是 `epi`。它回答“文件在哪里、谁负责什么、哪些目录不能被当成最终知识库写入入口”。文档权威分工（doc map）见 `docs/epi-linkage.md` 顶部；本文档只承担结构说明。若需要一份中文导航，先读 `docs/overview.zh.md`。
 
 ## 总体边界
 
-EPI 是 Codex 插件源码包，位于 `<plugin-root>`。插件的目标链路是：按用户画像/config 衍生高质量论文发现和排序 -> raw artifact 留痕 -> Reader/Critic 证据审查 -> staging evidence package -> `wiki-ingest-brief.json` canonical EPI-to-PRW handoff -> PRW `$paper-research-wiki` -> lint/review -> EPI record。`wiki_deposition_task.json is legacy` compatibility only, routed through `epi-paper-deposition` when needed。它是通用学术论文插件，不把任何单一学科写成默认方向。
+Paper Source/EPI 是 Codex 插件源码包，位于 `<plugin-root>`。插件的目标链路是：按用户画像/config 衍生高质量论文发现和排序 -> raw artifact 留痕 -> Reader/Critic 证据审查 -> staging evidence package -> `wiki-ingest-brief.json` canonical EPI-to-PRW handoff -> Paper Wiki/PRW `$paper-research-wiki` -> lint/review -> EPI record。`wiki_deposition_task.json is legacy` compatibility only, routed through `epi-paper-deposition` when needed。它是通用学术论文插件，不把任何单一学科写成默认方向。
 
-EPI 自身不应该把最终 Obsidian 页面路径、标签、合并策略或 staged writes 固定死。最终写入规则来自目标 vault 的 `AGENTS.md` 和根 `_meta/*` contract 文件，并参考个性化 `obsidian-wiki-dev`、`Ar9av/obsidian-wiki`、`kepano/obsidian-skills`。本插件只准备 `_epi/` 内部仓库中的证据、报告、审计记录、brief-first handoff 和 legacy compatibility metadata。
+Paper Source/EPI 自身不应该把最终 Obsidian 页面路径、标签、合并策略或 staged writes 固定死。最终写入规则来自目标 vault 的 `AGENTS.md` 和根 `_meta/*` contract 文件，并参考个性化 `obsidian-wiki-dev`、`Ar9av/obsidian-wiki`、`kepano/obsidian-skills`。本插件只准备 `_epi/` 内部仓库中的证据、报告、审计记录、brief-first handoff 和 legacy compatibility metadata。
 
-新的 sibling 插件包 `prw`（目录 `plugins/PRW`）是面向用户的一体化论文 wiki 助手，并提供公共 skill `$paper-research-wiki`：用户只需要请求 `提取` EPI 论文、`根据 wiki 提问`、`检测` wiki 库、`更新` wiki 库或 `重link` 论文知识。它内部消费 EPI 产出的 `wiki-ingest-brief.json`、source bundle 和 final-source-review contract；`wiki_deposition_task.json is legacy` compatibility only。EPI 保留发现、采集、MinerU、paper-gate、人类批准记录和 `record-wiki-ingest`。
+Sibling 插件包 Paper Wiki/PRW（目录 `plugins/PRW`，machine-facing name `prw`）是面向用户的一体化论文 wiki 助手，并提供公共 skill `$paper-research-wiki`：用户只需要请求 `提取` Paper Source/EPI 论文、`根据 wiki 提问`、`检测` wiki 库、`更新` wiki 库或 `重link` 论文知识。它内部消费 Paper Source/EPI 产出的 `wiki-ingest-brief.json`、source bundle 和 final-source-review contract；`wiki_deposition_task.json is legacy` compatibility only。Paper Source/EPI 保留发现、采集、MinerU、paper-gate、人类批准记录和 `record-wiki-ingest`。
 
 ## 插件包目录
 
