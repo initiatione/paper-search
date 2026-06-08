@@ -1,12 +1,14 @@
-# EPI Workflow
+# Paper Source / EPI Workflow
 
 Use `doctor --json` when install, dependency, or vault state is unclear.
+
+命名说明：Paper Source 是本插件的用户可见名，旧名 EPI 作为 legacy alias 保留；当前 machine-facing name 仍是 `epi`。Paper Wiki 是 sibling wiki 插件的用户可见名，formerly PRW，旧名 PRW 作为 legacy alias 保留；当前 machine-facing name 仍是 `prw`。PS/PW 只是自然语言别名，不新增 dollar-prefixed plugin or skill entrypoint。
 
 中文总览入口见 `docs/overview.zh.md`；主链路和维护契约见 `docs/epi-linkage.md`。本文档是安装后短入口，不复制完整 runbook。
 
 ## Skill-Based Routing And Task Closure
 
-EPI 依照 `skill-based-architecture` 维护轻量多 skill 插件：`plugins/epi/AGENTS.md` 只指向 `skills/routing.yaml`；`skills/routing.yaml` 是 Always Read、route rematch、task_closure、Codex sub-agent permission 和 skill route 分类来源。
+Paper Source/EPI 依照 `skill-based-architecture` 维护轻量多 skill 插件：`plugins/epi/AGENTS.md` 只指向 `skills/routing.yaml`；`skills/routing.yaml` 是 Always Read、route rematch、task_closure、Codex sub-agent permission 和 skill route 分类来源。
 
 每个 skill 必须提供 `agents/openai.yaml`，且 `interface.default_prompt` 必须包含对应 `$skill-name`。步骤性流程放在各自 `workflows/*.md`，并必须从 `skills/routing.yaml` 的 `workflows` 字段可达。
 
@@ -40,7 +42,7 @@ Full command semantics, artifact paths, and safety gates live in `docs/epi-linka
 
 ## Discovery And Source Intake
 
-EPI 是通用论文插件，不默认任何学科方向。`dry-run` derives `query-plan.json` from profile, domains, positive/negative keywords, venue prior, and the current request; AUV、机器人、医学等只能来自用户配置、当前请求或显式领域 hint。
+Paper Source (formerly EPI) 是通用论文插件，不默认任何学科方向。`dry-run` derives `query-plan.json` from profile, domains, positive/negative keywords, venue prior, and the current request; AUV、机器人、医学等只能来自用户配置、当前请求或显式领域 hint。
 
 `dry-run` writes `_epi/runs` and resumable `_epi/reviews`; default resume skips provider calls for the same signature. Use `--refresh` to force provider search. It writes source coverage into `report.json.discovery_context.source_coverage` and `report.md` with `sources_used`, `source_results`, `errors`, `raw_total`, `deduped_total`, `query_count`, `capabilities`, `provider_readiness`, `source_routing`, and `provider_gaps`.
 
@@ -64,21 +66,21 @@ Before recording approval, show one single human-readable 人工确认报告 / a
 
 Record pre-write approval with `record-human-approval --scope run-wiki-ingest-agent`; it writes `human-approval.json` and lets `wiki-ingest-handoff` show `ready_for_agent=true`. `wiki-ingest-trigger` writes a resume package for the current Claude, Codex, or other wiki-capable agent; it does not write final pages.
 
-After PRW or another wiki-capable agent writes final pages and `final-source-review.json`, run `record-wiki-ingest`. PRW writes `prw-record-request.json` in ask-mode automation; EPI consumes it with `record-wiki-ingest --from-prw-request`, validates live page hashes, and writes or replaces `wiki-ingest-record.json`.
+After Paper Wiki/PRW or another wiki-capable agent writes final pages and `final-source-review.json`, run `record-wiki-ingest`. Paper Wiki/PRW writes `prw-record-request.json` in ask-mode automation; Paper Source/EPI consumes it with `record-wiki-ingest --from-prw-request`, validates live page hashes, and writes or replaces `wiki-ingest-record.json`.
 
-If a prior completion is corrected as `premature-wiki-ingest-record`, PRW repairs pages and `final-source-review.json`; EPI writes or replaces `wiki-ingest-record.json` when the correction becomes `prw-reviewed-ready-for-epi-record`.
+If a prior completion is corrected as `premature-wiki-ingest-record`, Paper Wiki/PRW repairs pages and `final-source-review.json`; Paper Source/EPI writes or replaces `wiki-ingest-record.json` when the correction becomes `prw-reviewed-ready-for-epi-record`.
 
 ## Read-Only Wiki Ask
 
-`wiki-ask --question ... --vault <vault>` is a read-only formal graph query CLI. The conversational primary entrypoint is PRW `$paper-research-wiki` route `ask_wiki`; EPI `wiki-ask` is the same-source fallback / 程序化 `--json` entry. 对话场景优先 PRW。
+`wiki-ask --question ... --vault <vault>` is a read-only formal graph query CLI. The conversational primary entrypoint is Paper Wiki/PRW `$paper-research-wiki` route `ask_wiki`; Paper Source/EPI `wiki-ask` is the same-source fallback / 程序化 `--json` entry. 对话场景优先 Paper Wiki。
 
 It retrieves from `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`, expands backlinks/outlinks/aliases/tags/co-links, labels `【Wiki 证据】`, `【综合判断】`, `【推断】`, and `【边界/不确定】`, and reports correction candidates. It does not write `log.md`, formal pages, QMD, `prw-record-request.json`, or EPI artifacts.
 
 ## Literature Wiki Contract
 
-EPI formal deposition targets seven wiki page families: `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`.
+Paper Source/EPI formal deposition targets seven wiki page families: `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`.
 
-Page-family/frontmatter human-readable canonical source is PRW `plugins/PRW/rules/wiki-writing-standard.md` (canonical). This file only keeps an entry summary; full field rules live there.
+Page-family/frontmatter human-readable canonical source is Paper Wiki/PRW `plugins/PRW/rules/wiki-writing-standard.md` (canonical). This file only keeps an entry summary; full field rules live there.
 
 Every formal page must include frontmatter fields `title`, `category`, `page_family`, `tags`, `aliases`, `sources`, `summary`, `provenance`, `base_confidence`, `lifecycle`, `lifecycle_changed`, `tier`, `created`, and `updated`. Initial lifecycle is `draft` or `review-needed`; do not mark pages `source-reviewed` or `verified` before source reread, formula/figure review, wiki-lint, and human stage review actually happen.
 

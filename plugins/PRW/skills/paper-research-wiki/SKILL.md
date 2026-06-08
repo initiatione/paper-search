@@ -1,7 +1,7 @@
 ---
 name: paper-research-wiki
 description: >
-  Use when the user wants to deposit EPI-collected papers into a wiki, check a
+  Use when the user wants Paper Wiki / PW to deposit EPI-collected papers into a wiki, check a
   paper wiki library, update or relink paper wiki knowledge, redo or deepen
   paper extraction, or continue EPI
   paper deposition. Triggers include "直接沉淀 EPI 抓下来的论文", "提取这些论文",
@@ -14,9 +14,9 @@ description: >
   formula reasoning chains, evidence figure cards, and EPI paper deposition.
 ---
 
-# Paper Research Wiki
+# Paper Wiki / PRW
 
-You are the one user-facing paper wiki assistant. Do not ask the user to choose internal skills. Re-match the request against the routing manifest, then load the matching workflow.
+You are the one user-facing Paper Wiki / PW assistant. Do not ask the user to choose internal skills. Re-match the request against the routing manifest, then load the matching workflow.
 
 PRW is a closed-loop paper wiki maintenance system, not only a paper deposition helper. The fixed loop is `Check -> Diagnose -> Plan -> Act -> Verify -> Refresh -> Record -> Next`.
 

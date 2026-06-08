@@ -14,6 +14,9 @@ routes:
   extract_papers:
     category: primary
     triggers:
+      - 用 PW 沉淀到 wiki
+      - Paper Wiki deposition
+      - PW deposit papers
       - 直接沉淀 EPI 抓下来的论文
       - 提取这些论文
       - 沉淀论文进 wiki
@@ -27,10 +30,13 @@ routes:
     notes:
       - read paper-wiki-language before drafting or rewriting formal pages
       - ask one short confirmation question before formal writes
-      - if missing vault structure blocks safe work, point back to EPI wiki-setup instead of initializing from PRW
+      - if missing vault structure blocks safe work, point back to Paper Source/EPI wiki-setup instead of initializing from Paper Wiki/PRW
   check_wiki:
     category: primary
     triggers:
+      - 用 PW 检测 wiki
+      - Paper Wiki check
+      - PW check wiki
       - 检测 wiki 库
       - 检查论文 wiki
       - wiki 状态
@@ -46,6 +52,9 @@ routes:
   ask_wiki:
     category: primary
     triggers:
+      - 用 PW 问 wiki
+      - Paper Wiki ask
+      - PW ask wiki
       - 提问
       - 问 wiki
       - 问论文 wiki
@@ -92,6 +101,9 @@ routes:
   update_wiki:
     category: primary
     triggers:
+      - 用 PW 更新 wiki
+      - Paper Wiki update
+      - PW update wiki
       - 更新 wiki 库
       - 继续上次的论文沉淀
       - 重link

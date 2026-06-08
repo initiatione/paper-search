@@ -146,9 +146,12 @@ def test_plugin_manifest_exposes_simple_user_prompts():
     assert manifest["name"] == "prw"
     assert manifest["version"] == "0.2.1"
     assert manifest["skills"] == "./skills/"
-    assert manifest["interface"]["displayName"] == "Paper Research Wiki"
+    assert manifest["interface"]["displayName"] == "Paper Wiki"
+    assert "Paper Wiki" in manifest["description"]
+    assert "formerly PRW" in manifest["description"]
     assert "academic paper knowledge" in manifest["description"]
     assert "source-map-grounded" in manifest["description"]
+    assert "formerly PRW" in manifest["interface"]["longDescription"]
     assert "formula reasoning chains" in manifest["interface"]["longDescription"]
     assert "evidence figure cards" in manifest["interface"]["longDescription"]
     assert "link repair" in manifest["interface"]["longDescription"]
@@ -156,12 +159,12 @@ def test_plugin_manifest_exposes_simple_user_prompts():
     assert "post-task check" in manifest["interface"]["longDescription"]
     assert (
         manifest["interface"]["shortDescription"]
-        == "v0.2.1 | Brief-first PRW deposition, ask, checks, update, relink, redo, record requests."
+        == "v0.2.1 | Paper Wiki (formerly PRW): ask, deposit, check, update, relink, and redo."
     )
-    for phrase in ["deposition", "ask", "checks", "update", "relink", "redo"]:
+    for phrase in ["Paper Wiki", "formerly PRW", "ask", "deposit", "check", "update", "relink", "redo"]:
         assert phrase in manifest["interface"]["shortDescription"]
     prompt_text = "\n".join(manifest["interface"]["defaultPrompt"])
-    for phrase in ["提取", "提问", "检测", "更新", "沉淀", "EPI", "link", "QMD"]:
+    for phrase in ["Paper Wiki", "PW", "Paper Source", "formerly PRW", "提取", "提问", "检测", "更新", "沉淀", "EPI", "link", "QMD"]:
         assert phrase in prompt_text
 
 
@@ -169,14 +172,19 @@ def test_epi_manifest_describes_brief_first_prw_boundary():
     manifest = _read_json(EPI_PLUGIN / ".codex-plugin" / "plugin.json")
 
     assert manifest["version"] == "0.2.1"
+    assert manifest["name"] == "epi"
+    assert manifest["interface"]["displayName"] == "Paper Source"
     assert (
         manifest["description"]
-        == "Discover, acquire, parse, stage, approve, hand off, query, and record academic paper knowledge for an EPI-compatible PRW wiki."
+        == "Paper Source (formerly EPI) discovers, acquires, parses, stages, approves, hands off, queries, and records academic paper source evidence for a Paper Wiki-compatible vault."
     )
     assert (
         manifest["interface"]["shortDescription"]
-        == "v0.2.1 | Find, vet, route sources, OA-acquire, brief-first hand off to PRW, wiki-ask, and record PRW requests."
+        == "v0.2.1 | Paper Source (formerly EPI): find, vet, parse, hand off to Paper Wiki, and record."
     )
+    assert "Paper Source" in manifest["interface"]["longDescription"]
+    assert "formerly EPI" in manifest["interface"]["longDescription"]
+    assert "Paper Wiki" in manifest["interface"]["longDescription"]
 
 
 def test_marketplaces_register_paper_research_wiki():
@@ -940,10 +948,76 @@ def test_references_page_anatomy_requires_source_map_formula_chain_and_figure_ca
 def test_skill_ui_metadata_uses_single_public_skill():
     metadata = _read(PUBLIC_SKILL / "agents" / "openai.yaml")
 
-    assert "display_name: \"Paper Research Wiki\"" in metadata
+    assert "display_name: \"Paper Wiki\"" in metadata
     assert "$paper-research-wiki" in metadata
     for phrase in ["提取", "检测", "更新", "沉淀", "重做", "重link"]:
         assert phrase in metadata
+
+
+def test_paper_wiki_stage1_aliases_are_natural_language_only():
+    routing = _read(PLUGIN / "skills" / "routing.yaml")
+    skill = _read(PUBLIC_SKILL / "SKILL.md")
+    metadata = _read(PUBLIC_SKILL / "agents" / "openai.yaml")
+
+    for phrase in ["Paper Wiki", "PW", "用 PW 沉淀到 wiki", "用 PW 问 wiki", "Paper Source"]:
+        assert phrase in "\n".join([routing, skill, metadata])
+
+    assert ("$" + "PS") not in routing
+    assert ("$" + "PW") not in routing
+    assert ("name: " + "ps") not in routing.lower()
+    assert ("name: " + "pw") not in routing.lower()
+
+
+def test_prw_user_docs_use_paper_wiki_and_paper_source_stage1_names():
+    workflow = _read(PLUGIN / "docs" / "workflow.md")
+    structure = _read(PLUGIN / "docs" / "structure.md")
+    integration = _read(PLUGIN / "docs" / "epi-integration.md")
+    combined = "\n".join([workflow, structure, integration])
+
+    for phrase in [
+        "Paper Wiki",
+        "formerly PRW",
+        "Paper Source",
+        "formerly EPI",
+        "PW",
+        "PS",
+        "machine-facing",
+        "`prw`",
+        "`epi`",
+    ]:
+        assert phrase in combined
+
+    for phrase in [
+        "EPI `wiki-setup`",
+        "wiki-ingest-brief.json",
+        "wiki_deposition_task.json",
+        "prw-record-request.json",
+    ]:
+        assert phrase in combined
+
+
+def test_stage1_keeps_legacy_epi_prw_contract_terms_for_compatibility():
+    files = [
+        PLUGIN / "skills" / "routing.yaml",
+        PLUGIN / "skills" / "paper-research-wiki" / "SKILL.md",
+        PLUGIN / "docs" / "epi-integration.md",
+        EPI_PLUGIN / "skills" / "routing.yaml",
+        EPI_PLUGIN / "skills" / "epi-paper-deposition" / "SKILL.md",
+    ]
+    combined = "\n".join(path.read_text(encoding="utf-8") for path in files)
+
+    for phrase in [
+        "EPI",
+        "PRW",
+        "formerly EPI",
+        "formerly PRW",
+        "legacy",
+        "wiki-ingest-brief.json",
+        "wiki_deposition_task.json",
+        "epi-paper-deposition",
+        "paper-research-wiki",
+    ]:
+        assert phrase in combined
 
 
 def test_all_prw_skills_have_ui_metadata():

@@ -1,4 +1,4 @@
 interface:
-  display_name: "Paper Discovery"
+  display_name: "Paper Source Discovery"
   short_description: "Find, rank, and stage high-quality papers"
-  default_prompt: "Use $paper-discovery to find and rank high-quality papers for EPI."
+  default_prompt: "Use $paper-discovery for Paper Source / PS to find and rank high-quality papers."

@@ -13,7 +13,10 @@ routes:
   config_setup:
     category: primary
     triggers:
+      - 配置 Paper Source
+      - 配置 PS
       - 配置 EPI
+      - Paper Source config
       - 查看当前配置
       - 初始化配置
       - 修改研究画像
@@ -26,9 +29,12 @@ routes:
   paper_discovery:
     category: primary
     triggers:
+      - 用 PS 找论文
       - 找最新论文
       - 找高质量论文
       - 推荐优先阅读论文
+      - Paper Source search
+      - PS search papers
       - search papers
       - latest papers
       - high-quality papers
@@ -54,9 +60,12 @@ routes:
   paper_ingest:
     category: primary
     triggers:
+      - 用 PS 推进论文
       - 推进论文
       - 生成阅读报告
       - 准备 wiki handoff
+      - Paper Source ingest
+      - PS prepare papers
       - 沉淀前准备
       - prepare-ranked
       - advance-paper
@@ -120,6 +129,8 @@ routes:
   wiki_setup:
     category: primary
     triggers:
+      - Paper Source wiki setup
+      - PS 初始化 vault
       - 初始化 vault
       - 修复 vault
       - 重置 vault
@@ -131,7 +142,7 @@ routes:
     workflows:
       - wiki-setup/workflows/reset-repair.md
     notes:
-      - EPI keeps vault bootstrap ownership; PRW consumes the initialized vault contract and reports missing structure back to wiki-setup
+      - Paper Source/EPI keeps vault bootstrap ownership; Paper Wiki/PRW consumes the initialized vault contract and reports missing structure back to wiki-setup
   zotero_sync:
     category: support
     triggers:

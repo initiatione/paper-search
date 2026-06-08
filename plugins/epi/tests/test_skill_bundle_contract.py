@@ -293,6 +293,20 @@ def test_prw_documents_core_epi_bootstrap_without_requiring_on_demand_dirs():
     assert "on-demand" in combined
 
 
+def test_paper_source_stage1_aliases_are_natural_language_only():
+    routing = (SKILLS / "routing.yaml").read_text(encoding="utf-8")
+    discovery = (SKILLS / "paper-discovery" / "SKILL.md").read_text(encoding="utf-8")
+    ingest = (SKILLS / "paper-ingest" / "SKILL.md").read_text(encoding="utf-8")
+
+    for phrase in ["Paper Source", "PS", "用 PS 找论文", "用 PS 推进论文"]:
+        assert phrase in "\n".join([routing, discovery, ingest])
+
+    assert ("$" + "PS") not in routing
+    assert ("$" + "PW") not in routing
+    assert ("name: " + "ps") not in routing.lower()
+    assert ("name: " + "pw") not in routing.lower()
+
+
 def test_all_skill_entrypoints_stay_thin():
     for skill_dir in SKILLS.iterdir():
         if not skill_dir.is_dir() or not (skill_dir / "SKILL.md").exists():

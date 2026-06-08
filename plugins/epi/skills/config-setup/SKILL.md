@@ -1,14 +1,14 @@
 ---
 name: config-setup
 description: >
-  Use when the user asks to configure EPI, "配置 EPI", "查看当前配置",
+  Use when the user asks to configure Paper Source / EPI, "配置 EPI", "配置 PS", "查看当前配置",
   "初始化配置", "修改研究画像", or when EPI config is missing, viewed,
   initialized, or updated.
 ---
 
 # EPI Config Setup
 
-Single entrypoint for EPI config status, init, and updates. If config is missing, stop paper workflows and use this first. See `docs\config.md` for the full chat script and update flow.
+Single entrypoint for Paper Source / EPI config status, init, and updates. If config is missing, stop paper workflows and use this first. See `docs\config.md` for the full chat script and update flow.
 
 ## Read-Only Status
 

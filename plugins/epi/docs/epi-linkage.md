@@ -1,10 +1,10 @@
-# EPI 插件链路说明
+# Paper Source / EPI 插件链路说明
 
-本文档是 EPI 插件的主链路说明和维护契约。EPI 的核心目标是：按用户画像/config 衍生高质量论文收集 -> Obsidian/LLM Wiki 知识沉淀 -> 轻阅读负担的阅读报告。它是通用学术论文插件，不默认任何学科方向；AUV、机器人、AI、医学等词只能来自用户配置、当前请求或显式领域 hint。它不是从 0 到完成投稿的自动科研工作台，也不默认生成大型复现实验 agenda；复现只作为短小的验证线索。
+本文档是 Paper Source/EPI 插件的主链路说明和维护契约。Paper Source 是用户可见名，EPI 是 legacy alias；当前 machine-facing name 仍是 `epi`。Paper Wiki 是 sibling wiki 插件的用户可见名，PRW 是 legacy alias；当前 machine-facing name 仍是 `prw`。Paper Source/EPI 的核心目标是：按用户画像/config 衍生高质量论文收集 -> Obsidian/LLM Wiki 知识沉淀 -> 轻阅读负担的阅读报告。它是通用学术论文插件，不默认任何学科方向；AUV、机器人、AI、医学等词只能来自用户配置、当前请求或显式领域 hint。它不是从 0 到完成投稿的自动科研工作台，也不默认生成大型复现实验 agenda；复现只作为短小的验证线索。
 
 ## 维护契约
 
-每次修改或优化 EPI 插件，都必须同步更新本文档。需要更新的变化包括：CLI 命令、dry-run/ingest/critic/staging/promotion/rollback/redo/wiki-query/wiki-ask/evolution 链路、生成物路径、JSON 字段、Markdown 报告结构、Wiki 页面类型、安全边界、人类确认门、配置流程、技能说明、模板、ranking/critic 规则和阅读报告侧重点。若一次改动确实不影响链路，提交说明应写明无需更新本文档的原因。
+每次修改或优化 Paper Source/EPI 插件，都必须同步更新本文档。需要更新的变化包括：CLI 命令、dry-run/ingest/critic/staging/promotion/rollback/redo/wiki-query/wiki-ask/evolution 链路、生成物路径、JSON 字段、Markdown 报告结构、Wiki 页面类型、安全边界、人类确认门、配置流程、技能说明、模板、ranking/critic 规则和阅读报告侧重点。若一次改动确实不影响链路，提交说明应写明无需更新本文档的原因。
 
 配套文档（唯一 doc map / 权威分工）：
 
@@ -16,7 +16,7 @@
 
 ## 目标边界
 
-EPI 服务论文知识摄取，而不是替用户完成完整科研闭环。
+Paper Source/EPI 服务论文知识摄取，而不是替用户完成完整科研闭环。
 
 - 发现：按用户研究画像、关键词、venue prior、来源和 ranking 规则找到值得读的论文。
 - 留痕：保存 PDF、元数据、non-authoritative retrieval preview、MinerU Markdown/TeX/images/manifest、可选 reader/critic、source-staging handoff 和 run-state。
@@ -26,13 +26,13 @@ EPI 服务论文知识摄取，而不是替用户完成完整科研闭环。
 
 ## Obsidian Wiki 规则来源模型
 
-EPI 不能把 Obsidian Wiki 写入规则简化成“调用本机 `llm-wiki` / `wiki-ingest` 两个 skill”。这两个 skill 只是本机执行适配器；真正的构建和写入规则必须按优先级解析：
+Paper Source/EPI 不能把 Obsidian Wiki 写入规则简化成“调用本机 `llm-wiki` / `wiki-ingest` 两个 skill”。这两个 skill 只是本机执行适配器；真正的构建和写入规则必须按优先级解析：
 
 1. 当前用户指令：本次任务目标、语言、写入边界和安全要求。
 2. 目标 vault `AGENTS.md`：用户个性化约定、领域词汇、写作风格和安全边界。
 3. 目标 vault `_meta/agent-operating-contract.md`。
 4. 目标 vault `_meta/schema.md`、`_meta/taxonomy.md`、`_meta/directory-structure.md`：最终路由、页面类型、标签、链接、staged writes、合并/拆分策略。
-5. `prw` 插件包（目录 `plugins/PRW`）：面向用户的一体化论文 wiki 助手，提供 `$paper-research-wiki`，支持提取 EPI 论文、检测 wiki 库、更新 wiki 库和 `重link`，并在内部执行 source-first provenance、七类正式页面、staged review、paper lint、cross-link/relink 和 EPI handoff 消费。
+5. Paper Wiki/PRW 插件包（目录 `plugins/PRW`）：面向用户的一体化论文 wiki 助手，提供 `$paper-research-wiki`，支持提取 Paper Source/EPI 论文、检测 wiki 库、更新 wiki 库和 `重link`，并在内部执行 source-first provenance、七类正式页面、staged review、paper lint、cross-link/relink 和 EPI handoff 消费。
 6. `initiatione/obsidian-wiki-dev` 的 `liuchf/wiki-skills` 分支：个性化 multi-vault contract、QMD 只是检索辅助、Markdown vault 是 source of truth。
 7. `Ar9av/obsidian-wiki`：agent-mediated LLM Wiki 架构、manifest/index/log/hot、provenance、先搜索/合并再创建页面。
 8. `kepano/obsidian-skills`：Obsidian 语法、properties/frontmatter、wikilinks、embeds、callouts、bases/canvas 等格式约定。

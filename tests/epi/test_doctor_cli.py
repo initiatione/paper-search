@@ -20,7 +20,7 @@ def _seed_plugin_root(tmp_path):
             "author": {"name": "test"},
             "skills": "./skills/",
             "interface": {
-                "displayName": "EPI",
+                "displayName": "Paper Source",
                 "shortDescription": "Fixture",
                 "longDescription": "Fixture",
                 "developerName": "test",
