@@ -471,7 +471,7 @@ def _download_url_to_temp(url: str, temp_pdf: Path, timeout_seconds: int) -> tup
     request = urllib.request.Request(
         url,
         headers={
-            "User-Agent": "Mozilla/5.0 (compatible; EPI/0.1; +https://github.com/initiatione/paper-search)",
+            "User-Agent": "Mozilla/5.0 (compatible; EPI/0.1; +https://github.com/initiatione/paperflow)",
             "Accept": "application/pdf,text/html;q=0.9,*/*;q=0.8",
         },
     )

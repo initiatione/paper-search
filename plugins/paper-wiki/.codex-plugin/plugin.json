@@ -28,9 +28,9 @@
       "Read",
       "Write"
     ],
-    "websiteURL": "https://github.com/initiatione/paper-search",
-    "privacyPolicyURL": "https://github.com/initiatione/paper-search/blob/main/plugins/paper-wiki/docs/privacy.md",
-    "termsOfServiceURL": "https://github.com/initiatione/paper-search/blob/main/plugins/paper-wiki/docs/terms.md",
+    "websiteURL": "https://github.com/initiatione/paperflow",
+    "privacyPolicyURL": "https://github.com/initiatione/paperflow/blob/main/plugins/paper-wiki/docs/privacy.md",
+    "termsOfServiceURL": "https://github.com/initiatione/paperflow/blob/main/plugins/paper-wiki/docs/terms.md",
     "defaultPrompt": [
       "Use PW / Paper Wiki (formerly PRW) to 提取并直接沉淀 Paper Source/EPI 抓下来的论文到 wiki。",
       "Use PW / Paper Wiki to 根据论文 wiki 提问并回答，标记证据、综合判断、推断和纠错候选。",

@@ -27,9 +27,9 @@
       "Read",
       "Write"
     ],
-    "websiteURL": "https://github.com/initiatione/paper-search",
-    "privacyPolicyURL": "https://github.com/initiatione/paper-search/blob/main/plugins/paper-source/docs/privacy.md",
-    "termsOfServiceURL": "https://github.com/initiatione/paper-search/blob/main/plugins/paper-source/docs/terms.md",
+    "websiteURL": "https://github.com/initiatione/paperflow",
+    "privacyPolicyURL": "https://github.com/initiatione/paperflow/blob/main/plugins/paper-source/docs/privacy.md",
+    "termsOfServiceURL": "https://github.com/initiatione/paperflow/blob/main/plugins/paper-source/docs/terms.md",
     "defaultPrompt": [
       "Set up Paper Source (formerly EPI) configuration.",
       "Use PS / Paper Source to search and rank high-quality papers.",
