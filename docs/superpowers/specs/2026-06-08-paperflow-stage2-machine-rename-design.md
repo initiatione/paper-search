@@ -10,6 +10,7 @@ Stage 2 hard-cuts the source repository to the new plugin identities:
 
 | Concept | Old machine name | New machine name |
 | --- | --- | --- |
+| Bundle marketplace | `paper-search` | `paperflow` |
 | Source preparation plugin | `epi` | `paper-source` |
 | Wiki maintenance plugin | `prw` | `paper-wiki` |
 
@@ -28,7 +29,7 @@ Stage 2 changes:
 
 Stage 2 does not change:
 
-- bundle/marketplace name `paper-search`
+- source repository URL/name `paper-search`
 - Python package/module namespace `epi`
 - `_epi/` vault artifact root
 - `wiki-ingest-brief.json`, `wiki_deposition_task.json`, `prw-record-request.json`
@@ -45,7 +46,7 @@ Docs should say old `epi` / `prw` identifiers are pre-Stage-2 names, not active 
 
 ## Acceptance Criteria
 
-- `marketplace.json` and `.agents/plugins/marketplace.json` list `paper-source` and `paper-wiki`.
+- `marketplace.json` and `.agents/plugins/marketplace.json` are named `paperflow` and list `paper-source` and `paper-wiki`.
 - `plugins/paper-source/.codex-plugin/plugin.json` has `"name": "paper-source"`.
 - `plugins/paper-wiki/.codex-plugin/plugin.json` has `"name": "paper-wiki"`.
 - `plugins/epi` and `plugins/PRW` no longer exist in the Stage 2 branch.
