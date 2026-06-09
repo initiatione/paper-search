@@ -17,7 +17,7 @@ MAX_DESCRIPTION_LINES = 25
 WORKFLOW_SKILLS = {
     "paper-discovery",
     "paper-ingest",
-    "epi-paper-deposition",
+    "paper-source-paper-deposition",
     "wiki-setup",
 }
 
@@ -188,10 +188,10 @@ def _load_openai_metadata(metadata_path):
 def test_skill_bundle_has_the_expected_entrypoints():
     expected = [
         "config-setup",
-        "epi-paper-deposition",
         "mineru-paper-parser",
         "paper-discovery",
         "paper-ingest",
+        "paper-source-paper-deposition",
         "run-lifecycle",
         "skill-aware-evolve",
         "topic-tracking",
@@ -226,68 +226,68 @@ def test_all_skills_are_classified_in_plugin_routing():
 def test_plugin_routing_manifest_is_the_small_source_of_truth():
     routing = _load_routing()
 
-    assert routing["schema_version"] == "epi-skill-routing-v1"
+    assert routing["schema_version"] == "paper-source-skill-routing-v1"
     assert routing["source_of_truth"] == "skills/routing.yaml"
     assert len(routing["always_read"]) <= 3
 
 
-def test_epi_repository_initialization_uses_lean_default_structure(tmp_path):
-    from epi.epi_repository import ensure_epi_repository
+def test_paper_source_repository_initialization_uses_lean_default_structure(tmp_path):
+    from paper_source.paper_source_repository import ensure_paper_source_repository
 
-    ensure_epi_repository(tmp_path)
+    ensure_paper_source_repository(tmp_path)
 
     required = [
-        "_epi/README.md",
-        "_epi/manifest.json",
-        "_epi/raw",
-        "_epi/staging/papers",
-        "_epi/staging/wiki-batches/pending",
-        "_epi/meta/config-history",
-        "_epi/meta/formal-page-snapshots",
-        "_epi/policies/retention.json",
+        "_paper_source/README.md",
+        "_paper_source/manifest.json",
+        "_paper_source/raw",
+        "_paper_source/staging/papers",
+        "_paper_source/staging/wiki-batches/pending",
+        "_paper_source/meta/config-history",
+        "_paper_source/meta/formal-page-snapshots",
+        "_paper_source/policies/retention.json",
     ]
     for relative in required:
         assert (tmp_path / relative).exists(), relative
 
     on_demand = [
-        "_epi/runs",
-        "_epi/quarantine",
-        "_epi/evolution",
-        "_epi/cache",
-        "_epi/tmp",
-        "_epi/tmp-manual-pdfs",
+        "_paper_source/runs",
+        "_paper_source/quarantine",
+        "_paper_source/evolution",
+        "_paper_source/cache",
+        "_paper_source/tmp",
+        "_paper_source/tmp-manual-pdfs",
     ]
     for relative in on_demand:
         assert not (tmp_path / relative).exists(), relative
 
-    manifest = (tmp_path / "_epi" / "manifest.json").read_text(encoding="utf-8")
+    manifest = (tmp_path / "_paper_source" / "manifest.json").read_text(encoding="utf-8")
     assert "core_sections" in manifest
     assert "on_demand_sections" in manifest
     assert "not precreated" in manifest
 
 
-def test_wiki_setup_documents_lean_epi_bootstrap_contract():
+def test_wiki_setup_documents_lean_paper_source_bootstrap_contract():
     wiki_setup = (SKILLS / "wiki-setup" / "SKILL.md").read_text(encoding="utf-8")
 
-    assert "core `_epi` bootstrap" in wiki_setup
+    assert "core `_paper_source` bootstrap" in wiki_setup
     assert "raw/staging/meta/policies" in wiki_setup
     assert "on-demand" in wiki_setup
     assert "quarantine/evolution" in wiki_setup
     assert "raw/staging/runs/quarantine/evolution/meta roots" not in wiki_setup
 
 
-def test_prw_documents_core_epi_bootstrap_without_requiring_on_demand_dirs():
+def test_paper_wiki_documents_core_paper_source_bootstrap_without_requiring_on_demand_dirs():
     prw_root = ROOT.parent / "paper-wiki"
     files = [
         prw_root / "skills" / "paper-research-wiki" / "SKILL.md",
         prw_root / "docs" / "workflow.md",
-        prw_root / "docs" / "epi-integration.md",
+        prw_root / "docs" / "paper-source-integration.md",
         prw_root / "skills" / "paper-research-wiki" / "workflows" / "check-wiki.md",
         prw_root / "skills" / "paper-research-wiki" / "workflows" / "extract-papers.md",
     ]
     combined = "\n".join(path.read_text(encoding="utf-8") for path in files)
 
-    for required in ["_epi/raw/", "_epi/staging/", "_epi/meta/", "_epi/policies/"]:
+    for required in ["_paper_source/raw/", "_paper_source/staging/", "_paper_source/meta/", "_paper_source/policies/"]:
         assert required in combined
     assert "not a bootstrap failure" in combined
     assert "on-demand" in combined
@@ -305,6 +305,20 @@ def test_paper_source_stage1_aliases_are_natural_language_only():
     assert ("$" + "PW") not in routing
     assert ("name: " + "ps") not in routing.lower()
     assert ("name: " + "pw") not in routing.lower()
+
+
+def test_paper_source_support_directories_use_current_names():
+    assert (SKILLS / "paper-source-paper-deposition" / "SKILL.md").is_file()
+    assert not (SKILLS / "epi-paper-deposition").exists()
+    assert (ROOT / "metric-packs" / "paper-source-quality-gates" / "manifest.json").is_file()
+    assert not (ROOT / "metric-packs" / "epi-quality-gates").exists()
+
+
+def test_paper_discovery_query_planner_wrapper_imports_current_runtime_package():
+    wrapper = (SKILLS / "paper-discovery" / "scripts" / "query-planner.py").read_text(encoding="utf-8")
+
+    assert "from paper_source.query_planner import main" in wrapper
+    assert "from epi.query_planner import main" not in wrapper
 
 
 def test_all_skill_entrypoints_stay_thin():
@@ -414,17 +428,20 @@ def test_paper_discovery_keeps_policy_in_skill_and_references():
     assert not (SKILLS / "paper-discovery" / "README.md").exists()
 
 
-def test_epi_paper_deposition_is_thin_legacy_adapter():
-    deposition = (SKILLS / "epi-paper-deposition" / "SKILL.md").read_text(encoding="utf-8")
+def test_paper_source_paper_deposition_is_thin_legacy_adapter():
+    deposition = (SKILLS / "paper-source-paper-deposition" / "SKILL.md").read_text(encoding="utf-8")
     formal_workflow = (
-        SKILLS / "epi-paper-deposition" / "workflows" / "formal-wiki-write.md"
+        SKILLS / "paper-source-paper-deposition" / "workflows" / "formal-wiki-write.md"
     ).read_text(encoding="utf-8")
     combined = "\n".join([deposition, formal_workflow])
 
     assert "workflows/formal-wiki-write.md" in deposition
     assert "wiki-ingest-brief.json" in combined
     assert "legacy `wiki_deposition_task.json`" in combined
-    assert "epi-wiki-deposition" in deposition
+    assert "legacy epi-wiki-deposition" in deposition
+    assert "legacy `_epi/`" in combined
+    assert "legacy `_paper_source/`" not in combined
+    assert "Existing `_paper_source/` handoffs remain readable as legacy artifacts." not in combined
     assert "$paper-research-wiki" in combined
     assert "compatibility adapter" in combined
     assert "llm-wiki" not in combined
@@ -433,7 +450,7 @@ def test_epi_paper_deposition_is_thin_legacy_adapter():
     assert "must not enter the formal graph" in combined
 
 
-def test_epi_wiki_boundary_skill_docs_are_brief_first():
+def test_paper_source_wiki_boundary_skill_docs_are_brief_first():
     files = [
         SKILLS / "paper-ingest" / "SKILL.md",
         SKILLS / "paper-ingest" / "workflows" / "approval-and-trigger.md",
@@ -444,10 +461,10 @@ def test_epi_wiki_boundary_skill_docs_are_brief_first():
 
     for phrase in [
         "wiki-ingest-brief.json",
-        "canonical EPI-to-PRW handoff",
+        "canonical Paper Source-to-Paper Wiki handoff",
         "wiki_deposition_task.json is legacy",
         "paper-research-wiki",
-        "epi-paper-deposition",
+        "paper-source-paper-deposition",
         "external wiki skills are optional helpers",
         "record-wiki-ingest",
         "final-source-review.json",
@@ -455,17 +472,49 @@ def test_epi_wiki_boundary_skill_docs_are_brief_first():
         assert phrase in combined
 
 
-def test_prw_qmd_boundary_is_explicit_in_plugin_contracts():
+def test_current_skill_docs_prefer_current_env_names_with_legacy_fallbacks_only():
+    mineru = (SKILLS / "mineru-paper-parser" / "SKILL.md").read_text(encoding="utf-8")
+    prepare_ranked = (
+        SKILLS / "paper-ingest" / "workflows" / "prepare-ranked.md"
+    ).read_text(encoding="utf-8")
+    combined = "\n".join([mineru, prepare_ranked])
+
+    assert "PAPER_SOURCE_MINERU_TIMEOUT" in combined
+    assert "Legacy `EPI_MINERU_TIMEOUT`" in combined
+    assert "set `EPI_MINERU_TIMEOUT`" not in combined
+    assert "reads `EPI_MINERU_TIMEOUT`" not in combined
+
+
+def test_wiki_setup_legacy_root_is_epi_not_current_paper_source_root():
+    wiki_setup = (SKILLS / "wiki-setup" / "SKILL.md").read_text(encoding="utf-8")
+
+    assert "Existing `_epi` roots remain legacy-readable" in wiki_setup
+    assert "Existing `_paper_source` roots remain legacy-readable" not in wiki_setup
+    assert "legacy `_epi\\meta\\paper-source-config.yaml`" in wiki_setup
+    assert "legacy `_paper_source\\meta\\paper-source-config.yaml`" not in wiki_setup
+
+
+def test_page_provenance_accepts_current_pdf_links_and_legacy_epi_links_only():
+    page_provenance = (
+        SKILLS / "wiki-provenance" / "references" / "page-provenance.md"
+    ).read_text(encoding="utf-8")
+
+    assert "_paper_source/raw/<slug>/paper.pdf" in page_provenance
+    assert "legacy `\"[[_epi/raw/<slug>/paper.pdf|<slug>]]\"`" in page_provenance
+    assert "legacy `\"[[_paper_source/raw/<slug>/paper.pdf|<slug>]]\"`" not in page_provenance
+
+
+def test_paper_wiki_qmd_boundary_is_explicit_in_plugin_contracts():
     files = [
         ROOT / "docs" / "workflow.md",
-        ROOT / "docs" / "epi-linkage.md",
+        ROOT / "docs" / "paper-source-linkage.md",
         ROOT / "docs" / "structure.md",
-        SKILLS / "epi-paper-deposition" / "SKILL.md",
-        SKILLS / "epi-paper-deposition" / "workflows" / "formal-wiki-write.md",
-        ROOT / "scripts" / "build" / "epi" / "wiki_contracts.py",
-        ROOT / "scripts" / "build" / "epi" / "wiki_init.py",
-        ROOT / "scripts" / "build" / "epi" / "stage_wiki.py",
-        ROOT / "scripts" / "build" / "epi" / "wiki_ingest_handoff.py",
+        SKILLS / "paper-source-paper-deposition" / "SKILL.md",
+        SKILLS / "paper-source-paper-deposition" / "workflows" / "formal-wiki-write.md",
+        ROOT / "scripts" / "build" / "paper_source" / "wiki_contracts.py",
+        ROOT / "scripts" / "build" / "paper_source" / "wiki_init.py",
+        ROOT / "scripts" / "build" / "paper_source" / "stage_wiki.py",
+        ROOT / "scripts" / "build" / "paper_source" / "wiki_ingest_handoff.py",
     ]
     combined = "\n".join(path.read_text(encoding="utf-8") for path in files)
 
@@ -487,8 +536,8 @@ def test_prw_qmd_boundary_is_explicit_in_plugin_contracts():
     ]:
         assert allowed in combined
     for ignored in [
-        "_epi/**",
-        "_epi/meta/formal-page-snapshots/",
+        "_paper_source/**",
+        "_paper_source/meta/formal-page-snapshots/",
         "MinerU source Markdown",
         ".obsidian/**",
         ".claude/**",
@@ -496,13 +545,13 @@ def test_prw_qmd_boundary_is_explicit_in_plugin_contracts():
         assert ignored in combined
 
 
-def test_epi_formal_deposition_route_is_compatibility_adapter():
+def test_paper_source_formal_deposition_route_is_compatibility_adapter():
     routing = _load_routing()
     routes = routing["routes"]
 
     assert routes["wiki_setup"]["category"] == "primary"
 
-    deposition = routes["epi_paper_deposition"]
+    deposition = routes["paper_source_paper_deposition"]
     assert deposition["category"] == "compatibility"
-    assert deposition["skill"] == "epi-paper-deposition/SKILL.md"
+    assert deposition["skill"] == "paper-source-paper-deposition/SKILL.md"
     assert "$paper-research-wiki" in "\n".join(deposition.get("notes", []))

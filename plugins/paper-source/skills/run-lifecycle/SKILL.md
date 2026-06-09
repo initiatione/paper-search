@@ -1,13 +1,13 @@
 ---
 name: run-lifecycle
 description: >
-  Use when inspecting, cleaning, pruning, or archiving transient EPI run artifacts,
-  including "清理 runs", _epi/runs dashboards, queues, indexes, and logs.
+  Use when inspecting, cleaning, pruning, or archiving transient Paper Source run artifacts,
+  including "清理 runs", _paper_source/runs dashboards, queues, indexes, and logs.
 ---
 
-# EPI Run Lifecycle
+# Paper Source Run Lifecycle
 
-Manage transient EPI workflow artifacts without touching downloaded papers, staging papers, final wiki content, Zotero records, or configuration history.
+Manage transient Paper Source workflow artifacts without touching downloaded papers, staging papers, final wiki content, Zotero records, or configuration history.
 
 ## Default To Dry Run
 
@@ -23,19 +23,19 @@ Add `--apply` only after explicit approval:
 python scripts\orchestrator.py run-lifecycle --vault <vault> --keep-latest 15 --keep-per-workflow 2 --apply --json
 ```
 
-The EPI workflow may auto-apply lifecycle cleanup after runs when `_epi/runs` exceeds 15 single-run directories. Manual operation remains approval-first.
+The Paper Source workflow may auto-apply lifecycle cleanup after runs when `_paper_source/runs` exceeds 15 single-run directories. Manual operation remains approval-first.
 
 ## Cleanup Boundary
 
-Clean only terminal single-run directories under `_epi/runs`.
+Clean only terminal single-run directories under `_paper_source/runs`.
 
 Never delete:
 
-- `_epi/runs/index.json`, dashboards, research queue, feedback logs
-- `_epi/raw`, `_epi/staging`, final wiki pages, Zotero records, config history
+- `_paper_source/runs/index.json`, dashboards, research queue, feedback logs
+- `_paper_source/raw`, `_paper_source/staging`, final wiki pages, Zotero records, config history
 - active runs, human-gate-pending runs, or protected non-terminal failures
 
-The command writes a manifest under `_epi\meta\run-lifecycle\`.
+The command writes a manifest under `_paper_source\meta\run-lifecycle\`.
 
 ## Optional Delegation
 
@@ -43,4 +43,4 @@ Codex may use subagents only when the user explicitly authorizes delegation or p
 
 ## Discovery Coordination
 
-Discovery must deduplicate against `_epi\\raw`: already downloaded papers should be rejected as `already_in_library:<slug>` rather than recommended again. This keeps lifecycle cleanup separate from library identity.
+Discovery must deduplicate against `_paper_source\\raw`: already downloaded papers should be rejected as `already_in_library:<slug>` rather than recommended again. This keeps lifecycle cleanup separate from library identity.

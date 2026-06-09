@@ -1,14 +1,14 @@
 ---
 name: config-setup
 description: >
-  Use when the user asks to configure Paper Source / EPI, "配置 EPI", "配置 PS", "查看当前配置",
-  "初始化配置", "修改研究画像", or when EPI config is missing, viewed,
+  Use when the user asks to configure Paper Source / PS, "配置 Paper Source", "配置 PS", "查看当前配置",
+  "初始化配置", "修改研究画像", or when Paper Source config is missing, viewed,
   initialized, or updated.
 ---
 
-# EPI Config Setup
+# Paper Source Config Setup
 
-Single entrypoint for Paper Source / EPI config status, init, and updates. If config is missing, stop paper workflows and use this first. See `docs\config.md` for the full chat script and update flow.
+Single entrypoint for Paper Source / PS config status, init, and updates. If config is missing, stop paper workflows and use this first. See `docs\config.md` for the full chat script and update flow.
 
 ## Read-Only Status
 
@@ -32,5 +32,5 @@ Only run `doctor` for dependency health, plugin diagnosis, MCP/CLI/MinerU availa
 
 - 一次只问一个问题.
 - Do not use YAML field names as question titles.
-- EPI 是通用论文插件: no field defaults.
+- Paper Source 是通用论文插件: no field defaults.
 - `docs\config.md` owns the onboarding script, `默认` escape hatch, technical preview, and update flow.

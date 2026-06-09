@@ -7,13 +7,13 @@ This workflow adapts Ar9av/obsidian-wiki `wiki-update`, `cross-linker`, `wiki-li
 Read `../../../rules/wiki-writing-standard.md` first. For repairs that touch formal page prose, also read `../../paper-wiki-language/SKILL.md`. Repairs must move pages toward those standards, not merely make tests pass.
 
 1. Run the check workflow first.
-2. Continue safe pending deposition for ready EPI papers.
+2. Continue safe pending deposition for ready Paper Source papers.
 3. Repair staged pages with lint or provenance gaps.
 4. Repair page template, required frontmatter, source/provenance, tracking-file drift, and language-style drift against `wiki-writing-standard.md` and `paper-wiki-language`.
 5. Refresh links, tags, aliases, and duplicate-page decisions.
 6. Run relink/cross-link cleanup only after preserving evidence addresses.
 7. Stop before destructive reset or ambiguous merge.
-8. Preserve EPI boundaries for human approval and `record-wiki-ingest`.
+8. Preserve Paper Source boundaries for human approval and `record-wiki-ingest`.
 9. Run `workflows/check-wiki.md` after writing as the post-task check.
 
 ## Graph-Aware Rewrite
@@ -32,8 +32,8 @@ Use this path when the user asks to 重写某页, 重写页面, rewrite formal p
    - Hash/provenance drift after markdown edits.
 6. Create a new `derivations/` or `concepts/` node when reusable knowledge would otherwise remain trapped inside one reference page.
 7. Refresh manifest or `.manifest.json`, `final-source-review.json`, `index.md`, `log.md`, and `hot.md` in the same run. Read previous `wiki-ingest-record.json` only as provenance and reverse-dependency evidence.
-8. Report EPI record readiness. PRW records readiness; EPI writes or replaces `wiki-ingest-record.json` through `record-wiki-ingest`. If the update leaves pages record-ready, write `_epi/staging/papers/<paper-slug>/prw-record-request.json` with `schema_version: prw-record-request-v1`, `automation_mode: ask`, current final page hashes, `final-source-review.json` hash, and `record-wiki-ingest --from-prw-request ...`; PRW writes the request artifact; EPI consumes it.
-9. Run or report `qmd update` and `qmd embed`; confirm `_epi/` remains outside the formal graph/index when the vault contract requires that boundary.
+8. Report Paper Source record readiness. Paper Wiki records readiness; Paper Source writes or replaces `wiki-ingest-record.json` through `record-wiki-ingest`. If the update leaves pages record-ready, write `_paper_source/staging/papers/<paper-slug>/paper-wiki-record-request.json` with `schema_version: paper-wiki-record-request-v1`, `automation_mode: ask`, current final page hashes, `final-source-review.json` hash, and `record-wiki-ingest --from-paper-wiki-request ...`; Paper Wiki writes the request artifact; Paper Source consumes it. Legacy `_epi/.../prw-record-request.json` remains accepted only for existing artifacts.
+9. Run or report `qmd update` and `qmd embed`; confirm `_paper_source/` and legacy `_epi/` remain outside the formal graph/index when the vault contract requires that boundary.
 
 ## Relink And Maintenance
 
@@ -67,4 +67,4 @@ QMD is optional. Use QMD only after reading the Markdown vault inventory. If QMD
 
 Ask one confirmation question before any write-heavy relink, tag normalization, staged repair, or page merge. A reply of `默认` means apply the recommended safe next step.
 
-After confirmed maintenance writes, run the post-task check. Run `workflows/check-wiki.md` after writing and report broken wikilinks, ambiguous aliases, duplicate concept owners, forbidden internal links, relationship direction issues, QMD refresh status, stale tracking files, and remaining EPI `record-wiki-ingest` work.
+After confirmed maintenance writes, run the post-task check. Run `workflows/check-wiki.md` after writing and report broken wikilinks, ambiguous aliases, duplicate concept owners, forbidden internal links, relationship direction issues, QMD refresh status, stale tracking files, and remaining Paper Source `record-wiki-ingest` work.

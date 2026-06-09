@@ -25,7 +25,7 @@ Use this taxonomy when interpreting `rank.json.paper_classification`, curating c
 4. Do not let a famous venue override type: a survey in a strong venue is still a survey.
 5. When the user asks for non-review papers, `survey` candidates should be rejected or placed outside the recommendation list.
 
-## EPI Fields
+## Paper Source Fields
 
 `rank.json` candidates should expose:
 

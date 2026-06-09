@@ -1,6 +1,6 @@
 # Extract Papers
 
-Use this when the user asks to extract, process, or deposit EPI-collected papers.
+Use this when the user asks to extract, process, or deposit Paper Source-collected papers. `epi` is only a legacy alias for Paper Source.
 
 This workflow adapts Ar9av/obsidian-wiki `wiki-ingest`: do not summarize papers in isolation. Instead, distill and integrate source-grounded paper knowledge into the existing wiki graph.
 
@@ -11,10 +11,10 @@ Detect survey/review papers and route them differently. A paper is a survey/revi
 ## Preflight
 
 1. Resolve the target vault.
-2. Check the EPI `wiki-setup` bootstrap: core `_epi` roots (`_epi/`, `_epi/raw/`, `_epi/staging/`, `_epi/meta/`, `_epi/policies/`), `_meta/`, `.obsidian`, `.git`, and the seven formal page roots. If missing core vault structure blocks safe work, stop and point back to EPI `wiki-setup`; do not initialize or reset from PRW. Do not require `_epi/runs/`, `_epi/cache/`, `_epi/tmp/`, `_epi/tmp-manual-pdfs/`, `_epi/quarantine/`, or `_epi/evolution/`; EPI creates those on demand.
+2. Check the Paper Source `wiki-setup` bootstrap: core `_paper_source` roots (`_paper_source/`, `_paper_source/raw/`, `_paper_source/staging/`, `_paper_source/meta/`, `_paper_source/policies/`), legacy `_epi` roots, `_meta/`, `.obsidian`, `.git`, and the seven formal page roots. If missing core vault structure blocks safe work, stop and point back to Paper Source `wiki-setup`; do not initialize or reset from Paper Wiki. Do not require `_paper_source/runs/`, `_paper_source/cache/`, `_paper_source/tmp/`, `_paper_source/tmp-manual-pdfs/`, `_paper_source/quarantine/`, or `_paper_source/evolution/`; Paper Source creates those on demand.
 3. Read target vault `AGENTS.md`, `_meta/schema.md`, `_meta/taxonomy.md`, and `_meta/directory-structure.md` when present.
-4. Locate `_epi/staging/papers/*/wiki-ingest-brief.json`; this is the canonical EPI-to-PRW handoff.
-5. Treat `_epi/staging/papers/*/wiki_deposition_task.json` as legacy compatibility only. Do not treat task-only legacy handoffs as ready; route them back to EPI to regenerate or repair `wiki-ingest-brief.json`.
+4. Locate `_paper_source/staging/papers/*/wiki-ingest-brief.json`; this is the canonical Paper Source-to-Paper Wiki handoff. Legacy `_epi/staging/papers/*/wiki-ingest-brief.json` remains readable.
+5. Treat `_paper_source/staging/papers/*/wiki_deposition_task.json` and legacy `_epi/staging/papers/*/wiki_deposition_task.json` as compatibility artifacts only. Do not treat task-only legacy handoffs as ready; route them back to Paper Source to regenerate or repair `wiki-ingest-brief.json`.
 6. Run a readiness preflight and group papers as ready, needs human approval, blocked, already recorded, or legacy-needs-brief-repair.
 7. For ready papers, read source bundle artifacts before writing: PDF, metadata, MinerU Markdown, TeX, images, manifest, reading report, and `wiki-ingest-brief.json`.
 
@@ -33,7 +33,7 @@ Detect survey/review papers and route them differently. A paper is a survey/revi
 2. Apply the page template, merge-before-create rule, and body rules from `wiki-writing-standard.md`.
 3. Apply `paper-wiki-language`: write natural Chinese research-wiki prose, avoid machine-translation headings, and keep terminology stable.
 4. Preserve source support status and evidence addresses.
-5. Keep frontmatter `sources` PDF-only: `references/ pages` use exactly one clickable original-paper PDF link, canonical form a Markdown link displayed with the paper title pointing at `obsidian://open?vault=<vault>&file=_epi%2Fraw%2F<slug>%2Fpaper.pdf` (path `_epi/raw/<slug>/paper.pdf`, no `papers/` segment; legacy `"[[_epi/raw/<slug>/paper.pdf|<slug>]]"` still accepted for EPI pages); `concepts/, derivations/, experiments/, synthesis/, reports/, and opportunities/` use one or more clickable original-paper PDF links; never use plain path text, an alias such as `原论文 PDF`, or metadata/MinerU/DOI/arXiv entries.
+5. Keep frontmatter `sources` PDF-only: `references/ pages` use exactly one clickable original-paper PDF link, canonical form a Markdown link displayed with the paper title pointing at `obsidian://open?vault=<vault>&file=_paper_source%2Fraw%2F<slug>%2Fpaper.pdf` (path `_paper_source/raw/<slug>/paper.pdf`, no `papers/` segment; `"[[_paper_source/raw/<slug>/paper.pdf|<slug>]]"` also accepted for Paper Source pages; legacy `_epi` links remain accepted for existing artifacts); `concepts/, derivations/, experiments/, synthesis/, reports/, and opportunities/` use one or more clickable original-paper PDF links; never use plain path text, an alias such as `原论文 PDF`, or metadata/MinerU/DOI/arXiv entries.
 6. Add Obsidian wikilinks from new pages to existing related pages.
 7. Add `relationships:` frontmatter entries only when direction and type are clear.
 8. Keep formula and figure claims tied to formula or figure evidence.
@@ -49,9 +49,9 @@ Update the wiki tracking surface when the target vault contract expects it:
 - append a concise `log.md` entry
 - refresh `hot.md` with the conceptual change, not a file list
 
-Write `_epi/staging/papers/<paper-slug>/prw-record-request.json` when formal pages and `final-source-review.json` are ready for EPI record. The request must include `schema_version: prw-record-request-v1`, `automation_mode: ask`, final page relative paths and sha256 hashes, `final-source-review.json` path/hash, `human_approval.approved_by`, and the command `record-wiki-ingest --from-prw-request _epi/staging/papers/<paper-slug>/prw-record-request.json`. PRW writes the request artifact; EPI consumes it. Tell the user whether the current agent can continue with that EPI command or whether a safety gate still blocks it.
+Write `_paper_source/staging/papers/<paper-slug>/paper-wiki-record-request.json` when formal pages and `final-source-review.json` are ready for Paper Source record. The request must include `schema_version: paper-wiki-record-request-v1`, `automation_mode: ask`, final page relative paths and sha256 hashes, `final-source-review.json` path/hash, `human_approval.approved_by`, and the command `record-wiki-ingest --from-paper-wiki-request _paper_source/staging/papers/<paper-slug>/paper-wiki-record-request.json`. Paper Wiki writes the request artifact; Paper Source consumes it. Tell the user whether the current agent can continue with that Paper Source command or whether a safety gate still blocks it.
 
-Stop when source artifacts are missing and point back to EPI `paper-gate`.
+Stop when source artifacts are missing and point back to Paper Source `paper-gate`.
 
 ## QMD Compatibility
 
@@ -59,4 +59,4 @@ QMD is an optional accelerator after the source-first plan is built from the Mar
 
 ## Post-Task Check
 
-Run `workflows/check-wiki.md` after writing. The post-task check must cover broken wikilinks, orphan pages, missing frontmatter, provenance drift, QMD refresh status, stale tracking files, staged review state, `final-source-review.json`, and whether EPI `record-wiki-ingest` remains.
+Run `workflows/check-wiki.md` after writing. The post-task check must cover broken wikilinks, orphan pages, missing frontmatter, provenance drift, QMD refresh status, stale tracking files, staged review state, `final-source-review.json`, and whether Paper Source `record-wiki-ingest` remains.

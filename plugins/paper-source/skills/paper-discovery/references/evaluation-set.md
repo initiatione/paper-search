@@ -1,6 +1,6 @@
 # Evaluation Set For Discovery Quality
 
-Use this file to keep EPI paper discovery honest as the skill evolves. The point is not to create a large benchmark immediately; it is to keep small, repeatable prompts with expected behavior.
+Use this file to keep Paper Source paper discovery honest as the skill evolves. The point is not to create a large benchmark immediately; it is to keep small, repeatable prompts with expected behavior.
 
 ## Metrics
 

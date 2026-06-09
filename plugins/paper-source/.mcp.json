@@ -8,14 +8,14 @@
     }
   },
   "notes": [
-    "EPI wraps openags/paper-search-mcp as an external dependency.",
-    "EPI discovery calls search_papers and preserves source coverage telemetry in run reports, including source capabilities, provider readiness, source routing, and provider gaps when available.",
-    "EPI demotes unstable sources such as Google Scholar by default and records missing provider env, such as Unpaywall email, as provider gaps rather than paper unavailability.",
-    "EPI acquisition tries download_with_fallback first; if no direct PDF URL exists and OA fallback finds no PDF, it records manual-download-required with DOI/publisher links instead of running weak fallback loops.",
-    "EPI verifies downloaded PDF identity with lightweight DOI/title checks before MinerU; clear mismatches are quarantined under _epi/quarantine/papers/<slug>/paper.pdf.",
-    "When a direct PDF candidate exists, EPI may continue to source-native MCP, CLI, or direct URL fallback; Sci-Hub is disabled unless EPI_PAPER_SEARCH_MCP_USE_SCIHUB is explicitly enabled.",
-    "After successful acquisition, EPI may call read_<source>_paper or CLI read to write a non-authoritative retrieval preview sidecar at paper-search-read-preview.txt; this is not replacing MinerU.",
-    "Use EPI_PAPER_SEARCH_MCP_COMMAND and EPI_PAPER_SEARCH_MCP_ARGS to override the stdio server command; use EPI_PAPER_SEARCH_COMMAND for the CLI fallback.",
+    "Paper Source wraps openags/paper-search-mcp as an external dependency.",
+    "Paper Source discovery calls search_papers and preserves source coverage telemetry in run reports, including source capabilities, provider readiness, source routing, and provider gaps when available.",
+    "Paper Source demotes unstable sources such as Google Scholar by default and records missing provider env, such as Unpaywall email, as provider gaps rather than paper unavailability.",
+    "Paper Source acquisition tries download_with_fallback first; if no direct PDF URL exists and OA fallback finds no PDF, it records manual-download-required with DOI/publisher links instead of running weak fallback loops.",
+    "Paper Source verifies downloaded PDF identity with lightweight DOI/title checks before MinerU; clear mismatches are quarantined under _paper_source/quarantine/papers/<slug>/paper.pdf.",
+    "When a direct PDF candidate exists, Paper Source may continue to source-native MCP, CLI, or direct URL fallback; Sci-Hub is disabled unless PAPER_SOURCE_PAPER_SEARCH_MCP_USE_SCIHUB or legacy EPI_PAPER_SEARCH_MCP_USE_SCIHUB is explicitly enabled.",
+    "After successful acquisition, Paper Source may call read_<source>_paper or CLI read to write a non-authoritative retrieval preview sidecar at paper-search-read-preview.txt; this is not replacing MinerU.",
+    "Use PAPER_SOURCE_PAPER_SEARCH_MCP_COMMAND and PAPER_SOURCE_PAPER_SEARCH_MCP_ARGS to override the stdio server command; legacy EPI_PAPER_SEARCH_MCP_COMMAND / EPI_PAPER_SEARCH_MCP_ARGS remain accepted. Use PAPER_SOURCE_PAPER_SEARCH_COMMAND for the CLI fallback.",
     "doctor --json reports paper_search_provider_readiness so missing Unpaywall email, CORE key, Semantic Scholar key, Google Scholar proxy, DOAJ key, or Zenodo token can be treated as recall/fallback risk rather than hidden failure."
   ]
 }

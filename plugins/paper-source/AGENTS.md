@@ -1,6 +1,6 @@
-# EPI Plugin Agent Entry
+# Paper Source Plugin Agent Entry
 
-This is a thin shell for agents working inside the EPI plugin package. It does not duplicate the skill bodies or long-lived workflow rules.
+This is a thin shell for agents working inside the Paper Source plugin package. It does not duplicate the skill bodies or long-lived workflow rules.
 
 <!-- ROUTING_BOOTSTRAP_START -->
 <always-applicable>
@@ -14,6 +14,6 @@ This is a thin shell for agents working inside the EPI plugin package. It does n
 - Prefer focused workflow modules over growing `cli.py`, `orchestrator.py`, or `stage_wiki.py`.
 - For code or docs changes, close the task with original constraints, verification evidence, and a 30-second AAR.
 - Codex may use subagents only when the user explicitly authorizes delegation or parallel agent work for the task or session.
-- When that permission exists, delegate independent EPI workflow subtasks to fresh-context workers and review only final artifacts, changed files, and verification results.
+- When that permission exists, delegate independent Paper Source workflow subtasks to fresh-context workers and review only final artifacts, changed files, and verification results.
 </task-routing>
 <!-- ROUTING_BOOTSTRAP_END -->

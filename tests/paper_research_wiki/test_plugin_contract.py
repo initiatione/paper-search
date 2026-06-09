@@ -5,7 +5,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN = ROOT / "plugins" / "paper-wiki"
-EPI_PLUGIN = ROOT / "plugins" / "paper-source"
+PAPER_SOURCE_PLUGIN = ROOT / "plugins" / "paper-source"
 PUBLIC_SKILL = PLUGIN / "skills" / "paper-research-wiki"
 MARKETPLACES = [
     ROOT / "marketplace.json",
@@ -21,7 +21,7 @@ WORKFLOWS = {
 PUBLIC_SKILLS = {"paper-research-wiki"}
 SUPPORT_SKILLS = {"paper-wiki-language"}
 REFERENCES = {
-    "epi-artifact-contract.md",
+    "paper-source-artifact-contract.md",
     "page-provenance.md",
     "page-family-contract.md",
     "references-page-anatomy.md",
@@ -38,7 +38,7 @@ FORMAL_PAGE_FAMILIES = {
     "opportunities/",
 }
 FORBIDDEN_FORMAL_ROOTS = {
-    "_epi/",
+    "_paper_source/",
     "_raw/",
     "_staging/",
     "_runs/",
@@ -82,7 +82,7 @@ def _skill_body_line_count(path: Path) -> int:
     return len(lines)
 
 
-def _load_prw_routing():
+def _load_paper_wiki_routing():
     text = _read(PLUGIN / "skills" / "routing.yaml")
     try:
         import yaml
@@ -149,10 +149,8 @@ def test_plugin_manifest_exposes_simple_user_prompts():
     assert manifest["skills"] == "./skills/"
     assert manifest["interface"]["displayName"] == "Paper Wiki"
     assert "Paper Wiki" in manifest["description"]
-    assert "formerly PRW" in manifest["description"]
     assert "academic paper knowledge" in manifest["description"]
     assert "source-map-grounded" in manifest["description"]
-    assert "formerly PRW" in manifest["interface"]["longDescription"]
     assert "formula reasoning chains" in manifest["interface"]["longDescription"]
     assert "evidence figure cards" in manifest["interface"]["longDescription"]
     assert "link repair" in manifest["interface"]["longDescription"]
@@ -160,31 +158,30 @@ def test_plugin_manifest_exposes_simple_user_prompts():
     assert "post-task check" in manifest["interface"]["longDescription"]
     assert (
         manifest["interface"]["shortDescription"]
-        == "v0.2.1 | Paper Wiki (formerly PRW): ask, deposit, check, update, relink, and redo."
+        == "v0.2.1 | Paper Wiki: ask, deposit, check, update, relink, and redo."
     )
-    for phrase in ["Paper Wiki", "formerly PRW", "ask", "deposit", "check", "update", "relink", "redo"]:
+    for phrase in ["Paper Wiki", "ask", "deposit", "check", "update", "relink", "redo"]:
         assert phrase in manifest["interface"]["shortDescription"]
     prompt_text = "\n".join(manifest["interface"]["defaultPrompt"])
-    for phrase in ["Paper Wiki", "PW", "Paper Source", "formerly PRW", "提取", "提问", "检测", "更新", "沉淀", "EPI", "link", "QMD"]:
+    for phrase in ["Paper Wiki", "PW", "Paper Source", "提取", "提问", "检测", "更新", "沉淀", "link", "QMD"]:
         assert phrase in prompt_text
 
 
-def test_epi_manifest_describes_brief_first_prw_boundary():
-    manifest = _read_json(EPI_PLUGIN / ".codex-plugin" / "plugin.json")
+def test_paper_source_manifest_describes_brief_first_prw_boundary():
+    manifest = _read_json(PAPER_SOURCE_PLUGIN / ".codex-plugin" / "plugin.json")
 
     assert manifest["version"] == "0.2.1"
     assert manifest["name"] == "paper-source"
     assert manifest["interface"]["displayName"] == "Paper Source"
     assert (
         manifest["description"]
-        == "Paper Source (formerly EPI) discovers, acquires, parses, stages, approves, hands off, queries, and records academic paper source evidence for a Paper Wiki-compatible vault."
+        == "Paper Source discovers, acquires, parses, stages, approves, hands off, queries, and records academic paper source evidence for a Paper Wiki-compatible vault."
     )
     assert (
         manifest["interface"]["shortDescription"]
-        == "v0.2.1 | Paper Source (formerly EPI): find, vet, parse, hand off to Paper Wiki, and record."
+        == "v0.2.1 | Paper Source: find, vet, parse, hand off to Paper Wiki, and record."
     )
     assert "Paper Source" in manifest["interface"]["longDescription"]
-    assert "formerly EPI" in manifest["interface"]["longDescription"]
     assert "Paper Wiki" in manifest["interface"]["longDescription"]
 
 
@@ -215,18 +212,18 @@ def test_plugin_has_one_public_skill_plus_language_gate():
     }
     assert skill_dirs == PUBLIC_SKILLS | SUPPORT_SKILLS
     language_skill = _read(PLUGIN / "skills" / "paper-wiki-language" / "SKILL.md")
-    assert "formal PRW/EPI" in language_skill
+    assert "Paper Wiki/Paper Source legacy wording" in language_skill
     assert "Language Gate" in language_skill
     assert "references/style-guide.md" in language_skill
 
 
-def test_prw_all_skill_entrypoints_stay_thin():
+def test_paper_wiki_all_skill_entrypoints_stay_thin():
     for skill_name in PUBLIC_SKILLS | SUPPORT_SKILLS:
         skill_path = PLUGIN / "skills" / skill_name / "SKILL.md"
         assert _skill_body_line_count(skill_path) <= 90, skill_name
 
 
-def test_prw_support_skill_entrypoints_stay_thin_and_route_to_style_guide():
+def test_paper_wiki_support_skill_entrypoints_stay_thin_and_route_to_style_guide():
     language_skill_path = PLUGIN / "skills" / "paper-wiki-language" / "SKILL.md"
     style_guide_path = PLUGIN / "skills" / "paper-wiki-language" / "references" / "style-guide.md"
 
@@ -246,7 +243,7 @@ def test_prw_support_skill_entrypoints_stay_thin_and_route_to_style_guide():
         assert phrase in style_guide
 
 
-def test_public_skill_routes_natural_epi_deposition_actions():
+def test_public_skill_routes_natural_paper_source_deposition_actions():
     skill = _read(PUBLIC_SKILL / "SKILL.md")
 
     for phrase in [
@@ -297,12 +294,12 @@ def test_public_skill_routes_natural_epi_deposition_actions():
         assert path.read_text(encoding="utf-8").strip(), workflow
 
 
-def test_prw_skill_routing_manifest_matches_public_workflows():
+def test_paper_wiki_skill_routing_manifest_matches_public_workflows():
     routing_path = PLUGIN / "skills" / "routing.yaml"
     assert routing_path.exists()
 
-    routing = _load_prw_routing()
-    assert routing["schema_version"] == "prw-skill-routing-v1"
+    routing = _load_paper_wiki_routing()
+    assert routing["schema_version"] == "paper-wiki-skill-routing-v1"
     assert routing["source_of_truth"] == "skills/routing.yaml"
     assert len(routing["always_read"]) <= 3
     assert "paper-research-wiki/references/upstream-obsidian-wiki-map.md" not in routing["always_read"]
@@ -348,8 +345,8 @@ def test_prw_skill_routing_manifest_matches_public_workflows():
     assert "paper-wiki-language/references/style-guide.md" in routes["language_gate"].get("references", [])
 
 
-def test_prw_routes_read_only_wiki_questions_to_ask_workflow():
-    routing = _load_prw_routing()
+def test_paper_wiki_routes_read_only_wiki_questions_to_ask_workflow():
+    routing = _load_paper_wiki_routing()
     ask_route = routing["routes"]["ask_wiki"]
     skill = _read(PUBLIC_SKILL / "SKILL.md")
     workflow = _read(PUBLIC_SKILL / "workflows" / "ask-wiki.md")
@@ -377,7 +374,7 @@ def test_ask_wiki_workflow_is_read_only_graph_first_and_correction_candidate_bas
     routing = _read(PLUGIN / "skills" / "routing.yaml")
     workflow_doc = _read(PLUGIN / "docs" / "workflow.md")
     structure_doc = _read(PLUGIN / "docs" / "structure.md")
-    integration_doc = _read(PLUGIN / "docs" / "epi-integration.md")
+    integration_doc = _read(PLUGIN / "docs" / "paper-source-integration.md")
     combined = "\n".join([workflow, routing, workflow_doc, structure_doc, integration_doc])
 
     for phrase in [
@@ -386,7 +383,7 @@ def test_ask_wiki_workflow_is_read_only_graph_first_and_correction_candidate_bas
         "do not write `log.md`",
         "do not write formal pages",
         "do not refresh QMD",
-        "do not write EPI artifacts",
+        "do not write Paper Source artifacts",
         "formal Obsidian graph",
         "backlinks",
         "outlinks",
@@ -404,8 +401,8 @@ def test_ask_wiki_workflow_is_read_only_graph_first_and_correction_candidate_bas
 
     assert "Question -> Scope -> Formal graph retrieval -> Evidence check -> Answer labels -> Correction candidates -> Stop" in workflow_doc
     assert "read-only `ask_wiki`" in integration_doc
-    assert "prw-record-request.json" in integration_doc
-    assert "ask-wiki does not write `prw-record-request.json`" in integration_doc
+    assert "paper-wiki-record-request.json" in integration_doc
+    assert "ask-wiki does not write `paper-wiki-record-request.json`" in integration_doc
 
 
 def test_public_skill_references_internal_contract_files():
@@ -418,11 +415,11 @@ def test_public_skill_references_internal_contract_files():
         assert path.read_text(encoding="utf-8").strip(), reference
 
 
-def test_public_skill_defaults_epi_wiki_requests_to_deposition():
+def test_public_skill_defaults_paper_source_wiki_requests_to_deposition():
     skill = _read(PUBLIC_SKILL / "SKILL.md")
 
     for phrase in [
-        "EPI",
+        "Paper Source",
         "ready",
         "preflight",
         "沉淀",
@@ -440,7 +437,7 @@ def test_required_docs_and_rules_exist():
         "AGENTS.md",
         "docs/workflow.md",
         "docs/structure.md",
-        "docs/epi-integration.md",
+        "docs/paper-source-integration.md",
         "docs/provenance.md",
         "docs/privacy.md",
         "docs/terms.md",
@@ -465,8 +462,8 @@ def test_page_family_rules_capture_formal_and_forbidden_roots():
         assert root in text
 
 
-def test_epi_integration_docs_name_handoff_and_record_contracts():
-    text = _read(PLUGIN / "docs" / "epi-integration.md")
+def test_paper_source_integration_docs_name_handoff_and_record_contracts():
+    text = _read(PLUGIN / "docs" / "paper-source-integration.md")
 
     for phrase in [
         "canonical handoff",
@@ -517,14 +514,14 @@ def test_upstream_obsidian_wiki_map_is_internalized_not_runtime_fetch():
     for phrase in [
         "design source, not a runtime source of truth",
         "do not fetch or search Ar9av/obsidian-wiki",
-        "normal PRW runs",
-        "local PRW workflows",
-        "upstream repository only when maintaining PRW",
+        "normal Paper Wiki runs",
+        "local Paper Wiki workflows",
+        "upstream repository only when maintaining Paper Wiki",
     ]:
         assert phrase in text
 
 
-def test_prw_internalizes_link_repair_qmd_and_post_task_checks():
+def test_paper_wiki_internalizes_link_repair_qmd_and_post_task_checks():
     skill = _read(PUBLIC_SKILL / "SKILL.md")
     standard = _read(PLUGIN / "rules" / "wiki-writing-standard.md")
     upstream = _read(PUBLIC_SKILL / "references" / "upstream-obsidian-wiki-map.md")
@@ -561,26 +558,26 @@ def test_prw_internalizes_link_repair_qmd_and_post_task_checks():
         assert "Run `workflows/check-wiki.md` after writing" in text
 
 
-def test_prw_declares_closed_loop_boundary_and_completion_definition():
+def test_paper_wiki_declares_closed_loop_boundary_and_completion_definition():
     skill = _read(PUBLIC_SKILL / "SKILL.md")
     standard = _read(PLUGIN / "rules" / "wiki-writing-standard.md")
     workflow_doc = _read(PLUGIN / "docs" / "workflow.md")
-    epi_integration = _read(PLUGIN / "docs" / "epi-integration.md")
+    paper_source_integration = _read(PLUGIN / "docs" / "paper-source-integration.md")
 
     for text in [skill, workflow_doc]:
         assert "Check -> Diagnose -> Plan -> Act -> Verify -> Refresh -> Record -> Next" in text
 
     for text in [skill, standard, workflow_doc]:
         assert (
-            "A PRW task is not complete until formal pages, tracking files, graph links, "
-            "taxonomy, provenance, language gate, QMD freshness, and EPI record readiness "
+            "A Paper Wiki task is not complete until formal pages, tracking files, graph links, "
+            "taxonomy, provenance, language gate, QMD freshness, and Paper Source record readiness "
             "have been checked or explicitly reported as skipped with reason."
         ) in text
 
-    for text in [skill, workflow_doc, epi_integration]:
+    for text in [skill, workflow_doc, paper_source_integration]:
         for phrase in [
-            "PRW owns",
-            "EPI owns",
+            "Paper Wiki owns",
+            "Paper Source owns",
             "paper discovery",
             "MinerU parsing",
             "paper-gate",
@@ -591,41 +588,41 @@ def test_prw_declares_closed_loop_boundary_and_completion_definition():
             assert phrase in text
 
 
-def test_prw_does_not_claim_to_refresh_epi_record_files():
+def test_paper_wiki_does_not_claim_to_refresh_paper_source_record_files():
     standard = _read(PLUGIN / "rules" / "wiki-writing-standard.md")
     update = _read(PUBLIC_SKILL / "workflows" / "update-wiki.md")
     redo = _read(PUBLIC_SKILL / "workflows" / "redo-extraction.md")
     extract = _read(PUBLIC_SKILL / "workflows" / "extract-papers.md")
     check = _read(PUBLIC_SKILL / "workflows" / "check-wiki.md")
-    integration = _read(PLUGIN / "docs" / "epi-integration.md")
+    integration = _read(PLUGIN / "docs" / "paper-source-integration.md")
 
     combined = "\n".join([standard, update, redo, extract, check, integration])
 
-    assert "EPI owns human approval records and `record-wiki-ingest`" in combined
+    assert "Paper Source owns human approval records and `record-wiki-ingest`" in combined
     assert "previous `wiki-ingest-record.json`" in combined
     assert "staging/raw `wiki-ingest-record.json`" not in combined
     assert "Refresh manifest or `.manifest.json`, `final-source-review.json`, staging/raw `wiki-ingest-record.json`" not in combined
-    assert "PRW records readiness; EPI writes or replaces `wiki-ingest-record.json`" in combined
+    assert "Paper Wiki records readiness; Paper Source writes or replaces `wiki-ingest-record.json`" in combined
 
 
-def test_prw_documents_ask_mode_epi_record_request_handoff():
+def test_paper_wiki_documents_ask_mode_paper_source_record_request_handoff():
     standard = _read(PLUGIN / "rules" / "wiki-writing-standard.md")
     extract = _read(PUBLIC_SKILL / "workflows" / "extract-papers.md")
     update = _read(PUBLIC_SKILL / "workflows" / "update-wiki.md")
     redo = _read(PUBLIC_SKILL / "workflows" / "redo-extraction.md")
-    integration = _read(PLUGIN / "docs" / "epi-integration.md")
+    integration = _read(PLUGIN / "docs" / "paper-source-integration.md")
     combined = "\n".join([standard, extract, update, redo, integration])
 
     for phrase in [
-        "prw-record-request.json",
-        "schema_version: prw-record-request-v1",
+        "paper-wiki-record-request.json",
+        "schema_version: paper-wiki-record-request-v1",
         "automation_mode: ask",
-        "record-wiki-ingest --from-prw-request",
-        "PRW writes the request artifact; EPI consumes it",
+        "record-wiki-ingest --from-paper-wiki-request",
+        "Paper Wiki writes the request artifact; Paper Source consumes it",
     ]:
         assert phrase in combined
 
-    assert "PRW writes or replaces `wiki-ingest-record.json`" not in combined
+    assert "Paper Wiki writes or replaces `wiki-ingest-record.json`" not in combined
 
 
 def test_check_wiki_supports_layered_checks_and_completion_reports():
@@ -649,7 +646,7 @@ def test_check_wiki_supports_layered_checks_and_completion_reports():
         "tracking files updated",
         "QMD refreshed / skipped / failed with fallback",
         "remaining risks",
-        "next EPI/PRW action",
+        "next Paper Source/Paper Wiki action",
     ]:
         assert phrase in check
 
@@ -673,8 +670,8 @@ def test_update_wiki_has_controlled_link_repair_mechanism():
         assert phrase in update
 
 
-def test_prw_formal_page_rewrite_is_graph_aware_transaction():
-    routing = _load_prw_routing()
+def test_paper_wiki_formal_page_rewrite_is_graph_aware_transaction():
+    routing = _load_paper_wiki_routing()
     skill = _read(PUBLIC_SKILL / "SKILL.md")
     standard = _read(PLUGIN / "rules" / "wiki-writing-standard.md")
     update = _read(PUBLIC_SKILL / "workflows" / "update-wiki.md")
@@ -745,7 +742,7 @@ def test_workflows_adapt_upstream_ingest_status_update_and_relink_patterns():
 
     for phrase in [
         "What to Do Next",
-        "pending EPI handoffs",
+        "pending Paper Source handoffs",
         "orphan",
         "broken wikilinks",
         "staged writes",
@@ -767,7 +764,7 @@ def test_workflows_adapt_upstream_ingest_status_update_and_relink_patterns():
         assert phrase in provenance
 
 
-def test_prw_enforces_ar9av_style_wiki_writing_standard():
+def test_paper_wiki_enforces_ar9av_style_wiki_writing_standard():
     standard_path = PLUGIN / "rules" / "wiki-writing-standard.md"
     standard = _read(standard_path)
     skill = _read(PUBLIC_SKILL / "SKILL.md")
@@ -818,7 +815,7 @@ def test_prw_enforces_ar9av_style_wiki_writing_standard():
         assert phrase in standard
 
 
-def test_prw_supports_single_and_batch_redo_deep_extraction():
+def test_paper_wiki_supports_single_and_batch_redo_deep_extraction():
     skill = _read(PUBLIC_SKILL / "SKILL.md")
     redo = _read(PUBLIC_SKILL / "workflows" / "redo-extraction.md")
     metadata = _read(PUBLIC_SKILL / "agents" / "openai.yaml")
@@ -846,7 +843,7 @@ def test_prw_supports_single_and_batch_redo_deep_extraction():
         assert phrase in redo
 
 
-def test_prw_requires_clickable_source_pdf_links_in_frontmatter():
+def test_paper_wiki_requires_clickable_source_pdf_links_in_frontmatter():
     standard = _read(PLUGIN / "rules" / "wiki-writing-standard.md")
     frontmatter = _read(PLUGIN / "rules" / "formal-page-frontmatter.md")
     provenance = _read(PUBLIC_SKILL / "references" / "page-provenance.md")
@@ -856,9 +853,9 @@ def test_prw_requires_clickable_source_pdf_links_in_frontmatter():
         # canonical clickable obsidian:// form displayed with the paper title
         assert "obsidian://open?vault=" in text
         # correct PDF path with no stale papers/ segment; legacy wikilink form still accepted
-        assert "_epi/raw/<slug>/paper.pdf" in text
+        assert "_paper_source/raw/<slug>/paper.pdf" in text
         assert "papers/<slug>" not in text
-        assert "[[_epi/raw/<slug>/paper.pdf|<slug>]]" in text
+        assert "[[_paper_source/raw/<slug>/paper.pdf|<slug>]]" in text
     assert "Markdown link" in standard
     assert "原论文 PDF" in standard
     assert "plain path text" in standard
@@ -866,7 +863,28 @@ def test_prw_requires_clickable_source_pdf_links_in_frontmatter():
         assert phrase in standard
 
 
-def test_prw_scopes_reference_single_source_separately_from_synthesis_pages():
+def test_paper_wiki_active_docs_use_paper_source_root_as_primary_path():
+    ask = _read(PUBLIC_SKILL / "workflows" / "ask-wiki.md")
+    check = _read(PUBLIC_SKILL / "workflows" / "check-wiki.md")
+    update = _read(PUBLIC_SKILL / "workflows" / "update-wiki.md")
+    page_family = _read(PUBLIC_SKILL / "references" / "page-family-contract.md")
+    anatomy = _read(PUBLIC_SKILL / "references" / "references-page-anatomy.md")
+    upstream = _read(PUBLIC_SKILL / "references" / "upstream-obsidian-wiki-map.md")
+
+    assert "Use `_paper_source/raw` as primary source evidence" in ask
+    assert "legacy `_epi/raw` only for existing artifacts" in ask
+    assert "core `_paper_source` roots" in check
+    assert "using `_paper_source/staging/papers/*/wiki-ingest-brief.json` as canonical" in check
+    assert "Forbidden formal roots are `_paper_source/`, legacy `_epi/`" in page_family
+    assert "forbidden internal links from formal pages into `_paper_source/`, legacy `_epi/`" in upstream
+    assert "confirm `_paper_source/` and legacy `_epi/` remain outside the formal graph/index" in update
+    assert "file=_paper_source%2Fraw%2F<slug>%2Fpaper.pdf" in anatomy
+    assert "file=_epi%2Fraw%2F<slug>%2Fpaper.pdf" not in anatomy
+    assert "full source map remains in `_paper_source/raw/<slug>/mineru/*`" in anatomy
+    assert "file:///D:/paper-research-wiki/_paper_source/raw/<slug>/mineru/images/<hash>.jpg" in anatomy
+
+
+def test_paper_wiki_scopes_reference_single_source_separately_from_synthesis_pages():
     standard = _read(PLUGIN / "rules" / "wiki-writing-standard.md")
     frontmatter = _read(PLUGIN / "rules" / "formal-page-frontmatter.md")
     provenance = _read(PUBLIC_SKILL / "references" / "page-provenance.md")
@@ -970,60 +988,58 @@ def test_paper_wiki_short_aliases_are_natural_language_only():
     assert ("name: " + "pw") not in routing.lower()
 
 
-def test_prw_user_docs_use_paper_wiki_and_paper_source_stage2_names():
+def test_paper_wiki_user_docs_use_paper_wiki_and_paper_source_stage2_names():
     workflow = _read(PLUGIN / "docs" / "workflow.md")
     structure = _read(PLUGIN / "docs" / "structure.md")
-    integration = _read(PLUGIN / "docs" / "epi-integration.md")
+    integration = _read(PLUGIN / "docs" / "paper-source-integration.md")
     combined = "\n".join([workflow, structure, integration])
 
     for phrase in [
         "Paper Wiki",
-        "formerly PRW",
         "Paper Source",
-        "formerly EPI",
         "PW",
         "PS",
         "machine-facing",
         "`paper-wiki`",
         "`paper-source`",
+        "`prw` is a pre-Stage-2 legacy alias",
+        "`epi` is a pre-Stage-2 legacy alias",
         "pre-Stage-2",
     ]:
         assert phrase in combined
 
     for phrase in [
-        "EPI `wiki-setup`",
+        "Paper Source `wiki-setup`",
         "wiki-ingest-brief.json",
         "wiki_deposition_task.json",
-        "prw-record-request.json",
+        "paper-wiki-record-request.json",
     ]:
         assert phrase in combined
 
 
-def test_stage1_keeps_legacy_epi_prw_contract_terms_for_compatibility():
+def test_stage1_keeps_legacy_paper_source_paper_wiki_contract_terms_for_compatibility():
     files = [
         PLUGIN / "skills" / "routing.yaml",
         PLUGIN / "skills" / "paper-research-wiki" / "SKILL.md",
-        PLUGIN / "docs" / "epi-integration.md",
-        EPI_PLUGIN / "skills" / "routing.yaml",
-        EPI_PLUGIN / "skills" / "epi-paper-deposition" / "SKILL.md",
+        PLUGIN / "docs" / "paper-source-integration.md",
+        PAPER_SOURCE_PLUGIN / "skills" / "routing.yaml",
+        PAPER_SOURCE_PLUGIN / "skills" / "paper-source-paper-deposition" / "SKILL.md",
     ]
     combined = "\n".join(path.read_text(encoding="utf-8") for path in files)
 
     for phrase in [
-        "EPI",
-        "PRW",
-        "formerly EPI",
-        "formerly PRW",
+        "epi",
+        "prw",
         "legacy",
         "wiki-ingest-brief.json",
         "wiki_deposition_task.json",
-        "epi-paper-deposition",
+        "paper-source-paper-deposition",
         "paper-research-wiki",
     ]:
         assert phrase in combined
 
 
-def test_all_prw_skills_have_ui_metadata():
+def test_all_paper_wiki_skills_have_ui_metadata():
     for skill_name in PUBLIC_SKILLS | SUPPORT_SKILLS:
         metadata_path = PLUGIN / "skills" / skill_name / "agents" / "openai.yaml"
         assert metadata_path.exists(), skill_name
@@ -1038,19 +1054,19 @@ def test_all_prw_skills_have_ui_metadata():
         assert re.search(r"[\u4e00-\u9fff]", default_prompt), skill_name
 
 
-def test_epi_bridge_points_to_plugin_level_experience():
-    skill = _read(ROOT / "plugins" / "paper-source" / "skills" / "epi-paper-deposition" / "SKILL.md")
+def test_paper_source_bridge_points_to_plugin_level_experience():
+    skill = _read(ROOT / "plugins" / "paper-source" / "skills" / "paper-source-paper-deposition" / "SKILL.md")
     workflow = _read(
         ROOT
         / "plugins"
         / "paper-source"
         / "skills"
-        / "epi-paper-deposition"
+        / "paper-source-paper-deposition"
         / "workflows"
         / "formal-wiki-write.md"
     )
     structure = _read(ROOT / "plugins" / "paper-source" / "docs" / "structure.md")
-    linkage = _read(ROOT / "plugins" / "paper-source" / "docs" / "epi-linkage.md")
+    linkage = _read(ROOT / "plugins" / "paper-source" / "docs" / "paper-source-linkage.md")
 
     for text in [skill, workflow, structure, linkage]:
         assert "paper-research-wiki" in text
@@ -1063,70 +1079,70 @@ def test_epi_bridge_points_to_plugin_level_experience():
         assert "$paper-research-wiki" in text
 
 
-def test_epi_handoff_and_prw_routing_share_canonical_contract():
-    wiki_contracts = _read(EPI_PLUGIN / "scripts" / "build" / "epi" / "wiki_contracts.py")
-    stage_wiki = _read(EPI_PLUGIN / "scripts" / "build" / "epi" / "stage_wiki.py")
-    epi_routing = _read(EPI_PLUGIN / "skills" / "routing.yaml")
-    prw_routing = _read(PLUGIN / "skills" / "routing.yaml")
-    prw_skill = _read(PUBLIC_SKILL / "SKILL.md")
+def test_paper_source_handoff_and_paper_wiki_routing_share_canonical_contract():
+    wiki_contracts = _read(PAPER_SOURCE_PLUGIN / "scripts" / "build" / "paper_source" / "wiki_contracts.py")
+    stage_wiki = _read(PAPER_SOURCE_PLUGIN / "scripts" / "build" / "paper_source" / "stage_wiki.py")
+    paper_source_routing = _read(PAPER_SOURCE_PLUGIN / "skills" / "routing.yaml")
+    paper_wiki_routing = _read(PLUGIN / "skills" / "routing.yaml")
+    paper_wiki_skill = _read(PUBLIC_SKILL / "SKILL.md")
     check_workflow = _read(PUBLIC_SKILL / "workflows" / "check-wiki.md")
     workflow_doc = _read(PLUGIN / "docs" / "workflow.md")
 
-    assert 'PRW_CANONICAL_SKILL = "paper-research-wiki"' in wiki_contracts
-    assert "PRW_CANONICAL_SKILL" in stage_wiki
+    assert 'PAPER_WIKI_CANONICAL_SKILL = "paper-research-wiki"' in wiki_contracts
+    assert "PAPER_WIKI_CANONICAL_SKILL" in stage_wiki
     assert "first as the canonical paper wiki layer" in stage_wiki
     assert "wiki_deposition_task" in stage_wiki
 
     deposition_match = re.search(
-        r"(?ms)^  epi_paper_deposition:\n(?P<body>.*?)(?=^  [a-z0-9_]+:|\Z)",
-        epi_routing,
+        r"(?ms)^  paper_source_paper_deposition:\n(?P<body>.*?)(?=^  [a-z0-9_]+:|\Z)",
+        paper_source_routing,
     )
     assert deposition_match
     deposition_route = deposition_match.group("body")
     assert "category: compatibility" in deposition_route
-    assert "skill: epi-paper-deposition/SKILL.md" in deposition_route
+    assert "skill: paper-source-paper-deposition/SKILL.md" in deposition_route
     assert "$paper-research-wiki" in deposition_route
 
-    combined_prw_boundary = "\n".join([prw_routing, prw_skill, check_workflow, workflow_doc])
-    assert "missing vault structure" in combined_prw_boundary
-    assert "EPI `wiki-setup`" in combined_prw_boundary
-    assert "does not initialize" in combined_prw_boundary
-    assert "does not reset" in combined_prw_boundary
+    combined_paper_wiki_boundary = "\n".join([paper_wiki_routing, paper_wiki_skill, check_workflow, workflow_doc])
+    assert "missing vault structure" in combined_paper_wiki_boundary
+    assert "Paper Source `wiki-setup`" in combined_paper_wiki_boundary
+    assert "does not initialize" in combined_paper_wiki_boundary
+    assert "does not reset" in combined_paper_wiki_boundary
 
 
-def test_prw_defers_vault_bootstrap_to_epi_wiki_setup():
+def test_paper_wiki_defers_vault_bootstrap_to_paper_source_wiki_setup():
     skill = _read(PUBLIC_SKILL / "SKILL.md")
     check_workflow = _read(PUBLIC_SKILL / "workflows" / "check-wiki.md")
     extract_workflow = _read(PUBLIC_SKILL / "workflows" / "extract-papers.md")
-    integration = _read(PLUGIN / "docs" / "epi-integration.md")
+    integration = _read(PLUGIN / "docs" / "paper-source-integration.md")
     combined = "\n".join([skill, check_workflow, extract_workflow, integration])
 
-    assert "EPI `wiki-setup`" in combined
+    assert "Paper Source `wiki-setup`" in combined
     assert "does not initialize" in integration
     assert "does not reset" in integration
     assert "missing vault structure" in combined
 
 
-def test_prw_artifact_contract_marks_task_deprecated():
-    contract = _read(PUBLIC_SKILL / "references" / "epi-artifact-contract.md")
+def test_paper_wiki_artifact_contract_marks_task_deprecated():
+    contract = _read(PUBLIC_SKILL / "references" / "paper-source-artifact-contract.md")
 
     assert "wiki-ingest-brief.json" in contract
     assert "wiki_deposition_task.json" in contract
     assert "deprecated" in contract.lower() or "已废弃" in contract
 
 
-def test_prw_epi_artifact_contract_is_brief_first():
-    contract = _read(PUBLIC_SKILL / "references" / "epi-artifact-contract.md")
+def test_paper_wiki_paper_source_artifact_contract_is_brief_first():
+    contract = _read(PUBLIC_SKILL / "references" / "paper-source-artifact-contract.md")
     extract = _read(PUBLIC_SKILL / "workflows" / "extract-papers.md")
     check = _read(PUBLIC_SKILL / "workflows" / "check-wiki.md")
-    integration = _read(PLUGIN / "docs" / "epi-integration.md")
+    integration = _read(PLUGIN / "docs" / "paper-source-integration.md")
     combined = "\n".join([contract, extract, check, integration])
 
     assert "canonical handoff" in contract
     assert "wiki-ingest-brief.json" in contract
     assert "wiki_deposition_task.json" in contract
     assert "legacy compatibility" in contract
-    assert "Locate `_epi/staging/papers/*/wiki-ingest-brief.json`" in extract
+    assert "Locate `_paper_source/staging/papers/*/wiki-ingest-brief.json`" in extract
     assert "Do not treat task-only legacy handoffs as ready" in combined
 
 
@@ -1137,7 +1153,7 @@ def test_wiki_writing_standard_declares_itself_canonical():
     assert "page" in rule.lower() and "frontmatter" in rule.lower()
 
 
-def test_ask_wiki_notes_epi_cli_is_same_source_fallback():
+def test_ask_wiki_notes_paper_source_cli_is_same_source_fallback():
     ask = _read(PUBLIC_SKILL / "workflows" / "ask-wiki.md")
 
     assert "wiki-ask" in ask

@@ -49,7 +49,7 @@ relationships:
     type: uses
   - target: "[[synthesis/<page>]]"
     type: related_to
-sources: ["[<full paper title>](obsidian://open?vault=<vault>&file=_epi%2Fraw%2F<slug>%2Fpaper.pdf)"]
+sources: ["[<full paper title>](obsidian://open?vault=<vault>&file=_paper_source%2Fraw%2F<slug>%2Fpaper.pdf)"]
 summary: "<year> <venue> <type>，提出 <ACRONYM>：<one-line mechanism>。"
 provenance:
   extracted:
@@ -77,11 +77,12 @@ Field rules and *why*:
   being cited as field-proven.
 - **`sources`** — **only** a clickable link to the original PDF.
   - *Canonical form* (use this): a Markdown link displayed with the paper title, pointing at the
-    `obsidian://open?vault=<vault>&file=_epi%2Fraw%2F<slug>%2Fpaper.pdf` URI. This is what the
+    `obsidian://open?vault=<vault>&file=_paper_source%2Fraw%2F<slug>%2Fpaper.pdf` URI. This is what the
     reviewed exemplar pages use and what renders clickable in the Obsidian properties panel.
-  - The path is `_epi/raw/<slug>/paper.pdf` — **no `papers/` segment**.
-  - The legacy wikilink form `"[[_epi/raw/<slug>/paper.pdf|<slug>]]"` is still accepted for
-    EPI-generated pages, but new PRW writes should use the canonical form.
+  - The path is `_paper_source/raw/<slug>/paper.pdf` — **no `papers/` segment**.
+  - The wikilink form `"[[_paper_source/raw/<slug>/paper.pdf|<slug>]]"` is still accepted for
+    Paper Source-generated pages. Legacy `_epi` wikilinks remain accepted for existing artifacts,
+    but new Paper Wiki writes should use the canonical form.
   - Never put DOI, MinerU md/tex, manifest, or figure paths in frontmatter `sources` — those go in
     the body `## 原文与证据入口`.
 - **`summary`** — fixed shape: `年份 + 出处 + 类型，提出 缩写：一句机制`. A summary that does not
@@ -203,7 +204,7 @@ Use source-map depth as the page's depth control:
   `Table I row <metric>`. If a local source map provides block IDs such as `S012`, `C003`, `F002`,
   or `T001`, preserve them in the body or Provenance.
 - Do not expose the full source map in the reference page. Surface only the anchors needed to audit
-  the page's durable claims; the full source map remains in `_epi/raw/<slug>/mineru/*`.
+  the page's durable claims; the full source map remains in `_paper_source/raw/<slug>/mineru/*`.
 - If the source bundle does not support a step, say `原文未明确说明` instead of filling the gap from
   general field knowledge.
 
@@ -287,7 +288,7 @@ you cannot name the axis of difference, you have not yet understood how the pape
 **Placed near:** 核心机制（第 III 节首次实质引用）
 **Source:** MinerU Fig. 2 / Fig. 2 caption C003
 
-![Fig. 2](file:///D:/paper-research-wiki/_epi/raw/<slug>/mineru/images/<hash>.jpg)
+![Fig. 2](file:///D:/paper-research-wiki/_paper_source/raw/<slug>/mineru/images/<hash>.jpg)
 
 **中文图注:** <原图注的保守译文>
 
@@ -349,7 +350,7 @@ honest simulation-tier node.
 
 - Five tag facets present, `evidence/` tier set, and tier matches the prose boundary.
 - `summary` follows `年份+出处+类型，提出 缩写：机制`.
-- `sources` is PDF-only, clickable, canonical obsidian:// form, path `_epi/raw/<slug>/paper.pdf`
+- `sources` is PDF-only, clickable, canonical obsidian:// form, path `_paper_source/raw/<slug>/paper.pdf`
   (no `papers/`).
 - Frontmatter `provenance` has all three lists; body has a `## Provenance` block with stance labels.
 - Source-map-first writing used MinerU Markdown / TeX / images / manifest, not only reader/critic

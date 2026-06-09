@@ -1,24 +1,24 @@
 # Redo Extraction
 
-Use this when the user asks PRW to 重做, 重新提取, 更详细提取, 批量重提取, redo, redo extraction, or deep extraction for one paper or many papers.
+Use this when the user asks Paper Wiki to 重做, 重新提取, 更详细提取, 批量重提取, redo, redo extraction, or deep extraction for one paper or many papers.
 
-This workflow is for deliberate re-deposition. It is stronger than ordinary update: PRW must re-read the source bundle, compare existing wiki pages, and produce a controlled rewrite or staged patch.
+This workflow is for deliberate re-deposition. It is stronger than ordinary update: Paper Wiki must re-read the source bundle, compare existing wiki pages, and produce a controlled rewrite or staged patch.
 
 If the paper is a survey/review (detection signals in `../references/survey-page-anatomy.md`), write or repair the `references/` page with the survey map/hub spine from that contract — not the method spine. Keep survey routing additive: taxonomy → `concepts/`, cross-method landscape → `synthesis/`, gaps → `opportunities/`; do not create `derivations/` pages from a survey's borrowed illustrative formulas or `experiments/` pages for a survey. Reframe any existing such pages honestly rather than forcing the survey through them.
 
 ## Modes
 
-- single paper: target one slug, title, DOI, arXiv id, selected page, or selected EPI handoff.
+- single paper: target one slug, title, DOI, arXiv id, selected page, or selected Paper Source handoff.
 - batch: target a list of slugs, all ready handoffs, all papers in a run, or all papers matching a topic/status filter.
 
-If the target is ambiguous, ask one short question. A reply of `默认` means redo the ready paper or batch PRW can identify from the current EPI handoff context.
+If the target is ambiguous, ask one short question. A reply of `默认` means redo the ready paper or batch Paper Wiki can identify from the current Paper Source handoff context.
 
 ## Preflight
 
 1. Read `../../../rules/wiki-writing-standard.md`.
 2. Read `../../paper-wiki-language/SKILL.md`; redo writing must fix language quality without changing evidence.
 3. Resolve the target vault and read `AGENTS.md`, `_meta/schema.md`, `_meta/taxonomy.md`, and `_meta/directory-structure.md` when present.
-4. Locate the relevant `_epi/staging/papers/*/wiki-ingest-brief.json`; it is the canonical EPI-to-PRW handoff. Treat `_epi/staging/papers/*/wiki_deposition_task.json` as legacy compatibility context only, and stop for EPI brief repair if only the task exists.
+4. Locate the relevant `_paper_source/staging/papers/*/wiki-ingest-brief.json`; it is the canonical Paper Source-to-Paper Wiki handoff. Legacy `_epi/staging/papers/*/wiki-ingest-brief.json` remains readable. Treat `_paper_source/staging/papers/*/wiki_deposition_task.json` and legacy `_epi/staging/papers/*/wiki_deposition_task.json` as compatibility context only, and stop for Paper Source brief repair if only the task exists.
 5. Check `paper-gate` status or handoff status. Stop if source artifacts are missing or if human approval is the only unresolved gate.
 6. Read current formal pages named by previous `wiki-ingest-record.json`, `final-source-review.json`, page frontmatter `sources:`, or search hits in the seven page families.
 
@@ -61,7 +61,7 @@ Redo work that materially changes formal page claims is a material rewrite and a
 3. Update dependent formal pages when the redo changes claim/evidence boundaries, formulas, figure/table evidence, evidence tiers, reusable mechanisms, synthesis conclusions, or opportunity wording.
 4. Create a new `derivations/` or `concepts/` page when the source reread exposes reusable knowledge that downstream pages need to cite.
 5. Refresh manifest or `.manifest.json`, `final-source-review.json`, `index.md`, `log.md`, and `hot.md` in the same run as the markdown rewrite. Read prior `wiki-ingest-record.json` only as provenance and reverse-dependency evidence.
-6. Report EPI record readiness. PRW records readiness; EPI writes or replaces `wiki-ingest-record.json` through `record-wiki-ingest`. When the redo produces record-ready formal pages, write `_epi/staging/papers/<paper-slug>/prw-record-request.json` with `schema_version: prw-record-request-v1`, `automation_mode: ask`, current final page hashes, current `final-source-review.json` hash, and `record-wiki-ingest --from-prw-request ...`; PRW writes the request artifact; EPI consumes it.
+6. Report Paper Source record readiness. Paper Wiki records readiness; Paper Source writes or replaces `wiki-ingest-record.json` through `record-wiki-ingest`. When the redo produces record-ready formal pages, write `_paper_source/staging/papers/<paper-slug>/paper-wiki-record-request.json` with `schema_version: paper-wiki-record-request-v1`, `automation_mode: ask`, current final page hashes, current `final-source-review.json` hash, and `record-wiki-ingest --from-paper-wiki-request ...`; Paper Wiki writes the request artifact; Paper Source consumes it. Legacy `_epi/.../prw-record-request.json` remains accepted only for existing artifacts.
 7. Run or report `qmd update` and `qmd embed` after confirmed writes or staged patches.
 
 ## Deep Extraction Lenses
@@ -105,7 +105,7 @@ After confirmation:
 8. Update or recreate `final-source-review.json` for every selected paper.
 9. Run `workflows/check-wiki.md` after writing as the post-task check.
 
-## Tracking And EPI Boundary
+## Tracking And Paper Source Boundary
 
 Update the target vault tracking surface after the redo:
 
@@ -114,9 +114,9 @@ Update the target vault tracking surface after the redo:
 - `log.md`
 - `hot.md`
 
-PRW can prepare pages and source review, but do not write human approval. EPI owns human approval records and `record-wiki-ingest`.
+Paper Wiki can prepare pages and source review, but do not write human approval. Paper Source owns human approval records and `record-wiki-ingest`.
 
-After redo, tell the user which `record-wiki-ingest --from-prw-request _epi/staging/papers/<paper-slug>/prw-record-request.json` command remains, or say that staged review must happen first.
+After redo, tell the user which `record-wiki-ingest --from-paper-wiki-request _paper_source/staging/papers/<paper-slug>/paper-wiki-record-request.json` command remains, or say that staged review must happen first.
 
 ## QMD Compatibility
 

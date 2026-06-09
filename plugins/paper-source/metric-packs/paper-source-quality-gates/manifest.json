@@ -1,0 +1,12 @@
+{
+  "name": "paper-source-quality-gates",
+  "version": "0.1.0",
+  "supportedTargetKinds": [
+    "plugin",
+    "directory"
+  ],
+  "command": [
+    "node",
+    "../../build/metric-packs/paper-source-quality-gates/emit-paper-source-quality-gates.js"
+  ]
+}

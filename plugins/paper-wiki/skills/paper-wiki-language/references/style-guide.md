@@ -1,6 +1,6 @@
 # Paper Wiki Language Style Guide
 
-Use this reference after `paper-wiki-language/SKILL.md` when drafting, rewriting, reviewing, or polishing formal PRW/EPI paper wiki pages.
+Use this reference after `paper-wiki-language/SKILL.md` when drafting, rewriting, reviewing, or polishing formal Paper Wiki/Paper Source paper wiki pages.
 
 ## Voice Target
 

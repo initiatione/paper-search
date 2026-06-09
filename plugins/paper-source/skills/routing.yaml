@@ -1,4 +1,4 @@
-schema_version: epi-skill-routing-v1
+schema_version: paper-source-skill-routing-v1
 source_of_truth: skills/routing.yaml
 session_discipline:
   re_match_every_task: true
@@ -15,13 +15,13 @@ routes:
     triggers:
       - 配置 Paper Source
       - 配置 PS
-      - 配置 EPI
+      - 配置 Paper Source
       - Paper Source config
       - 查看当前配置
       - 初始化配置
       - 修改研究画像
       - missing config
-      - initialize EPI
+      - initialize Paper Source
       - update runtime config
     skill: config-setup/SKILL.md
     docs:
@@ -89,21 +89,21 @@ routes:
     skill: mineru-paper-parser/SKILL.md
     notes:
       - support paper-ingest source bundle preparation
-  epi_paper_deposition:
+  paper_source_paper_deposition:
     category: compatibility
     triggers:
       - wiki_deposition_task.json
       - 兼容旧沉淀任务
-      - EPI handoff adapter
-      - legacy EPI wiki deposition
+      - Paper Source handoff adapter
+      - legacy Paper Source wiki deposition
       - final paper deposition compatibility
-    skill: epi-paper-deposition/SKILL.md
+    skill: paper-source-paper-deposition/SKILL.md
     workflows:
-      - epi-paper-deposition/workflows/formal-wiki-write.md
+      - paper-source-paper-deposition/workflows/formal-wiki-write.md
     notes:
-      - user-facing formal paper wiki work should route to $paper-research-wiki when PRW is installed
+      - user-facing formal paper wiki work should route to $paper-research-wiki when Paper Wiki is installed
       - this skill remains a compatibility bridge for existing wiki_deposition_task.json artifacts and legacy epi-wiki-deposition mentions
-      - formal_page_language_policy is enforced by PRW paper-wiki-language during formal writes
+      - formal_page_language_policy is enforced by Paper Wiki paper-wiki-language during formal writes
       - Codex may use subagents only when the user explicitly authorizes delegation
   wiki_provenance:
     category: support
@@ -120,7 +120,7 @@ routes:
     category: maintenance
     triggers:
       - 清理 runs
-      - _epi/runs cleanup
+      - _paper_source/runs cleanup
       - run index audit
       - dashboard pruning
     skill: run-lifecycle/SKILL.md
@@ -142,7 +142,7 @@ routes:
     workflows:
       - wiki-setup/workflows/reset-repair.md
     notes:
-      - Paper Source/EPI keeps vault bootstrap ownership; Paper Wiki/PRW consumes the initialized vault contract and reports missing structure back to wiki-setup
+      - Paper Source keeps vault bootstrap ownership; Paper Wiki consumes the initialized vault contract and reports missing structure back to wiki-setup
   zotero_sync:
     category: support
     triggers:
@@ -158,7 +158,7 @@ routes:
   skill_aware_evolve:
     category: maintenance
     triggers:
-      - 优化 EPI 插件
+      - 优化 Paper Source 插件
       - 根据实测反馈优化
       - plugin eval
       - quality gates

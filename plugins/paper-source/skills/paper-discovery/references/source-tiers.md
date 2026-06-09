@@ -1,6 +1,6 @@
 # Source Tiers For Academic Paper Discovery
 
-EPI uses source tiers to avoid treating one search transport as the definition of quality. Prefer structured academic metadata first, then use publisher/web sources for verification and recall gaps.
+Paper Source uses source tiers to avoid treating one search transport as the definition of quality. Prefer structured academic metadata first, then use publisher/web sources for verification and recall gaps.
 
 ## Tier Definitions
 

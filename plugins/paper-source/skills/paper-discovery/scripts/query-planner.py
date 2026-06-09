@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Thin wrapper for the EPI query planner."""
+"""Thin wrapper for the Paper Source query planner."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 PLUGIN_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PLUGIN_ROOT / "scripts" / "build"))
 
-from epi.query_planner import main
+from paper_source.query_planner import main
 
 
 if __name__ == "__main__":

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paper Source Paper Deposition"
+  short_description: "Bridge legacy Paper Source bundles to Paper Wiki"
+  default_prompt: "Use $paper-source-paper-deposition to bridge legacy Paper Source bundles to Paper Wiki."

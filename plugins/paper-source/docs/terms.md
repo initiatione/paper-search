@@ -1,6 +1,6 @@
 # Terms
 
-EPI is provided as a local research workflow aid. Users are responsible for complying with the terms of upstream paper indexes, PDF providers, MinerU, Zotero, any configured MCP servers, and any explicitly enabled optional PDF provider or Sci-Hub base URL.
+Paper Source is provided as a local research workflow aid. Users are responsible for complying with the terms of upstream paper indexes, PDF providers, MinerU, Zotero, any configured MCP servers, and any explicitly enabled optional PDF provider or Sci-Hub base URL.
 
 The plugin preserves provenance and dry-run artifacts so users can inspect search and ranking decisions before acquisition, parsing, critic review, or wiki promotion.
 

@@ -4,7 +4,7 @@ Use this file when explaining why a candidate was advanced, held for review, or 
 
 ## Ranking Layers
 
-EPI ranking is intentionally multi-layered:
+Paper Source ranking is intentionally multi-layered:
 
 1. `ranking_signals`: numeric heuristic signals for topic, venue, EasyScholar `easyscholar_score`, citation, freshness, PDF/code, benchmark, reproducibility, and negative keyword overlap.
 2. `paper_classification`: title/abstract paper type classification.
@@ -35,4 +35,4 @@ EPI ranking is intentionally multi-layered:
 
 ## Chat Recommendation Shape
 
-For each kept candidate, include the paper type, ranking rationale, strongest evidence, and caveat. Avoid long abstracts; point to the EPI run artifacts for audit.
+For each kept candidate, include the paper type, ranking rationale, strongest evidence, and caveat. Avoid long abstracts; point to the Paper Source run artifacts for audit.

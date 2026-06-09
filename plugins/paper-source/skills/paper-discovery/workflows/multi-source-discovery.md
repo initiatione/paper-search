@@ -1,6 +1,6 @@
 # Workflow: Multi-Source Academic Paper Discovery
 
-Use this workflow when the user asks for high-quality papers, latest papers, non-review papers, or any topic defined by the user's EPI profile/config.
+Use this workflow when the user asks for high-quality papers, latest papers, non-review papers, or any topic defined by the user's Paper Source profile/config.
 
 ## Procedure
 
@@ -42,4 +42,4 @@ The final answer should distinguish:
 - `venue_prior`: community or curated venue tier, if used.
 - `verified_metrics`: DOI, citation count, IF/JCR/CiteScore, official venue page, PDF/code.
 - `verification_warnings`: fields that are plausible but not confirmed.
-- `recall_gap`: important papers or venues discovered outside the first EPI result set.
+- `recall_gap`: important papers or venues discovered outside the first Paper Source result set.

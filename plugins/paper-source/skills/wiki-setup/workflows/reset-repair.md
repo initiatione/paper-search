@@ -33,19 +33,19 @@ Before reset, inventory the vault, run `config-status`, explain moved/removed/pr
 Require this exact second confirmation:
 
 ```text
-确认重置 EPI wiki
+确认重置 Paper Source wiki
 ```
 
 Then run:
 
 ```powershell
-python scripts\orchestrator.py wiki-reset --vault <vault> --confirmed-by "确认重置 EPI wiki" --json
+python scripts\orchestrator.py wiki-reset --vault <vault> --confirmed-by "确认重置 Paper Source wiki" --json
 ```
 
 If backup is explicitly declined, this is allowed only for wiki content and still preserves config:
 
 ```powershell
-python scripts\orchestrator.py wiki-reset --vault <vault> --confirmed-by "确认重置 EPI wiki" --no-backup --json
+python scripts\orchestrator.py wiki-reset --vault <vault> --confirmed-by "确认重置 Paper Source wiki" --no-backup --json
 ```
 
 Treat `不需要备份` as "do not back up wiki content"; it does not authorize config deletion.
@@ -55,13 +55,13 @@ Treat `不需要备份` as "do not back up wiki content"; it does not authorize 
 To reset config too, require this separate phrase:
 
 ```text
-确认同时重置 EPI config
+确认同时重置 Paper Source config
 ```
 
 Do not infer config reset from `reset wiki`, `clean everything`, `no backup`, or `重新初始化`.
 
 ```powershell
-python scripts\orchestrator.py wiki-reset --vault <vault> --confirmed-by "确认重置 EPI wiki" --reset-config-confirmed-by "确认同时重置 EPI config" --json
+python scripts\orchestrator.py wiki-reset --vault <vault> --confirmed-by "确认重置 Paper Source wiki" --reset-config-confirmed-by "确认同时重置 Paper Source config" --json
 ```
 
 After reset, initialize, rerun `config-status`, and stop if config unexpectedly needs onboarding.
@@ -73,8 +73,8 @@ Use for accidental deletion, mistaken reset, missing config after preserve reset
 ```powershell
 python scripts\orchestrator.py wiki-repair --vault <vault> --json
 python scripts\orchestrator.py config-recover --vault <vault> --json
-python scripts\orchestrator.py config-restore --vault <vault> --from <backup-config-yaml> --confirmed-by "确认恢复 EPI config" --json
-python scripts\orchestrator.py wiki-repair --vault <vault> --restore-from <backup-config-yaml> --confirmed-by "确认恢复 EPI config" --json
+python scripts\orchestrator.py config-restore --vault <vault> --from <backup-config-yaml> --confirmed-by "确认恢复 Paper Source config" --json
+python scripts\orchestrator.py wiki-repair --vault <vault> --restore-from <backup-config-yaml> --confirmed-by "确认恢复 Paper Source config" --json
 ```
 
 Never reset or delete outside the intended vault, while ingest/MinerU/promotion/wiki ingest is running, or without the exact second confirmation.

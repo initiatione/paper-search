@@ -1,7 +1,7 @@
 ---
 name: paper-wiki-language
 description: >
-  Use when writing, rewriting, reviewing, or polishing formal Paper Wiki / PRW pages,
+  Use when writing, rewriting, reviewing, or polishing formal Paper Wiki pages,
   pages, especially Chinese formal pages, machine-translation-like prose,
   unnatural headings, stiff academic summaries, terminology drift, or language
   style checks before source-reviewed wiki deposition.
@@ -9,7 +9,7 @@ description: >
 
 # Paper Wiki Language
 
-This support skill governs language quality for formal Paper Wiki / PRW pages and formal PRW/EPI legacy wording. It is a gate for source-grounded Chinese research-wiki prose, not a generic polishing pass.
+This support skill governs language quality for formal Paper Wiki pages and Paper Wiki/Paper Source legacy wording. It is a gate for source-grounded Chinese research-wiki prose, not a generic polishing pass.
 
 Before drafting, rewriting, or materially repairing a formal page, load `references/style-guide.md` and keep it active while writing.
 
@@ -31,7 +31,7 @@ Before formal page writing, read in this order:
 2. `../../rules/wiki-writing-standard.md`
 3. `references/style-guide.md`
 4. target vault `AGENTS.md` and `_meta/*` files when present
-5. EPI handoff and source artifacts required by the active workflow
+5. Paper Source handoff and source artifacts required by the active workflow
 
 If the vault contract conflicts with this skill, follow the stricter rule unless it would break source provenance.
 

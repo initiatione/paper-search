@@ -9,7 +9,7 @@ __pycache__/
 coverage.xml
 coverage/
 /paper-research-wiki/
-plugins/epi/.runtime/
-plugins/epi/.plugin-eval/
+plugins/paper-source/.runtime/
+plugins/paper-source/.plugin-eval/
 .codex_tmp_refs/
 .worktrees/

@@ -1,4 +1,4 @@
-# EPI Recovery
+# Paper Source Recovery
 
 Repair commands operate on raw paper artifacts and append audit records:
 

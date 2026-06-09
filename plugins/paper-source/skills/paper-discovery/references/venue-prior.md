@@ -1,6 +1,6 @@
 # Venue Prior For Profile-Driven Paper Quality
 
-Use venue prior to improve ranking and recall for whatever field the user's EPI config describes. A venue prior is only an input signal. It is not a final quality label and must not replace DOI, official metadata, citation counts, impact metrics, PDF/code availability, or actual validation evidence.
+Use venue prior to improve ranking and recall for whatever field the user's Paper Source config describes. A venue prior is only an input signal. It is not a final quality label and must not replace DOI, official metadata, citation counts, impact metrics, PDF/code availability, or actual validation evidence.
 
 ## Source Classes
 
@@ -12,7 +12,7 @@ Use venue prior to improve ranking and recall for whatever field the user's EPI 
 
 ## Practical Prior From Config
 
-Start with `venue_prior` in `_epi\meta\epi-config.yaml`. The user can list journals, conferences, publishers, societies, field databases, or curated pages that matter in their discipline. If `venue_prior` is empty, use only generic metadata verification until the user config is improved.
+Start with `venue_prior` in `_paper_source\meta\paper-source-config.yaml`. The user can list journals, conferences, publishers, societies, field databases, or curated pages that matter in their discipline. If `venue_prior` is empty, use only generic metadata verification until the user config is improved.
 
 Domain examples, not defaults:
 
@@ -45,6 +45,6 @@ Never invent impact factors, rankings, acceptance rates, or citation counts. If 
 
 ## Recall Use
 
-If the first EPI/MCP result set misses obvious venue families from the user's config, run a sharper query, update `venue_prior`, or use field-specific official sources for recall.
+If the first Paper Source/MCP result set misses obvious venue families from the user's config, run a sharper query, update `venue_prior`, or use field-specific official sources for recall.
 
-Record missed venue families as `recall_gap` under `EPI 实测证据`.
+Record missed venue families as `recall_gap` under `Paper Source 实测证据`.

@@ -8,7 +8,7 @@ Paper type from `paper-type-taxonomy.md` is a routing hint. It should change how
 
 Two-stage retrieval changes when the gate runs: do not reject too early during the high-recall pool stage unless the item is clearly off-topic, duplicated, or explicitly excluded. Apply strict Tier A/B/C/Reject labels only after deduplication, source verification, and citation/venue checks.
 
-For narrow requests, a paper that only matches a broad method family but misses the request's object/task/domain anchor should be rejected as `outside_domain` or left in Tier C at most. This is how EPI avoids letting generic reinforcement learning / GNN / deep learning papers crowd out the actual target field.
+For narrow requests, a paper that only matches a broad method family but misses the request's object/task/domain anchor should be rejected as `outside_domain` or left in Tier C at most. This is how Paper Source avoids letting generic reinforcement learning / GNN / deep learning papers crowd out the actual target field.
 
 Separate quality tiers:
 
@@ -19,4 +19,4 @@ Separate quality tiers:
 
 For narrow domains, field-specific validation from the user's config can outweigh a generic top venue paper that only touches the topic superficially.
 
-If the EPI `rank.json` misses obviously high-quality papers found by live verification, report that as a recall gap under `EPI 实测证据` and run a sharper query before finalizing when time allows.
+If the Paper Source `rank.json` misses obviously high-quality papers found by live verification, report that as a recall gap under `Paper Source 实测证据` and run a sharper query before finalizing when time allows.

@@ -1,6 +1,6 @@
 # Output Format
 
-When the user asks to "find papers", "找最新/高质量论文", "不要综述", or similar, do not stop at the raw dry-run report. Run the EPI discovery evidence first, then curate the chat answer for reading decisions.
+When the user asks to "find papers", "找最新/高质量论文", "不要综述", or similar, do not stop at the raw dry-run report. Run the Paper Source discovery evidence first, then curate the chat answer for reading decisions.
 
 In the chat, present the curated result in a scan-friendly format before technical logs. The section title can be `推荐优先看`, but the section must include every paper found and kept for this run, sorted by reading priority, not only the top few. Do not output an unsorted title-only list.
 
@@ -18,7 +18,7 @@ Each item should have:
 - PDF/code availability
 - a short Chinese abstract, 2-3 compact sentences explaining method, task, evidence, and caveat
 
-Then add `EPI 实测证据` with:
+Then add `Paper Source 实测证据` with:
 
 - run path
 - `source_mode`

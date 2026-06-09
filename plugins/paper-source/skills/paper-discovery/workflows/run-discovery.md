@@ -1,6 +1,6 @@
 # Run Discovery
 
-Use this workflow for one-off EPI paper search, ranking, and read-priority reporting.
+Use this workflow for one-off Paper Source paper search, ranking, and read-priority reporting.
 
 ## Preflight
 
@@ -21,8 +21,8 @@ python skills\paper-discovery\scripts\query-planner.py --topic "<topic>" --domai
 python skills\paper-discovery\scripts\query-planner.py --topic "<review topic>" --domain auto --include-reviews --max-queries 8
 ```
 
-Default `dry-run` writes `_epi/runs/<run-id>/query-plan.json`, records `research_mode`, runs query variants, and excludes review/survey/meta candidates unless reviews are explicitly requested.
-It also writes or resumes `_epi/reviews/<review-id>/` by default. A repeated matching dry-run uses default resume from the review session and skips provider calls; use `--refresh` to force a new provider search, or `--no-resume` only for debugging.
+Default `dry-run` writes `_paper_source/runs/<run-id>/query-plan.json`, records `research_mode`, runs query variants, and excludes review/survey/meta candidates unless reviews are explicitly requested.
+It also writes or resumes `_paper_source/reviews/<review-id>/` by default. A repeated matching dry-run uses default resume from the review session and skips provider calls; use `--refresh` to force a new provider search, or `--no-resume` only for debugging.
 
 ## Dry Run
 
@@ -59,17 +59,17 @@ Before reporting success, inspect the relevant artifacts:
 
 - `search-record.json`
 - `rank.json`
-- `_epi/runs/<run-id>/report.md`
-- `_epi/runs/<run-id>/report.json`
-- `_epi/runs/<run-id>/run-state.json`
-- `_epi/reviews/<review-id>/state.json`
-- `_epi/reviews/<review-id>/candidates.json`
-- `_epi/reviews/<review-id>/shortlist.json`
-- `_epi/reviews/<review-id>/fetch_plan.json`
-- `_epi/reviews/<review-id>/coverage.json`
+- `_paper_source/runs/<run-id>/report.md`
+- `_paper_source/runs/<run-id>/report.json`
+- `_paper_source/runs/<run-id>/run-state.json`
+- `_paper_source/reviews/<review-id>/state.json`
+- `_paper_source/reviews/<review-id>/candidates.json`
+- `_paper_source/reviews/<review-id>/shortlist.json`
+- `_paper_source/reviews/<review-id>/fetch_plan.json`
+- `_paper_source/reviews/<review-id>/coverage.json`
 
 Track `paper_type`, `classification_confidence`, `ranking_confidence`, and per-paper `acquire_failed`, `parse_failed`, or `prepare_failed` when a later source-staging step ran.
 
 ## Safety Boundary
 
-`dry-run` writes `_epi/runs/<run-id>/` and resumable `_epi/reviews/<review-id>/`. It does not acquire PDFs, run MinerU, create source-staging handoffs, run reader/critic, or write final wiki pages.
+`dry-run` writes `_paper_source/runs/<run-id>/` and resumable `_paper_source/reviews/<review-id>/`. It does not acquire PDFs, run MinerU, create source-staging handoffs, run reader/critic, or write final wiki pages.

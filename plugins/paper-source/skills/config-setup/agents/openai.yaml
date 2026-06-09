@@ -1,4 +1,4 @@
 interface:
   display_name: "Paper Source Config"
   short_description: "Configure and inspect Paper Source runtime"
-  default_prompt: "Use $config-setup to configure Paper Source / EPI runtime settings."
+  default_prompt: "Use $config-setup to configure Paper Source / PS runtime settings."

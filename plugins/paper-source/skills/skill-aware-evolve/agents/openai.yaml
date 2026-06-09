@@ -1,4 +1,4 @@
 interface:
   display_name: "Skill-Aware Evolve"
-  short_description: "Propose controlled EPI skill and profile changes"
-  default_prompt: "Use $skill-aware-evolve to propose controlled EPI skill or profile changes."
+  short_description: "Propose controlled Paper Source skill and profile changes"
+  default_prompt: "Use $skill-aware-evolve to propose controlled Paper Source skill or profile changes."

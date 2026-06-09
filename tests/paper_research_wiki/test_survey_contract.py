@@ -2,9 +2,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-PRW = ROOT / "plugins" / "paper-wiki"
-PRW_SKILL = PRW / "skills" / "paper-research-wiki"
-REFS = PRW_SKILL / "references"
+PAPER_WIKI = ROOT / "plugins" / "paper-wiki"
+PAPER_WIKI_SKILL = PAPER_WIKI / "skills" / "paper-research-wiki"
+REFS = PAPER_WIKI_SKILL / "references"
 SURVEY = REFS / "survey-page-anatomy.md"
 
 
@@ -56,22 +56,22 @@ def test_references_anatomy_gates_surveys_to_the_survey_contract():
 
 
 def test_wiki_writing_standard_lists_literature_review_tier_and_points_to_survey_contract():
-    text = _read(PRW / "rules" / "wiki-writing-standard.md")
+    text = _read(PAPER_WIKI / "rules" / "wiki-writing-standard.md")
     assert "literature-review" in text
     assert "survey-page-anatomy.md" in text
 
 
 def test_skill_entrypoint_routes_surveys_to_the_survey_contract():
-    assert "survey-page-anatomy.md" in _read(PRW_SKILL / "SKILL.md")
+    assert "survey-page-anatomy.md" in _read(PAPER_WIKI_SKILL / "SKILL.md")
 
 
 def test_language_gate_does_not_force_surveys_through_the_method_spine():
-    text = _read(PRW / "skills" / "paper-wiki-language" / "references" / "style-guide.md")
+    text = _read(PAPER_WIKI / "skills" / "paper-wiki-language" / "references" / "style-guide.md")
     assert "survey-page-anatomy.md" in text
     assert "method-paper spine" in text
 
 
 def test_workflows_detect_and_route_surveys():
     for workflow in ["extract-papers.md", "redo-extraction.md"]:
-        text = _read(PRW_SKILL / "workflows" / workflow)
+        text = _read(PAPER_WIKI_SKILL / "workflows" / workflow)
         assert "survey-page-anatomy.md" in text, workflow

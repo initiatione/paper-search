@@ -1,16 +1,16 @@
-# PRW Wiki Writing Standard
+# Paper Wiki Writing Standard
 
-This file is the canonical human-readable contract for PRW formal page families and frontmatter. EPI docs and other PRW rules/references should point here instead of copying the field list.
+This file is the canonical human-readable contract for Paper Wiki formal page families and frontmatter. Paper Source docs and other Paper Wiki rules/references should point here instead of copying the field list. PW/PS are conversational aliases; legacy `prw`/`epi` wording is compatibility-only.
 
-This rule is mandatory for every PRW formal paper wiki write. It adapts Ar9av/obsidian-wiki `wiki-ingest`, `llm-wiki`, `wiki-lint`, `cross-linker`, `tag-taxonomy`, and `wiki-update` into the paper research wiki contract.
+This rule is mandatory for every Paper Wiki formal paper wiki write. It adapts Ar9av/obsidian-wiki `wiki-ingest`, `llm-wiki`, `wiki-lint`, `cross-linker`, `tag-taxonomy`, and `wiki-update` into the paper research wiki contract.
 
 Formal page prose must also follow `../skills/paper-wiki-language/SKILL.md`. Read that skill before drafting, rewriting, or materially repairing formal pages.
 
-A PRW task is not complete until formal pages, tracking files, graph links, taxonomy, provenance, language gate, QMD freshness, and EPI record readiness have been checked or explicitly reported as skipped with reason.
+A Paper Wiki task is not complete until formal pages, tracking files, graph links, taxonomy, provenance, language gate, QMD freshness, and Paper Source record readiness have been checked or explicitly reported as skipped with reason.
 
 ## Core Rule
 
-Do not summarize papers in isolation. PRW must distill and integrate paper knowledge into the existing wiki graph.
+Do not summarize papers in isolation. Paper Wiki must distill and integrate paper knowledge into the existing wiki graph.
 
 The default decision is merge before create:
 
@@ -32,7 +32,7 @@ For a graph-aware rewrite:
 4. Update dependent formal pages when the rewrite changes claim/evidence boundaries, formula or figure/table evidence, evidence-tier wording, relationships, or downstream synthesis.
 5. Create a new `derivations/` or `concepts/` page when the rewrite exposes a reusable formula chain, mechanism, dataset, metric, or distinction that should not stay buried in a reference page.
 6. Refresh manifest or `.manifest.json`, `final-source-review.json`, `index.md`, `log.md`, and `hot.md` in the same run as the markdown rewrite. Read previous `wiki-ingest-record.json` only as provenance and reverse-dependency evidence.
-7. Report EPI record readiness. PRW records readiness; EPI writes or replaces `wiki-ingest-record.json` through `record-wiki-ingest`. For ask-mode automation, write `_epi/staging/papers/<paper-slug>/prw-record-request.json` with `schema_version: prw-record-request-v1`, `automation_mode: ask`, final page hashes, `final-source-review.json` hash, and `record-wiki-ingest --from-prw-request ...`; PRW writes the request artifact; EPI consumes it.
+7. Report Paper Source record readiness. Paper Wiki records readiness; Paper Source writes or replaces `wiki-ingest-record.json` through `record-wiki-ingest`. For ask-mode automation, write `_paper_source/staging/papers/<paper-slug>/paper-wiki-record-request.json` with `schema_version: paper-wiki-record-request-v1`, `automation_mode: ask`, final page hashes, `final-source-review.json` hash, and `record-wiki-ingest --from-paper-wiki-request ...`; Paper Wiki writes the request artifact; Paper Source consumes it. Legacy `_epi/staging/papers/<paper-slug>/prw-record-request.json`, `schema_version: prw-record-request-v1`, and `--from-prw-request` remain accepted only for existing artifacts.
 8. Run `qmd update` and `qmd embed` when QMD is in scope, or report the fallback to direct Markdown inventory.
 
 ## Page Families
@@ -47,7 +47,7 @@ Formal paper pages may be written only to:
 - `reports/`
 - `opportunities/`
 
-Never write formal graph pages under `_epi/`, `_raw/`, `_staging/`, `_runs/`, `_quarantine/`, `.obsidian/`, or source bundle folders. Staged writes may use the target vault staging contract, but staged pages must still obey the same page template and evidence rules.
+Never write formal graph pages under `_paper_source/`, legacy `_epi/`, `_raw/`, `_staging/`, `_runs/`, `_quarantine/`, `.obsidian/`, or source bundle folders. Staged writes may use the target vault staging contract, but staged pages must still obey the same page template and evidence rules.
 
 ## Page Template
 
@@ -63,7 +63,7 @@ aliases: ["<ACRONYM>", "<full method name>", "<descriptive name>"]
 relationships:
   - target: "[[concepts/related-concept]]"
     type: uses
-sources: ["[<full paper title>](obsidian://open?vault=<vault>&file=_epi%2Fraw%2F<slug>%2Fpaper.pdf)"]
+sources: ["[<full paper title>](obsidian://open?vault=<vault>&file=_paper_source%2Fraw%2F<slug>%2Fpaper.pdf)"]
 summary: "<year> <venue> <type>，提出 <ACRONYM>：<one-line mechanism>。"
 provenance:
   extracted:
@@ -117,7 +117,7 @@ Required frontmatter fields:
 
 Do not set `lifecycle: reviewed`, `verified`, or `source-reviewed` automatically. New agent-written pages start as `draft` or `review-needed` unless the target vault contract says otherwise.
 
-`sources:` contains clickable original-paper PDF links only. `references/ pages` use exactly one clickable original-paper PDF link. Canonical form: a Markdown link displayed with the paper title, pointing at `obsidian://open?vault=<vault>&file=_epi%2Fraw%2F<slug>%2Fpaper.pdf` — this is what the reviewed exemplar pages use and what renders clickable in the Obsidian properties panel. The path is `_epi/raw/<slug>/paper.pdf`, with no `papers/` segment. The legacy wikilink form `"[[_epi/raw/<slug>/paper.pdf|<slug>]]"` remains accepted for EPI-generated pages. `concepts/, derivations/, experiments/, synthesis/, reports/, and opportunities/` use one or more clickable original-paper PDF links for the papers the page materially uses. Do not use plain path text, an alias such as `原论文 PDF`, or metadata/MinerU/DOI/arXiv entries in frontmatter `sources`; put those in the body evidence section or the Provenance section.
+`sources:` contains clickable original-paper PDF links only. `references/ pages` use exactly one clickable original-paper PDF link. Canonical form: a Markdown link displayed with the paper title, pointing at `obsidian://open?vault=<vault>&file=_paper_source%2Fraw%2F<slug>%2Fpaper.pdf`. The path is `_paper_source/raw/<slug>/paper.pdf`, with no `papers/` segment. The wikilink form `"[[_paper_source/raw/<slug>/paper.pdf|<slug>]]"` is also accepted for Paper Source-generated pages; the legacy `_epi` wikilink remains accepted for existing artifacts. `concepts/, derivations/, experiments/, synthesis/, reports/, and opportunities/` use one or more clickable original-paper PDF links for the papers the page materially uses. Do not use plain path text, an alias such as `原论文 PDF`, or metadata/MinerU/DOI/arXiv entries in frontmatter `sources`; put those in the body evidence section or the Provenance section.
 
 ## Body Rules
 
@@ -157,7 +157,7 @@ If the vault stages writes, update `index.md`, `log.md`, and `hot.md` immediatel
 
 QMD is a secondary retrieval/indexing layer, not the source of truth. Prefer the Markdown vault, target vault contract, manifest or `.manifest.json`, `index.md`, `log.md`, `hot.md`, and direct file search when deciding what exists or what should be changed.
 
-After PRW writes, repairs, relinks, or stages formal pages, refresh QMD when it is installed and in scope with `qmd update` and `qmd embed`. If QMD is unavailable, stale, slow, or returns noisy results, fallback to manifest, index files, and direct search, and do not block on qmd query.
+After Paper Wiki writes, repairs, relinks, or stages formal pages, refresh QMD when it is installed and in scope with `qmd update` and `qmd embed`. If QMD is unavailable, stale, slow, or returns noisy results, fallback to manifest, index files, and direct search, and do not block on qmd query.
 
 ## Link Repair Gate
 
@@ -165,7 +165,7 @@ When repairing link chaos, check broken wikilinks, orphan pages, ambiguous alias
 
 ## Quality Gate
 
-Before telling the user a wiki write is ready for EPI `record-wiki-ingest`, run a post-task check for:
+Before telling the user a wiki write is ready for Paper Source `record-wiki-ingest`, run a post-task check for:
 
 - orphan pages created by the write
 - broken wikilinks
@@ -178,10 +178,10 @@ Before telling the user a wiki write is ready for EPI `record-wiki-ingest`, run 
 - staged writes that still need human review
 - missing `final-source-review.json`
 - QMD refresh status when QMD is installed and in scope
-- whether the next EPI/PRW action is explicit
+- whether the next Paper Source/Paper Wiki action is explicit
 
-Only after the formal pages and `final-source-review.json` pass this gate should PRW tell the user the remaining EPI recording step.
+Only after the formal pages and `final-source-review.json` pass this gate should Paper Wiki tell the user the remaining Paper Source recording step.
 
 ## Completion Report
 
-Do not end with only "done". Report pages created or updated, links/tags/aliases repaired, tracking files updated, QMD refreshed / skipped / failed with fallback, remaining risks, and the next EPI/PRW action.
+Do not end with only "done". Report pages created or updated, links/tags/aliases repaired, tracking files updated, QMD refreshed / skipped / failed with fallback, remaining risks, and the next Paper Source/Paper Wiki action.

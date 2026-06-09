@@ -56,7 +56,7 @@ Final wiki ingest must read the source bundle again:
 
 Use `reader/evidence-map.json`, `reader/claim-support.json`, `reader/figures.md`, and `critic/*.json` as supporting evidence only. Treat `source-grounded`, `metadata-only`, and `inferred` claims differently during final wiki writing. The final wiki pages must not lose the original paper's formulas, figures, tables, source caveats, or negative findings.
 
-Before `record-wiki-ingest`, write `final-source-review.json` near the staging handoff. Use schema `epi-final-source-review-v1` and include:
+Before `record-wiki-ingest`, write `final-source-review.json` near the staging handoff. Use schema `paper-source-final-source-review-v1` and include:
 
 - `reviewed_artifacts[]`: `paper.pdf`, `metadata.json`, `mineru/<slug>.md`, `mineru/paper.tex`, `mineru/images/*`, `mineru/mineru-manifest.json`; file artifacts need `status=reviewed` and `sha256`.
 - `mineru/images/*`: `status=reviewed`, `file_count`, and per-image `relative_path` plus `sha256` when images exist.
@@ -65,4 +65,4 @@ Before `record-wiki-ingest`, write `final-source-review.json` near the staging h
 - `pdf_fallback_review`: `status=reviewed` or `not-needed` with the PDF fallback decision.
 - `final_page_provenance[]`: every final wiki page `relative_path`, optional page `sha256`, and `source_grounded=true`.
 
-Then run `record-wiki-ingest --source-review <final-source-review.json>` so EPI records a machine-verifiable source-first closure instead of relying on the reader summary or brief text alone.
+Then run `record-wiki-ingest --source-review <final-source-review.json>` so Paper Source records a machine-verifiable source-first closure instead of relying on the reader summary or brief text alone.

@@ -1,14 +1,14 @@
 ---
 name: wiki-provenance
 description: >
-  Use when final EPI paper knowledge is written to an Obsidian or LLM wiki and
+  Use when final Paper Source paper knowledge is written to an Obsidian or LLM wiki and
   claims must preserve provenance, including "claim 能否回溯", "证据地址",
   support status, evidence-map addresses, final-source-review links, or retrieval hooks.
 ---
 
 # Wiki Provenance
 
-Use this for the final knowledge deposition boundary. EPI reader and critic artifacts reduce reading cost, but final wiki claims must remain traceable back to source paper evidence, whether the final writer is Claude, Codex, or another wiki-capable agent.
+Use this for the final knowledge deposition boundary. Paper Source reader and critic artifacts reduce reading cost, but final wiki claims must remain traceable back to source paper evidence, whether the final writer is Claude, Codex, or another wiki-capable agent.
 
 ## Core Rule
 
@@ -19,17 +19,17 @@ No durable wiki claim without a support status and an evidence route. The page m
 Before writing or reviewing final pages, load:
 
 - `wiki-ingest-handoff` output.
-- `wiki-agent-trigger.json` when the handoff has already been approved and EPI has generated the resume package.
+- `wiki-agent-trigger.json` when the handoff has already been approved and Paper Source has generated the resume package.
 - `wiki-ingest-brief.json`.
 - `paper.pdf`, `metadata.json`, `mineru/<slug>.md`, `mineru/paper.tex`, `mineru/images/*`, `mineru/mineru-manifest.json`.
-- `evidence-index.json` and `_epi/meta/evidence-index.json` when present.
+- `evidence-index.json` and `_paper_source/meta/evidence-index.json` when present.
 - `reader/evidence-map.json` and `reader/claim-support.json`.
 - `critic/*.json` and `briefs/reading-report.md`.
 - Target vault `AGENTS.md` and `_meta/*` contract files.
 
 ## Claim Statuses
 
-Use the EPI support status when present:
+Use the Paper Source support status when present:
 
 - `source-grounded`: supported by parsed paper text, TeX, figure/table/image, or PDF review.
 - `metadata-only`: supported by title, DOI, venue, year, authors, source metadata, or abstract-only fields.
@@ -44,7 +44,7 @@ If a source-grounded claim is only the paper author's assertion, keep the suppor
 2. Read the source bundle before final prose. Reader summaries are navigation aids, not source authority.
 3. Use `evidence-index.json` as a page/section/chunk locator aid when present, then verify important claims against MinerU Markdown, TeX, images, manifest, and `paper.pdf` before final prose.
 4. For each durable claim, choose a support status and cite the evidence address from `evidence-map.json`, `claim-support.json`, `evidence-index.json` locator follow-up, source artifacts, or PDF fallback review.
-5. Embed evidence addresses in the page or in a page-local provenance block; do not leave them only in EPI sidecar JSON.
+5. Embed evidence addresses in the page or in a page-local provenance block; do not leave them only in Paper Source sidecar JSON.
 6. Put agent inferences in a clearly labeled section such as `Inferences`, `Hypotheses`, or `Open Questions`.
 7. Add synthesis hooks for later retrieval: method family, task, benchmark, metric, dataset, limitation, conflict candidate, and related paper slugs.
 8. After final page writing, create `final-source-review.json`, then run `record-wiki-ingest` with the same approved identity used for pre-write human approval.
@@ -75,10 +75,10 @@ Load `references/page-provenance.md` for a fuller page and final-source-review c
 - Do not let unsupported claims enter main factual sections.
 - Do not omit evidence addresses from final pages just because `record-wiki-ingest` stores hashes.
 - Do not treat `evidence-index.json` chunks as sufficient verification; use them to locate evidence, then reread source artifacts before marking claims source-grounded or pages verified.
-- Do not write final pages from EPI suggested routes directly; the target vault contract decides paths, links, tags, merge policy, and staged writes.
+- Do not write final pages from Paper Source suggested routes directly; the target vault contract decides paths, links, tags, merge policy, and staged writes.
 
 ## Literature Wiki Contract
 
-Apply provenance across the seven EPI paper wiki families: `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`. `wiki-ingest-brief.json` is the canonical EPI-to-PRW handoff; `wiki_deposition_task.json is legacy` compatibility only. PRW `$paper-research-wiki` owns final writing, while `epi-paper-deposition` is the compatibility adapter. external wiki skills are optional helpers / policy references: use `wiki-provenance` and `tag-taxonomy` policies when they help keep evidence status and tags from drifting, but do not treat standalone helper skills as EPI runtime required stack.
+Apply provenance across the seven Paper Source paper wiki families: `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`. `wiki-ingest-brief.json` is the canonical Paper Source-to-Paper Wiki handoff; `wiki_deposition_task.json is legacy` compatibility only. Paper Wiki `$paper-research-wiki` owns final writing, while `paper-source-paper-deposition` is the compatibility adapter. external wiki skills are optional helpers / policy references: use `wiki-provenance` and `tag-taxonomy` policies when they help keep evidence status and tags from drifting, but do not treat standalone helper skills as Paper Source runtime required stack.
 
-`final-source-review.json` must preserve `theory_reconstruction`, `formula_derivation`, `figure_table_evidence`, `novelty_type`, `implementability`, `reproducibility_risk`, `research_gap`, and `cost_level`. Keep author-claimed novelty separate from EPI-confirmed novelty, and only mark pages `verified` after source reread, formula/figure review, and complete evidence paths.
+`final-source-review.json` must preserve `theory_reconstruction`, `formula_derivation`, `figure_table_evidence`, `novelty_type`, `implementability`, `reproducibility_risk`, `research_gap`, and `cost_level`. Keep author-claimed novelty separate from Paper Source-confirmed novelty, and only mark pages `verified` after source reread, formula/figure review, and complete evidence paths.

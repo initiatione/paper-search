@@ -1,7 +1,7 @@
 ---
 name: topic-tracking
 description: >
-  Use when the user asks to track an EPI research topic over time, such as
+  Use when the user asks to track an Paper Source research topic over time, such as
   "持续跟踪这个方向", "最近有什么新论文", "有没有漏掉关键分支",
   what changed since a prior run/date, reading backlog, breadth coverage,
   or broad-to-deep literature review planning.
@@ -9,11 +9,11 @@ description: >
 
 # Topic Tracking
 
-Use this as the topic-level layer above per-paper EPI stages. The goal is not "finish one slug"; it is to grow a trustworthy view of a research direction over time.
+Use this as the topic-level layer above per-paper Paper Source stages. The goal is not "finish one slug"; it is to grow a trustworthy view of a research direction over time.
 
 ## Core Rule
 
-Treat every `dry-run`, `rank.json`, `report.json`, `_epi/raw/*/metadata.json`, and wiki-ingest record as part of a longitudinal topic ledger. A topic update should separate net-new papers from already-known papers, then show breadth coverage and the next best reading actions.
+Treat every `dry-run`, `rank.json`, `report.json`, `_paper_source/raw/*/metadata.json`, and wiki-ingest record as part of a longitudinal topic ledger. A topic update should separate net-new papers from already-known papers, then show breadth coverage and the next best reading actions.
 
 ## When To Pair Skills
 
@@ -27,7 +27,7 @@ Treat every `dry-run`, `rank.json`, `report.json`, `_epi/raw/*/metadata.json`, a
 ## Workflow
 
 1. Identify the topic boundary: user question, profile/config terms, must-include and must-exclude concepts, and the last covered run/date if available.
-2. Inspect prior state before searching: `_epi/runs/index.json`, recent `_epi/runs/<run-id>/report.json`, `rank.json`, `_epi/raw/*/metadata.json`, and existing `research-queue` buckets.
+2. Inspect prior state before searching: `_paper_source/runs/index.json`, recent `_paper_source/runs/<run-id>/report.json`, `rank.json`, `_paper_source/raw/*/metadata.json`, and existing `research-queue` buckets.
 3. Run or inspect discovery. Surface `research_mode`, query variants, source route, `domain_focus_terms`, and `recall_gap_checks`; do not hide query drift behind a ranked list.
 4. Build the delta: separate `net_new`, `already_known`, `already_in_library:<slug>`, repeated candidates, and lower-confidence review/survey candidates.
 5. Rank the backlog by `quality_tier`, profile/topic fit, stable identity, PDF availability, ranking confidence, novelty against the existing topic ledger, and parse/acquisition readiness.
@@ -44,7 +44,7 @@ python scripts\orchestrator.py research-queue --vault <vault> --json
 python scripts\orchestrator.py prepare-ranked --run-id <run-id> --max-papers 10 --skip-existing --vault <vault> --json
 ```
 
-If this plugin version has no explicit `--since`, emulate since semantics by comparing the current run against prior run artifacts and `_epi/raw/*/metadata.json`. Use `already_in_library:<slug>` as a hard dedupe signal, not as a hidden filter.
+If this plugin version has no explicit `--since`, emulate since semantics by comparing the current run against prior run artifacts and `_paper_source/raw/*/metadata.json`. Use `already_in_library:<slug>` as a hard dedupe signal, not as a hidden filter.
 
 ## Output Contract
 

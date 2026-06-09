@@ -22,7 +22,7 @@ Every reference page ends with a `## Provenance` block, one entry per load-beari
   Basis: <reasoning / which pages it rests on>
 ```
 
-For `references/ pages`, frontmatter `sources` must contain exactly one clickable original-paper PDF link. Canonical form: a Markdown link displayed with the paper title pointing at `obsidian://open?vault=<vault>&file=_epi%2Fraw%2F<slug>%2Fpaper.pdf` (path `_epi/raw/<slug>/paper.pdf`, no `papers/` segment); the legacy `"[[_epi/raw/<slug>/paper.pdf|<slug>]]"` wikilink form remains accepted for EPI-generated pages. Do not use plain path text, the alias `原论文 PDF`, or metadata/MinerU/DOI/arXiv entries in frontmatter `sources`.
+For `references/ pages`, frontmatter `sources` must contain exactly one clickable original-paper PDF link. Canonical form: a Markdown link displayed with the paper title pointing at `obsidian://open?vault=<vault>&file=_paper_source%2Fraw%2F<slug>%2Fpaper.pdf` (path `_paper_source/raw/<slug>/paper.pdf`, no `papers/` segment); the `"[[_paper_source/raw/<slug>/paper.pdf|<slug>]]"` wikilink form is also accepted for Paper Source-generated pages, and legacy `_epi` wikilinks remain accepted for existing artifacts. Do not use plain path text, the alias `原论文 PDF`, or metadata/MinerU/DOI/arXiv entries in frontmatter `sources`.
 
 Relink, tag, alias, and merge repairs must keep support labels visible in final pages.
 

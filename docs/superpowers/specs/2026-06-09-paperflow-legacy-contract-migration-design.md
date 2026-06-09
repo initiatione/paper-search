@@ -7,7 +7,7 @@
 ## Purpose
 
 Stage 1 made the user-visible names `Paper Source` and `Paper Wiki`.
-Stage 2 hard-cut the installable plugin machine names to `paper-source` and `paper-wiki`, but deliberately left legacy runtime and artifact contracts such as `_epi/`, `EPI_VAULT`, `epi-*` schema names, `prw-record-request.json`, and the Python `epi` package in place.
+Stage 2 hard-cut the installable plugin machine names to `paper-source` and `paper-wiki`, but deliberately left legacy runtime and artifact contracts such as `_epi/`, `EPI_VAULT`, `epi-*` schema names, `prw-record-request.json`, and the Python `epi` import shim in place.
 
 Stage 3A moves those remaining machine-facing contracts toward current PaperFlow names without breaking existing vaults. New source-generated artifacts should use Paper Source and Paper Wiki naming, while existing legacy artifacts remain readable through a compatibility layer.
 
@@ -21,7 +21,7 @@ Stage 3A moves those remaining machine-facing contracts toward current PaperFlow
 | Paper Wiki schema prefix | `paper-wiki-*` | `prw-*` |
 | Paper Wiki record request file | `paper-wiki-record-request.json` | `prw-record-request.json` |
 | Python/internal namespace | `paper_source`, `paper_wiki` for new code | `epi` import compatibility |
-| Compatibility deposition skill | Paper Source deposition compatibility adapter | `epi-paper-deposition` skill id |
+| Compatibility deposition skill | Paper Source deposition compatibility adapter | `paper-source-paper-deposition` skill id |
 
 ## Scope
 
@@ -41,7 +41,7 @@ Stage 3A should:
 - update user-visible docs, skills, workflow prose, and plugin descriptions so `EPI` and `PRW` appear only as explicitly legacy/internal compatibility terms
 - keep tests explicit about which old names are allowed because they are legacy contracts
 
-Stage 3A may introduce lightweight `paper_source` wrappers or facades for new code, but it does not need to physically rename every Python file in `scripts/build/epi` in the first implementation pass. A full package relocation is a later stage after the compatibility layer is tested.
+Stage 3A may introduce lightweight `paper_source` wrappers or facades for new code, but it does not need to physically rename every Python file in `scripts/build/paper_source` in the first implementation pass. A full package relocation is a later stage after the compatibility layer is tested.
 
 ## Non-Goals
 
@@ -49,7 +49,7 @@ Stage 3A may introduce lightweight `paper_source` wrappers or facades for new co
 - Do not delete legacy `_epi/` read support.
 - Do not remove support for `EPI_VAULT` or `EPI_RUNTIME_CONFIG`.
 - Do not break existing `epi-*` or `prw-*` artifacts.
-- Do not remove `epi-paper-deposition` until a replacement skill id and migration path are proven.
+- Do not remove `paper-source-paper-deposition` until a replacement skill id and migration path are proven.
 - Do not treat external `paper-search-mcp`, `paper-search` CLI, or repository URL strings as legacy plugin names.
 - Do not bulk-replace substrings inside historical audit files, migration notes, schema constants, or tests without checking whether they are compatibility evidence.
 
@@ -143,7 +143,7 @@ Focused tests should cover:
 Expected verification starts with focused tests around the changed modules, then expands to current Paper Source and Paper Wiki contract suites:
 
 ```powershell
-python -m pytest tests\epi tests\paper_research_wiki tests\test_marketplace_manifest.py -q
+python -m pytest tests\paper_source tests\paper_research_wiki tests\test_marketplace_manifest.py -q
 git diff --check
 ```
 
@@ -164,10 +164,10 @@ If the implementation touches plugin manifests or installed-cache expectations, 
 
 ## Follow-Up Stage
 
-Stage 3B can consider physical package and path relocation after Stage 3A passes source and compatibility tests. Candidate follow-up work includes:
+Stage 3B can consider deeper schema retirement after Stage 3A passes source and compatibility tests. Candidate follow-up work includes:
 
-- moving `scripts/build/epi` to a `paper_source` package with an `epi` import shim
-- renaming `tests/epi` to `tests/paper_source`
-- introducing a replacement skill id for `epi-paper-deposition`
+- removing internal imports of the legacy `epi` package where compatibility no longer needs them
+- retiring remaining `epi-*` schema names behind explicit migration readers
+- introducing a replacement skill id for `paper-source-paper-deposition`
 - retiring legacy env vars after at least one migration window
 - migrating `D:\paper-research-wiki` through a dedicated dry-run, snapshot, manifest, and rollback procedure

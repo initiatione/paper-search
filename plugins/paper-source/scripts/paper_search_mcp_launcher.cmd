@@ -6,14 +6,16 @@ set "LAUNCHER=%SCRIPT_DIR%paper_search_mcp_launcher.py"
 set "SELECTED_PYTHON="
 set "RUNTIME_PYTHON="
 
-call :debug "start script=%~f0 cwd=%CD% codex_home=%CODEX_HOME% plugin_root=%CLAUDE_PLUGIN_ROOT% runtime_config=%EPI_RUNTIME_CONFIG%"
+call :debug "start script=%~f0 cwd=%CD% codex_home=%CODEX_HOME% plugin_root=%CLAUDE_PLUGIN_ROOT% runtime_config=%PAPER_SOURCE_RUNTIME_CONFIG% legacy_runtime_config=%EPI_RUNTIME_CONFIG%"
 
-for /f "usebackq delims=" %%P in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$runtime=$env:EPI_RUNTIME_CONFIG; if (-not $runtime) { $codexHome=$env:CODEX_HOME; if (-not $codexHome) { $codexHome=Join-Path $env:USERPROFILE '.codex' }; $runtime=Join-Path $codexHome 'plugins\paperflow\paper-source\runtime.json' }; if (Test-Path -LiteralPath $runtime) { $json=Get-Content -LiteralPath $runtime -Raw | ConvertFrom-Json; $cmd=$json.paper_search_mcp.command; if ($cmd) { [Console]::Out.Write($cmd) } }"`) do set "RUNTIME_PYTHON=%%P"
+for /f "usebackq delims=" %%P in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$runtime=$env:PAPER_SOURCE_RUNTIME_CONFIG; if (-not $runtime) { $runtime=$env:EPI_RUNTIME_CONFIG }; if (-not $runtime) { $codexHome=$env:CODEX_HOME; if (-not $codexHome) { $codexHome=Join-Path $env:USERPROFILE '.codex' }; $runtime=Join-Path $codexHome 'plugins\paperflow\paper-source\runtime.json' }; if (Test-Path -LiteralPath $runtime) { $json=Get-Content -LiteralPath $runtime -Raw | ConvertFrom-Json; $cmd=$json.paper_search_mcp.command; if ($cmd) { [Console]::Out.Write($cmd) } }"`) do set "RUNTIME_PYTHON=%%P"
 
 call :debug "runtime_python=%RUNTIME_PYTHON% launcher=%LAUNCHER%"
 
 call :select_python "%RUNTIME_PYTHON%"
+call :select_python "%PAPER_SOURCE_PAPER_SEARCH_MCP_LAUNCHER_PYTHON%"
 call :select_python "%EPI_PAPER_SEARCH_MCP_LAUNCHER_PYTHON%"
+call :select_python "%PAPER_SOURCE_PAPER_SEARCH_MCP_COMMAND%"
 call :select_python "%EPI_PAPER_SEARCH_MCP_COMMAND%"
 call :select_python "%CONDA_PREFIX%\python.exe"
 call :select_python "python.exe"
@@ -32,8 +34,10 @@ call :debug "exit_code=%LAUNCHER_EXIT%"
 exit /b %LAUNCHER_EXIT%
 
 :debug
-if not defined EPI_PAPER_SEARCH_MCP_LAUNCHER_DEBUG_LOG exit /b 0
->> "%EPI_PAPER_SEARCH_MCP_LAUNCHER_DEBUG_LOG%" echo [%DATE% %TIME%] %~1
+set "DEBUG_LOG=%PAPER_SOURCE_PAPER_SEARCH_MCP_LAUNCHER_DEBUG_LOG%"
+if not defined DEBUG_LOG set "DEBUG_LOG=%EPI_PAPER_SEARCH_MCP_LAUNCHER_DEBUG_LOG%"
+if not defined DEBUG_LOG exit /b 0
+>> "%DEBUG_LOG%" echo [%DATE% %TIME%] %~1
 exit /b 0
 
 :select_python

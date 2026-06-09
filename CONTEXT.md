@@ -12,7 +12,7 @@ The user-facing bundle/product name for the coordinated academic paper workflow.
 
 The user-facing name for the plugin that prepares traceable paper source evidence for Paper Wiki. Its responsibilities include paper discovery, acquisition, parsing, source bundle preparation, approval handoff, and completion recording.
 
-Legacy name: EPI. During the transition, the machine-facing plugin name may remain `epi` while user-facing copy uses Paper Source.
+Legacy alias: `epi`. It remains only for compatibility shims and existing artifacts; the current machine-facing plugin name is `paper-source`.
 
 Alias: PS. PS is a conversational alias only, not a separate plugin name or explicit tool entrypoint.
 
@@ -20,7 +20,7 @@ Alias: PS. PS is a conversational alias only, not a separate plugin name or expl
 
 The user-facing name for the plugin that writes, queries, checks, repairs, and maintains the formal paper wiki graph from source evidence prepared by Paper Source or from an existing compatible vault.
 
-Legacy name: PRW. During the transition, the machine-facing plugin name may remain `prw` while user-facing copy uses Paper Wiki.
+Legacy alias: `prw`. It remains only for compatibility references and existing artifacts; the current machine-facing plugin name is `paper-wiki`.
 
 Alias: PW. PW is a conversational alias only, not a separate plugin name or explicit tool entrypoint.
 
@@ -30,11 +30,11 @@ A previous public or machine-facing name that remains recognized for compatibili
 
 ### Display Name
 
-The user-visible name shown in marketplace and product-facing copy. During the first naming transition, display names use PaperFlow, Paper Source, and Paper Wiki while existing machine-facing names may remain unchanged.
+The user-visible name shown in marketplace and product-facing copy. Current display names are PaperFlow, Paper Source, and Paper Wiki.
 
 ### Machine-Facing Name
 
-A stable identifier used by manifests, plugin installation, artifacts, tests, or runtime compatibility. Machine-facing names may lag behind display names during a staged migration.
+A stable identifier used by manifests, plugin installation, artifacts, tests, or runtime compatibility. Current machine-facing names are `paperflow`, `paper-source`, and `paper-wiki`; legacy aliases remain compatibility-only.
 
 ### Capability Gap
 

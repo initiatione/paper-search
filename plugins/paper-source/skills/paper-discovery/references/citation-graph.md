@@ -25,4 +25,4 @@ Use citation graph expansion after an initial candidate pool finds 2-5 strong se
 - Do not let citation graph expansion drift into generic RL or generic robotics.
 - Prefer recent cited-by papers for `latest` requests.
 - Prefer foundational references only when they explain why a new paper matters.
-- Mark expansion evidence in the final `EPI 实测证据`.
+- Mark expansion evidence in the final `Paper Source 实测证据`.

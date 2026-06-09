@@ -17,15 +17,15 @@ Use `--max-papers 10 --skip-existing` for real testing. Use `--max-papers 1` onl
 Acquisition order is OA-first:
 
 1. Try paper-search MCP `download_with_fallback` using source id, DOI, and title.
-2. Keep Sci-Hub disabled by default. Only include it when the user explicitly sets `EPI_PAPER_SEARCH_MCP_USE_SCIHUB=1`; `EPI_PAPER_SEARCH_MCP_SCIHUB_BASE_URL` only changes the configured base URL.
+2. Keep Sci-Hub disabled by default. Only include it when the user explicitly sets `PAPER_SOURCE_PAPER_SEARCH_MCP_USE_SCIHUB=1`; `PAPER_SOURCE_PAPER_SEARCH_MCP_SCIHUB_BASE_URL` only changes the configured base URL. Legacy `EPI_PAPER_SEARCH_MCP_USE_SCIHUB` / `EPI_PAPER_SEARCH_MCP_SCIHUB_BASE_URL` remain accepted for existing environments.
 3. If there is no direct candidate PDF URL and OA fallback produces no PDF, stop with `failure_class=manual-download-required` and write `manual_download` instead of trying weak source-native/CLI/direct fallbacks.
 4. If the candidate has direct PDF URLs, and the fallback tool fails or produces no PDF, try source-native MCP `download_<source>`.
 5. If MCP cannot produce a usable PDF, fall back to CLI/direct URL behavior and keep the same failure recording rules.
-6. After any PDF download, require the lightweight DOI/title identity check. If it writes `failure_class=identity-mismatch`, keep `identity-check.json`, use `_epi/quarantine/papers/<slug>/paper.pdf` for inspection, and do not run MinerU.
+6. After any PDF download, require the lightweight DOI/title identity check. If it writes `failure_class=identity-mismatch`, keep `identity-check.json`, use `_paper_source/quarantine/papers/<slug>/paper.pdf` for inspection, and do not run MinerU.
 
 Successful MCP fallback acquisition writes `fallback_chain`, `use_scihub=false` by default, `doi`, `title`, `mcp_server_probe`, `upstream.tool`, and `identity_check` into `acquire-record.json`. Treat those fields as acquisition provenance, not as proof that the paper itself was read.
 
-After acquire success, EPI may call MCP `read_<source>_paper` or CLI read and write `paper-search-read-preview.txt`. The matching `acquire-record.json.retrieval_preview` is a non-authoritative retrieval preview sidecar for checking upstream text extraction depth; it is not replacing MinerU, and final wiki ingest must still use `paper.pdf` plus MinerU Markdown/TeX/images/manifest.
+After acquire success, Paper Source may call MCP `read_<source>_paper` or CLI read and write `paper-search-read-preview.txt`. The matching `acquire-record.json.retrieval_preview` is a non-authoritative retrieval preview sidecar for checking upstream text extraction depth; it is not replacing MinerU, and final wiki ingest must still use `paper.pdf` plus MinerU Markdown/TeX/images/manifest.
 
 ## Reviewed Or Audited Mode
 
@@ -47,17 +47,17 @@ Inspect per-paper failures:
 
 Failed `acquire-record.json` includes `candidate_pdf_urls`, `acquire_attempts`, `failure_class`, `retryable`, and `recovery_hint`; use those fields to decide retry, source switch, or skip. If `failure_class=manual-download-required`, also use `manual_download.doi_url`, `manual_download.candidate_manual_urls`, report-level `manual_downloads`, or `runs-query --json` to tell the user the DOI/publisher links immediately, ask them to download through their organization/institution, and avoid exhaustive fallback attempts.
 
-`manual_download` includes `preferred_next_step`, `tmp_manual_pdf_dir`, and `candidate_manual_urls`. The preferred recovery is a user-supplied local PDF under `_epi/tmp-manual-pdfs` or a direct open-access PDF URL; do not suggest Sci-Hub unless the user has explicitly opted in.
+`manual_download` includes `preferred_next_step`, `tmp_manual_pdf_dir`, and `candidate_manual_urls`. The preferred recovery is a user-supplied local PDF under `_paper_source/tmp-manual-pdfs` or a direct open-access PDF URL; do not suggest Sci-Hub unless the user has explicitly opted in.
 
-`failure_class=identity-mismatch` means the downloaded PDF was a real PDF but did not match the candidate DOI/title. Do not parse it. Use `identity-check.json` and `_epi/quarantine/papers/<slug>/paper.pdf` for debugging, then reacquire from a corrected DOI/publisher/OA PDF link.
+`failure_class=identity-mismatch` means the downloaded PDF was a real PDF but did not match the candidate DOI/title. Do not parse it. Use `identity-check.json` and `_paper_source/quarantine/papers/<slug>/paper.pdf` for debugging, then reacquire from a corrected DOI/publisher/OA PDF link.
 
-`failure_class=not-pdf` means the candidate URL returned a DOI/publisher landing page, HTML, or another non-PDF payload. EPI will try landing page recovery by reading `citation_pdf_url` or an obvious publisher PDF link, and merged candidates can provide multiple `candidate_pdf_urls` fallback attempts; if those still fail, switch to a direct PDF, arXiv, Unpaywall, or open-access source before rerunning acquisition.
+`failure_class=not-pdf` means the candidate URL returned a DOI/publisher landing page, HTML, or another non-PDF payload. Paper Source will try landing page recovery by reading `citation_pdf_url` or an obvious publisher PDF link, and merged candidates can provide multiple `candidate_pdf_urls` fallback attempts; if those still fail, switch to a direct PDF, arXiv, Unpaywall, or open-access source before rerunning acquisition.
 
-Failed acquire attempts that never downloaded `paper.pdf` are not library entries. `prepare-ranked` cleans those `_epi/raw/<slug>` folders only when there is no source PDF, staging plan, wiki-ingest record, or Zotero record, and records the cleanup manifest under `_epi/meta/raw-cleanup/`. Parse failures with `paper.pdf` present stay in raw for retry or manual repair.
+Failed acquire attempts that never downloaded `paper.pdf` are not library entries. `prepare-ranked` cleans those `_paper_source/raw/<slug>` folders only when there is no source PDF, staging plan, wiki-ingest record, or Zotero record, and records the cleanup manifest under `_paper_source/meta/raw-cleanup/`. Parse failures with `paper.pdf` present stay in raw for retry or manual repair.
 
-For slow MinerU jobs, pass `--mineru-timeout <seconds>` or set `EPI_MINERU_TIMEOUT`. Complete parse reuse requires `parse-record.json status=success`, not just a Markdown file.
+For slow MinerU jobs, pass `--mineru-timeout <seconds>` or set `PAPER_SOURCE_MINERU_TIMEOUT`. Legacy `EPI_MINERU_TIMEOUT` remains accepted for existing environments. Complete parse reuse requires `parse-record.json status=success`, not just a Markdown file.
 
-After MinerU parse success, EPI writes `_epi/raw/<slug>/evidence-index.json` and refreshes `_epi/meta/evidence-index.json`. Treat `evidence-index.json` as a full-text page/section/chunk locator for later claim support and wiki provenance; it is generated from MinerU Markdown and does not replace `paper.pdf`, `mineru/<slug>.md`, `mineru/paper.tex`, `mineru/images/*`, or `mineru/mineru-manifest.json`.
+After MinerU parse success, Paper Source writes `_paper_source/raw/<slug>/evidence-index.json` and refreshes `_paper_source/meta/evidence-index.json`. Treat `evidence-index.json` as a full-text page/section/chunk locator for later claim support and wiki provenance; it is generated from MinerU Markdown and does not replace `paper.pdf`, `mineru/<slug>.md`, `mineru/paper.tex`, `mineru/images/*`, or `mineru/mineru-manifest.json`.
 
 ## Source-First Handoff Check
 
@@ -80,11 +80,11 @@ The handoff must require source artifacts:
 Optional evidence aids when generated:
 
 - `evidence-index.json`
-- `_epi/meta/evidence-index.json`
+- `_paper_source/meta/evidence-index.json`
 - `paper-search-read-preview.txt`
 - `reader/evidence-map.json`
 - `reader/claim-support.json`
 - `reader/figures.md`
 - `critic/*.json`
 
-If the handoff lacks source artifacts, formula/figure review cues, parse uncertainty, source provenance, or `final-source-review.json` requirements, repair staging or rerun the relevant EPI step before final wiki writing.
+If the handoff lacks source artifacts, formula/figure review cues, parse uncertainty, source provenance, or `final-source-review.json` requirements, repair staging or rerun the relevant Paper Source step before final wiki writing.

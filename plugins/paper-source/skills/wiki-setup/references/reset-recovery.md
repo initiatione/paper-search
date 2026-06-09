@@ -4,15 +4,15 @@ Load this only when reset, `--no-backup`, config reset, or recovery is in scope.
 
 ## Reset Checklist
 
-1. Inventory the vault root and important EPI directories.
+1. Inventory the vault root and important Paper Source directories.
 2. Run `config-status`.
 3. Explain moved, removed, and preserved paths.
 4. Propose backup outside the active vault, for example `<vault-parent>\paper-research-wiki-reset-backups\<timestamp>`.
-5. Require exact second confirmation: `确认重置 EPI wiki`.
+5. Require exact second confirmation: `确认重置 Paper Source wiki`.
 6. Treat `不需要备份` as do not back up wiki content; it never authorizes config deletion.
 7. Reset while preserving config, initialize, rerun `config-status`, and stop if onboarding is unexpectedly required.
 
-Only reset config when the user separately provides `确认同时重置 EPI config`; pass it through `--reset-config-confirmed-by`.
+Only reset config when the user separately provides `确认同时重置 Paper Source config`; pass it through `--reset-config-confirmed-by`.
 
 ## Misdelete Recovery
 
@@ -28,6 +28,6 @@ For 误删, 误操作, missing config, or mistaken reset:
 ```powershell
 python scripts\orchestrator.py wiki-repair --vault <vault> --json
 python scripts\orchestrator.py config-recover --vault <vault> --json
-python scripts\orchestrator.py config-restore --vault <vault> --from <backup-config-yaml> --confirmed-by "确认恢复 EPI config" --json
-python scripts\orchestrator.py wiki-repair --vault <vault> --restore-from <backup-config-yaml> --confirmed-by "确认恢复 EPI config" --json
+python scripts\orchestrator.py config-restore --vault <vault> --from <backup-config-yaml> --confirmed-by "确认恢复 Paper Source config" --json
+python scripts\orchestrator.py wiki-repair --vault <vault> --restore-from <backup-config-yaml> --confirmed-by "确认恢复 Paper Source config" --json
 ```

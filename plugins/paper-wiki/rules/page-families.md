@@ -12,7 +12,8 @@ Allowed formal page roots:
 
 Forbidden formal page roots:
 
-- `_epi/`
+- `_paper_source/`
+- legacy `_epi/`
 - `_raw/`
 - `_staging/`
 - `_runs/`
