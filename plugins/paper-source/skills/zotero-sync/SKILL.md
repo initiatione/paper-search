@@ -1,9 +1,7 @@
 ---
 name: zotero-sync
 description: >
-  Use when recording or running optional Paper Source Zotero sync, including Zotero,
-  "同步 Zotero", "记录 Zotero 文献", "同步文献库记录", zotero-sync,
-  local record-only sidecars, or post-ingest bibliographic records.
+  Use when recording optional Zotero data: "同步 Zotero", "记录 Zotero 文献", zotero-sync sidecars.
 ---
 
 # Zotero Sync

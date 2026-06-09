@@ -1,19 +1,16 @@
 ---
 name: topic-tracking
 description: >
-  Use when the user asks to track an Paper Source research topic over time, such as
-  "持续跟踪这个方向", "最近有什么新论文", "有没有漏掉关键分支",
-  what changed since a prior run/date, reading backlog, breadth coverage,
-  or broad-to-deep literature review planning.
+  Use when tracking Paper Source topics: "持续跟踪这个方向", "最近有什么新论文", backlog, coverage, since.
 ---
 
 # Topic Tracking
 
-Use this as the topic-level layer above per-paper Paper Source stages. The goal is not "finish one slug"; it is to grow a trustworthy view of a research direction over time.
+Use this as the topic-level layer above per-paper stages. Goal: grow a trustworthy view of a research direction over time, not finish one slug.
 
 ## Core Rule
 
-Treat every `dry-run`, `rank.json`, `report.json`, `_paper_source/raw/*/metadata.json`, and wiki-ingest record as part of a longitudinal topic ledger. A topic update should separate net-new papers from already-known papers, then show breadth coverage and the next best reading actions.
+Treat every `dry-run`, `rank.json`, `report.json`, `_paper_source/raw/*/metadata.json`, and wiki-ingest record as a topic ledger. Separate net-new from already-known papers, then show coverage and next reading actions.
 
 ## When To Pair Skills
 
@@ -26,13 +23,13 @@ Treat every `dry-run`, `rank.json`, `report.json`, `_paper_source/raw/*/metadata
 
 ## Workflow
 
-1. Identify the topic boundary: user question, profile/config terms, must-include and must-exclude concepts, and the last covered run/date if available.
-2. Inspect prior state before searching: `_paper_source/runs/index.json`, recent `_paper_source/runs/<run-id>/report.json`, `rank.json`, `_paper_source/raw/*/metadata.json`, and existing `research-queue` buckets.
+1. Identify boundary: user question, config/profile terms, must-include/exclude concepts, and last covered run/date.
+2. Inspect prior state before searching: `_paper_source/runs/index.json`, recent reports/ranks, `_paper_source/raw/*/metadata.json`, and `research-queue`.
 3. Run or inspect discovery. Surface `research_mode`, query variants, source route, `domain_focus_terms`, and `recall_gap_checks`; do not hide query drift behind a ranked list.
-4. Build the delta: separate `net_new`, `already_known`, `already_in_library:<slug>`, repeated candidates, and lower-confidence review/survey candidates.
-5. Rank the backlog by `quality_tier`, profile/topic fit, stable identity, PDF availability, ranking confidence, novelty against the existing topic ledger, and parse/acquisition readiness.
-6. Report breadth before depth: venue/source/year/method family/task/benchmark/citation-cluster coverage, plus missing clusters that need another search or citation snowballing pass.
-7. Only then choose depth actions: `prepare-ranked --skip-existing`, reader/critic, wiki handoff, or manual PDF reading when parse fidelity is weak.
+4. Build the delta: `net_new`, `already_known`, `already_in_library:<slug>`, repeats, uncertain review/survey candidates.
+5. Rank backlog by quality tier, topic fit, stable identity, PDF availability, confidence, novelty, and parse/acquisition readiness.
+6. Report breadth before depth: venue/source/year/method/task/benchmark/citation-cluster coverage and missing clusters.
+7. Then choose depth actions: `prepare-ranked --skip-existing`, reader/critic, wiki handoff, or manual PDF reading when parse fidelity is weak.
 
 ## Commands
 
@@ -50,11 +47,11 @@ If this plugin version has no explicit `--since`, emulate since semantics by com
 
 A topic update should include:
 
-- `Topic delta`: new, already-known, excluded, and uncertain papers.
-- `Backlog`: ranked reading order with reasons, not just a top-N list.
+- `Topic delta`: new, already-known, excluded, uncertain papers.
+- `Backlog`: ranked reading order with reasons.
 - `Coverage`: source/venue/year/method/task/benchmark/citation-cluster breadth and gaps.
-- `Depth flags`: parse fidelity, acquisition fallback state, and whether PDF/manual inspection is needed.
-- `Evidence`: run id, artifact paths, query plan summary, accepted/rejected counts, and any unverified metrics.
+- `Depth flags`: parse fidelity, acquisition fallback, PDF/manual inspection.
+- `Evidence`: run id, artifact paths, query plan summary, accepted/rejected counts, unverified metrics.
 
 Load `references/coverage-and-backlog.md` for the detailed delta, backlog, coverage, and parse-fidelity checklist.
 

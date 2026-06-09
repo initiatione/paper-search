@@ -1,4 +1,4 @@
 interface:
   display_name: "Paper Wiki Language"
-  short_description: "规范 Paper Wiki 正式论文页的中文语言风格。"
-  default_prompt: "Use $paper-wiki-language to polish Paper Wiki formal paper wiki pages while preserving evidence，并保护证据地址。"
+  short_description: "规范 Paper Wiki 正式论文页中文。"
+  default_prompt: "Use $paper-wiki-language to 规范正式论文页中文并保护证据地址。"

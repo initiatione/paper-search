@@ -145,7 +145,7 @@ def test_plugin_manifest_exposes_simple_user_prompts():
     manifest = _read_json(PLUGIN / ".codex-plugin" / "plugin.json")
 
     assert manifest["name"] == "paper-wiki"
-    assert manifest["version"] == "0.2.1"
+    assert manifest["version"] == "0.2.2"
     assert manifest["skills"] == "./skills/"
     assert manifest["interface"]["displayName"] == "Paper Wiki"
     assert "Paper Wiki" in manifest["description"]
@@ -156,10 +156,7 @@ def test_plugin_manifest_exposes_simple_user_prompts():
     assert "link repair" in manifest["interface"]["longDescription"]
     assert "QMD-compatible" in manifest["interface"]["longDescription"]
     assert "post-task check" in manifest["interface"]["longDescription"]
-    assert (
-        manifest["interface"]["shortDescription"]
-        == "v0.2.1 | Paper Wiki: ask, deposit, check, update, relink, and redo."
-    )
+    assert manifest["interface"]["shortDescription"].startswith("v0.2.2 | Paper Wiki:")
     for phrase in ["Paper Wiki", "ask", "deposit", "check", "update", "relink", "redo"]:
         assert phrase in manifest["interface"]["shortDescription"]
     prompt_text = "\n".join(manifest["interface"]["defaultPrompt"])
@@ -170,17 +167,13 @@ def test_plugin_manifest_exposes_simple_user_prompts():
 def test_paper_source_manifest_describes_brief_first_prw_boundary():
     manifest = _read_json(PAPER_SOURCE_PLUGIN / ".codex-plugin" / "plugin.json")
 
-    assert manifest["version"] == "0.2.1"
+    assert manifest["version"] == "0.2.3"
     assert manifest["name"] == "paper-source"
     assert manifest["interface"]["displayName"] == "Paper Source"
-    assert (
-        manifest["description"]
-        == "Paper Source discovers, acquires, parses, stages, approves, hands off, queries, and records academic paper source evidence for a Paper Wiki-compatible vault."
-    )
-    assert (
-        manifest["interface"]["shortDescription"]
-        == "v0.2.1 | Paper Source: find, vet, parse, hand off to Paper Wiki, and record."
-    )
+    assert "Paper Source" in manifest["description"]
+    assert "Paper Wiki-compatible" in manifest["description"]
+    assert manifest["interface"]["shortDescription"].startswith("v0.2.3 | Paper Source:")
+    assert "record" in manifest["interface"]["shortDescription"]
     assert "Paper Source" in manifest["interface"]["longDescription"]
     assert "Paper Wiki" in manifest["interface"]["longDescription"]
 

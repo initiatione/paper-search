@@ -4,6 +4,16 @@
 
 - S3b brief-first machine-contract 进入实现队列：`wiki-ingest-brief.json` 作为新链路 canonical handoff，`wiki_deposition_task.json` 降为 legacy compatibility，`REQUIRED_WIKI_SKILLS` 将收敛到 Paper Wiki `$paper-research-wiki` 和 Paper Source `paper-source-paper-deposition`。
 
+## 0.2.3 (2026-06-10)
+
+- Paper Source skill trigger descriptions 再精炼：保留中文任务触发词、Paper Source/Paper Wiki 边界和 research-grill-me deep-research prompt 契约，降低默认触发上下文成本。
+
+## 0.2.2 (2026-06-10)
+
+- Paper Source / Paper Wiki skill 入口压缩：保留路由、来源边界、handoff gate 和 post-task check，减少默认加载成本。
+- Paper Source / Paper Wiki manifest 和默认 prompt 精简为短入口，版本同步到 `0.2.2`。
+- Paper Wiki 继续保持一个用户级 `$paper-research-wiki` 助手，`paper-wiki-language` 作为正式页语言 gate。
+
 ## 0.2.1 (2026-06-07)
 
 - S3a 文档/契约 canonical 化：A1 overview 导航化。

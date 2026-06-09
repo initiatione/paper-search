@@ -1,8 +1,7 @@
 ---
 name: run-lifecycle
 description: >
-  Use when inspecting, cleaning, pruning, or archiving transient Paper Source run artifacts,
-  including "清理 runs", _paper_source/runs dashboards, queues, indexes, and logs.
+  Use when cleaning Paper Source runs: "清理 runs", _paper_source/runs, queues, indexes, logs.
 ---
 
 # Paper Source Run Lifecycle

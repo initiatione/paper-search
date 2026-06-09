@@ -1,9 +1,7 @@
 ---
 name: skill-aware-evolve
 description: >
-  Use when Paper Source evidence suggests controlled optimization, including "优化 Paper Source 插件",
-  "根据实测反馈优化", Plugin Eval, quality gates, benchmark evidence, or profile,
-  filter, ranking, template, and routing changes.
+  Use when optimizing Paper Source safely: "优化 Paper Source 插件", Plugin Eval, quality gates, propose-evolution.
 ---
 
 # Skill-Aware Evolve

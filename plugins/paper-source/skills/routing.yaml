@@ -35,7 +35,6 @@ routes:
       - 推荐优先阅读论文
       - Paper Source search
       - PS search papers
-      - search papers
       - latest papers
       - high-quality papers
       - dry-run
@@ -87,7 +86,6 @@ routes:
       - 沉淀前准备
       - prepare-ranked
       - advance-paper
-      - source-staging
       - wiki ingest handoff
     skill: paper-ingest/SKILL.md
     workflows:
@@ -119,8 +117,8 @@ routes:
     workflows:
       - paper-source-paper-deposition/workflows/formal-wiki-write.md
     notes:
-      - user-facing formal paper wiki work should route to $paper-research-wiki when Paper Wiki is installed
-      - this skill remains a compatibility bridge for existing wiki_deposition_task.json artifacts and legacy epi-wiki-deposition mentions
+      - user-facing formal paper wiki work routes to $paper-research-wiki when available
+      - compatibility bridge for wiki_deposition_task.json and legacy epi-wiki-deposition
       - formal_page_language_policy is enforced by Paper Wiki paper-wiki-language during formal writes
       - Codex may use subagents only when the user explicitly authorizes delegation
   wiki_provenance:
@@ -160,7 +158,7 @@ routes:
     workflows:
       - wiki-setup/workflows/reset-repair.md
     notes:
-      - Paper Source keeps vault bootstrap ownership; Paper Wiki consumes the initialized vault contract and reports missing structure back to wiki-setup
+      - Paper Source owns vault bootstrap; Paper Wiki reports missing structure back here
   zotero_sync:
     category: support
     triggers:
@@ -194,8 +192,7 @@ task_closure:
   checklist:
     - restate original constraints
     - record verification commands and outcomes
-    - run a 30-second AAR for recurring failures, drift, or missing activation paths
-    - route reusable lessons into docs, skills, or tests instead of this manifest when they become durable
+    - route durable lessons into docs, skills, or tests, not this manifest
 codex_subagent_permission:
   rule: "Codex may use subagents only when the user explicitly authorizes delegation or parallel agent work."
   preferred_use:
@@ -208,4 +205,3 @@ codex_subagent_permission:
     - verification result
   main_agent_avoids:
     - large intermediate transcripts
-    - duplicated source-paper summaries

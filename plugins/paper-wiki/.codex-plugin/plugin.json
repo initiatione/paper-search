@@ -1,7 +1,7 @@
 {
   "name": "paper-wiki",
-  "version": "0.2.1",
-  "description": "Paper Wiki extracts, checks, updates, and relinks source-map-grounded academic paper knowledge in a Paper Source-compatible Obsidian/LLM Wiki.",
+  "version": "0.2.2",
+  "description": "Paper Wiki asks, deposits, checks, updates, relinks, and redoes source-map-grounded academic paper knowledge.",
   "author": {
     "name": "liuchf"
   },
@@ -20,8 +20,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Paper Wiki",
-    "shortDescription": "v0.2.1 | Paper Wiki: ask, deposit, check, update, relink, and redo.",
-    "longDescription": "Paper Wiki gives users one plugin-level assistant for Paper Source-collected papers. The default path is to inspect Paper Source handoffs, identify ready papers, and deposit them into the wiki while keeping detailed provenance, source-map-first reference writing, formula reasoning chains, evidence figure cards, page-family rules, formal-page language style, link repair, linting, taxonomy maintenance, QMD-compatible indexing, and a post-task check inside internal workflows so users do not need to learn many skill names.",
+    "shortDescription": "v0.2.2 | Paper Wiki: ask, deposit, check, update, relink, redo.",
+    "longDescription": "Paper Wiki is one assistant for Paper Source handoffs: ask the formal graph, deposit ready papers, redo source-map extraction, update/relink pages, enforce provenance and language gates, keep formula reasoning chains and evidence figure cards source-grounded, run link repair, preserve QMD-compatible indexing, and finish with a post-task check.",
     "developerName": "liuchf",
     "category": "Productivity",
     "capabilities": [
@@ -32,10 +32,9 @@
     "privacyPolicyURL": "https://github.com/initiatione/paperflow/blob/main/plugins/paper-wiki/docs/privacy.md",
     "termsOfServiceURL": "https://github.com/initiatione/paperflow/blob/main/plugins/paper-wiki/docs/terms.md",
     "defaultPrompt": [
-      "Use PW / Paper Wiki to 提取并直接沉淀 Paper Source 抓下来的论文到 wiki。",
-      "Use PW / Paper Wiki to 根据论文 wiki 提问并回答，标记证据、综合判断、推断和纠错候选。",
-      "Use PW / Paper Wiki to 检测论文 wiki 库的状态、缺口、link 混乱和待处理任务。",
-      "Use PW / Paper Wiki to 更新论文 wiki 库，继续沉淀、重link、兼容 QMD，并修复 ready 的论文。"
+      "Use PW / Paper Wiki to 提取并沉淀 Paper Source 论文到 wiki。",
+      "Use PW / Paper Wiki to 提问论文 wiki，回答并标记证据边界。",
+      "Use PW / Paper Wiki to 检测、更新、重link、重做论文 wiki，并报告 QMD 状态。"
     ]
   }
 }

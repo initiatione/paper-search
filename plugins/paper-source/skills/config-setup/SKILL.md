@@ -1,9 +1,7 @@
 ---
 name: config-setup
 description: >
-  Use when the user asks to configure Paper Source / PS, "配置 Paper Source", "配置 PS", "查看当前配置",
-  "初始化配置", "修改研究画像", or when Paper Source config is missing, viewed,
-  initialized, or updated.
+  Use when Paper Source / PS config is missing or user says "配置 PS", 查看/初始化配置, 研究画像.
 ---
 
 # Paper Source Config Setup

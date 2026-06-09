@@ -28,9 +28,8 @@ routes:
     references:
       - paper-research-wiki/references/page-provenance.md
     notes:
-      - read paper-wiki-language before drafting or rewriting formal pages
-      - ask one short confirmation question before formal writes
-      - if missing vault structure blocks safe work, point back to Paper Source wiki-setup instead of initializing from Paper Wiki
+      - formal writes use paper-wiki-language
+      - missing vault structure routes back to Paper Source wiki-setup
   check_wiki:
     category: primary
     triggers:
@@ -45,10 +44,6 @@ routes:
     skill: paper-research-wiki/SKILL.md
     workflows:
       - paper-research-wiki/workflows/check-wiki.md
-    notes:
-      - default to Quick + Targeted unless systemic link or tag chaos appears
-      - check Paper Source wiki-setup bootstrap structure and report missing vault structure as a Paper Source action
-      - QMD is optional and must fall back to manifest and direct Markdown search
   ask_wiki:
     category: primary
     triggers:
@@ -68,9 +63,7 @@ routes:
     workflows:
       - paper-research-wiki/workflows/ask-wiki.md
     notes:
-      - read-only formal Obsidian graph retrieval; do not write `log.md`, formal pages, QMD, or Paper Source artifacts
-      - use QMD only as an optional accelerator and fallback to frontmatter, index, and direct Markdown search
-      - report correction candidates and ask before repair
+      - read-only; report correction candidates and ask before repair
   redo_extraction:
     category: primary
     triggers:
@@ -95,9 +88,6 @@ routes:
       - paper-research-wiki/workflows/redo-extraction.md
     references:
       - paper-research-wiki/references/page-provenance.md
-    notes:
-      - compare existing pages before staging replacement edits
-      - do not write Paper Source human approval records
   update_wiki:
     category: primary
     triggers:
@@ -119,10 +109,6 @@ routes:
       - paper-research-wiki/workflows/update-wiki.md
     references:
       - paper-research-wiki/references/upstream-obsidian-wiki-map.md
-    notes:
-      - repair links, aliases, tags, duplicate concept owners, and relationship drift in small batches
-      - treat material formal page rewrites as graph-aware rewrite transactions with dependent-page impact analysis
-      - rerun check-wiki after writing
   language_gate:
     category: support
     triggers:
@@ -134,8 +120,6 @@ routes:
     skill: paper-wiki-language/SKILL.md
     references:
       - paper-wiki-language/references/style-guide.md
-    notes:
-      - applies to any formal page draft, rewrite, repair, or material update
 task_closure:
   applies_to:
     - formal page writes
@@ -144,10 +128,9 @@ task_closure:
     - tracking file updates
     - skill behavior changes
   skip_for:
-    - pure read-only Q&A
     - ask_wiki read-only answers
   checklist:
-    - run the matched workflow's post-task check
+    - run the matched workflow post-task check
     - report QMD refreshed, skipped, or failed with fallback
-    - report Paper Source record readiness or the exact remaining Paper Source action
+    - report Paper Source record readiness or next Paper Source action
     - route recurring failures into Paper Wiki rules, workflows, references, or tests

@@ -1,9 +1,7 @@
 ---
 name: research-grill-me
 description: >
-  Use when the user asks Paper Source / PS to clarify a research direction, refine a vague research
-  question, build a Research Brief, produce a deep-research prompt, "研究简报", "帮我梳理科研方向",
-  "强追问科研问题", or prepare a formal Paper Source search.
+  Use when clarifying Paper Source research: Research Brief, deep-research prompt, "研究简报", "强追问科研问题".
 ---
 
 # Research Grill

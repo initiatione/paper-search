@@ -1,52 +1,33 @@
 ---
 name: wiki-provenance
 description: >
-  Use when final Paper Source paper knowledge is written to an Obsidian or LLM wiki and
-  claims must preserve provenance, including "claim 能否回溯", "证据地址",
-  support status, evidence-map addresses, final-source-review links, or retrieval hooks.
+  Use when checking Paper Source wiki provenance: "claim 能否回溯", "证据地址", support status, final-source-review.
 ---
 
 # Wiki Provenance
 
-Use this for the final knowledge deposition boundary. Paper Source reader and critic artifacts reduce reading cost, but final wiki claims must remain traceable back to source paper evidence, whether the final writer is Claude, Codex, or another wiki-capable agent.
+Use at the final knowledge deposition boundary. Reader/critic artifacts reduce reading cost, but final wiki claims must trace back to source paper evidence.
 
 ## Core Rule
 
-No durable wiki claim without a support status and an evidence route. The page must preserve the difference between source-grounded findings, author claims, metadata facts, agent inferences, and unsupported hypotheses.
+No durable wiki claim without support status and evidence route. Preserve the difference between source-grounded findings, author claims, metadata facts, agent inferences, and unsupported hypotheses.
 
-## Inputs
+## Read Before Writing
 
-Before writing or reviewing final pages, load:
-
-- `wiki-ingest-handoff` output.
-- `wiki-agent-trigger.json` when the handoff has already been approved and Paper Source has generated the resume package.
-- `wiki-ingest-brief.json`.
-- `paper.pdf`, `metadata.json`, `mineru/<slug>.md`, `mineru/paper.tex`, `mineru/images/*`, `mineru/mineru-manifest.json`.
-- `evidence-index.json` and `_paper_source/meta/evidence-index.json` when present.
-- `reader/evidence-map.json` and `reader/claim-support.json`.
-- `critic/*.json` and `briefs/reading-report.md`.
-- Target vault `AGENTS.md` and `_meta/*` contract files.
+Load the handoff/trigger (`wiki-ingest-handoff`, `wiki-agent-trigger.json`, `wiki-ingest-brief.json`), source bundle (`paper.pdf`, `metadata.json`, MinerU Markdown/TeX/images/manifest), evidence aids (`evidence-index.json`, reader maps, critic reports), reading report, and target vault `AGENTS.md` / `_meta/*`.
 
 ## Claim Statuses
 
-Use the Paper Source support status when present:
-
-- `source-grounded`: supported by parsed paper text, TeX, figure/table/image, or PDF review.
-- `metadata-only`: supported by title, DOI, venue, year, authors, source metadata, or abstract-only fields.
-- `inferred`: agent synthesis or interpretation; keep it useful, but label it.
-- `unsupported`: do not put in main factual prose; move to open questions or hypotheses.
-
-If a source-grounded claim is only the paper author's assertion, keep the support status and add an explicit stance such as `author-claim`.
+Use Paper Source status when present: `source-grounded`, `metadata-only`, `inferred`, `unsupported`. If a source-grounded claim is only the author's assertion, keep the status and add `stance=author-claim`.
 
 ## Workflow
 
-1. Run `wiki-ingest-handoff --slug <slug>` and stop if the handoff is not ready; after human approval, `wiki-ingest-trigger --slug <slug>` may provide the current agent's resume package.
+1. Run `wiki-ingest-handoff --slug <slug>` and stop if not ready; after approval, `wiki-ingest-trigger --slug <slug>` may provide the resume package.
 2. Read the source bundle before final prose. Reader summaries are navigation aids, not source authority.
-3. Use `evidence-index.json` as a page/section/chunk locator aid when present, then verify important claims against MinerU Markdown, TeX, images, manifest, and `paper.pdf` before final prose.
-4. For each durable claim, choose a support status and cite the evidence address from `evidence-map.json`, `claim-support.json`, `evidence-index.json` locator follow-up, source artifacts, or PDF fallback review.
-5. Embed evidence addresses in the page or in a page-local provenance block; do not leave them only in Paper Source sidecar JSON.
-6. Put agent inferences in a clearly labeled section such as `Inferences`, `Hypotheses`, or `Open Questions`.
-7. Add synthesis hooks for later retrieval: method family, task, benchmark, metric, dataset, limitation, conflict candidate, and related paper slugs.
+3. Use `evidence-index.json` only to locate evidence; verify important claims against MinerU Markdown, TeX, images, manifest, and `paper.pdf`.
+4. For each durable claim, choose support status and cite the evidence address from source artifacts or evidence sidecars.
+5. Embed evidence addresses in the page or page-local provenance block; do not leave them only in sidecar JSON.
+6. Label agent inferences and add retrieval hooks: method, task, benchmark, metric, dataset, limitation, conflict candidate, related slugs.
 8. After final page writing, create `final-source-review.json`, then run `record-wiki-ingest` with the same approved identity used for pre-write human approval.
 
 ## Page Pattern
@@ -67,7 +48,7 @@ For inferred synthesis:
   Basis: claim-014 + claim-021; compare with [[related-paper]]
 ```
 
-Load `references/page-provenance.md` for a fuller page and final-source-review checklist.
+Load `references/page-provenance.md` for the full page and final-source-review checklist.
 
 ## Hard Stops
 
@@ -79,6 +60,6 @@ Load `references/page-provenance.md` for a fuller page and final-source-review c
 
 ## Literature Wiki Contract
 
-Apply provenance across the seven Paper Source paper wiki families: `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`. `wiki-ingest-brief.json` is the canonical Paper Source-to-Paper Wiki handoff; `wiki_deposition_task.json is legacy` compatibility only. Paper Wiki `$paper-research-wiki` owns final writing, while `paper-source-paper-deposition` is the compatibility adapter. external wiki skills are optional helpers / policy references: use `wiki-provenance` and `tag-taxonomy` policies when they help keep evidence status and tags from drifting, but do not treat standalone helper skills as Paper Source runtime required stack.
+Apply provenance across `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`. `wiki-ingest-brief.json` is the canonical Paper Source-to-Paper Wiki handoff; `wiki_deposition_task.json is legacy` compatibility only. Paper Wiki `$paper-research-wiki` owns final writing; `paper-source-paper-deposition` is the compatibility adapter. external wiki skills are optional helpers / policy references.
 
-`final-source-review.json` must preserve `theory_reconstruction`, `formula_derivation`, `figure_table_evidence`, `novelty_type`, `implementability`, `reproducibility_risk`, `research_gap`, and `cost_level`. Keep author-claimed novelty separate from Paper Source-confirmed novelty, and only mark pages `verified` after source reread, formula/figure review, and complete evidence paths.
+`final-source-review.json` preserves `theory_reconstruction`, `formula_derivation`, `figure_table_evidence`, `novelty_type`, `implementability`, `reproducibility_risk`, `research_gap`, and `cost_level`. Only mark pages `verified` after source reread, formula/figure review, and complete evidence paths.

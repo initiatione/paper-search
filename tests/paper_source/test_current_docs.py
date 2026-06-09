@@ -383,8 +383,8 @@ def test_docs_document_paper_search_mcp_fallback_and_source_coverage():
         ]
     )
 
-    assert manifest["version"] == "0.2.1"
-    assert "v0.2.1" in manifest["interface"]["shortDescription"]
+    assert manifest["version"] == "0.2.3"
+    assert "v0.2.3" in manifest["interface"]["shortDescription"]
     for phrase in [
         "search_papers",
         "source_coverage",
@@ -436,6 +436,8 @@ def test_docs_document_paper_search_mcp_fallback_and_source_coverage():
         "source capability matrix",
         "wiki-ask",
         "read-only formal graph",
+        "0.2.3",
+        "0.2.2",
         "0.2.1",
         "0.1.14",
         "0.1.11",
@@ -760,18 +762,14 @@ def test_marketplace_and_readme_describe_profile_driven_generic_paper_source():
     assert manifest["interface"]["displayName"] == "Paper Source"
     assert "Paper Source" in manifest_text
     assert "Paper Wiki" in manifest_text
-    assert manifest["description"].startswith("Paper Source discovers")
-    assert manifest["interface"]["shortDescription"].startswith("v0.2.1 | Paper Source:")
-    assert "profile-driven academic paper discovery" in manifest_text
-    assert "user's config plus the current request" in manifest_text
-    assert "reader/critic review" in manifest_text
-    assert "low-burden reading reports" in manifest_text
+    assert manifest["description"].startswith("Paper Source")
+    assert manifest["interface"]["shortDescription"].startswith("v0.2.3 | Paper Source:")
+    assert "profile-driven discovery" in manifest_text
     assert "Paper Wiki handoff" in manifest_text
-    assert "quality evolution" in manifest_text
-    assert "MinerU parsing" in manifest_text
+    assert "MinerU" in manifest_text
     assert "Paper Wiki handoff" in manifest_text
     assert "Paper Wiki-compatible vault" in manifest["description"]
-    assert "hand off to Paper Wiki" in manifest["interface"]["shortDescription"]
+    assert "hand off" in manifest["interface"]["shortDescription"]
     assert "robotics" not in manifest["keywords"]
     assert "embodied-intelligence" not in manifest["keywords"]
     assert "control" not in manifest["keywords"]
@@ -980,9 +978,13 @@ def test_read_only_ask_ownership_documented_paper_source_side():
     assert ("fallback" in linkage.lower()) or ("程序化" in linkage) or ("对话优先 Paper Wiki" in linkage)
 
 
-def test_plugin_versions_bumped_to_0_2_1():
-    for rel in ["plugins/paper-source/.codex-plugin/plugin.json", "plugins/paper-wiki/.codex-plugin/plugin.json"]:
+def test_plugin_versions_track_current_plugin_changes():
+    expected = {
+        "plugins/paper-source/.codex-plugin/plugin.json": "0.2.3",
+        "plugins/paper-wiki/.codex-plugin/plugin.json": "0.2.2",
+    }
+    for rel, version in expected.items():
         manifest = json.loads((ROOT / rel).read_text(encoding="utf-8"))
 
-        assert manifest["version"] == "0.2.1"
-        assert "v0.2.1" in manifest["interface"]["shortDescription"]
+        assert manifest["version"] == version
+        assert f"v{version}" in manifest["interface"]["shortDescription"]

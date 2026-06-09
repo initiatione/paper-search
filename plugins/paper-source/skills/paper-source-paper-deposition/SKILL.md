@@ -1,14 +1,12 @@
 ---
 name: paper-source-paper-deposition
 description: >
-  Use when a Paper Source wiki_deposition_task.json or legacy epi-wiki-deposition artifact
-  must be bridged to the paper wiki layer, especially "兼容旧沉淀任务",
-  Paper Source handoff adapter, Paper Wiki unavailable, or historical Paper Source deposition records.
+  Use when handling legacy Paper Source deposition: wiki_deposition_task.json, epi-wiki-deposition, "兼容旧沉淀任务".
 ---
 
 # Paper Source Paper Deposition
 
-Use this skill only as the legacy compatibility adapter at the Paper Source-to-Paper Wiki boundary.
+Use this skill only as the legacy compatibility adapter at the Paper Source-to-Paper Wiki boundary, including legacy epi-wiki-deposition mentions.
 
 Canonical path: formal paper wiki work goes through Paper Wiki `$paper-research-wiki` using `_paper_source/staging/papers/<slug>/wiki-ingest-brief.json` as the handoff. Existing legacy `_epi/` handoffs remain readable as compatibility inputs.
 

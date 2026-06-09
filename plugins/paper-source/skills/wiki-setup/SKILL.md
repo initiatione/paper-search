@@ -1,9 +1,7 @@
 ---
 name: wiki-setup
 description: >
-  Use when initializing, inspecting, repairing, or resetting a Paper Source paper wiki vault,
-  including "初始化 vault", "修复 vault", "重置 vault", graph visibility,
-  destructive reset safety, or misdelete recovery.
+  Use when setting up or repairing a Paper Source vault: "初始化 vault", "修复 vault", reset, graph visibility.
 ---
 
 # Paper Source Wiki Setup
@@ -14,7 +12,7 @@ Load `references/reset-recovery.md` and `workflows/reset-repair.md` before reset
 
 ## Config Boundary
 
-wiki structure reset and Paper Source config reset are separate operations. Default reset preserves config, even if the user says 不需要备份.
+wiki structure reset and Paper Source config reset are separate operations. Default reset preserves config, even when the user says 不需要备份.
 
 Preserve:
 
@@ -47,13 +45,13 @@ python scripts\init_paper_wiki.py --vault <vault>
 
 Initialization must ensure the vault is a git repository. `init_paper_wiki.py` runs `git init` when `<vault>\.git` is missing, records `.git` in the created path list, and does not create a first commit. If `.git` already exists, preserve the existing repository.
 
-Expected structure includes one Paper Source internal repository root `_paper_source`, wiki contract root `_meta`, wiki roots, `.obsidian`, `.git`, `index.md`, `log.md`, `hot.md`, and `.manifest.json`. New initialization must not create top-level `_raw`, `_staging`, `_runs`, `_quarantine`, or `_evolution`.
+Expected structure: `_paper_source`, `_meta`, formal wiki roots, `.obsidian`, `.git`, `index.md`, `log.md`, `hot.md`, `.manifest.json`. Do not create top-level `_raw`, `_staging`, `_runs`, `_quarantine`, or `_evolution`.
 
-The core `_paper_source` bootstrap must include `_paper_source\README.md`, `_paper_source\manifest.json`, `_paper_source\policies\retention.json`, and raw/staging/meta/policies roots. `runs`, `cache`, `tmp`, `tmp-manual-pdfs`, and quarantine/evolution roots are on-demand workflow directories, not empty bootstrap shells. Obsidian graph views should ignore `_paper_source`; `_paper_source/raw/<slug>/mineru/<slug>.md` remains source material, not a formal wiki page. Existing `_epi` roots remain legacy-readable. The default retention policy must cap lifecycle artifacts even when the repository is under total file/byte budget: transient run dirs, `_paper_source\meta\run-lifecycle`, `_paper_source\meta\raw-cleanup`, `_paper_source\meta\repository-maintenance`, `_paper_source\meta\migrations`, `_paper_source\meta\wiki-reset`, `_paper_source\meta\formal-page-snapshots`, and `_paper_source\tmp-manual-pdfs` are not allowed to grow forever once those on-demand paths exist.
+The core `_paper_source` bootstrap must include `_paper_source\README.md`, `_paper_source\manifest.json`, `_paper_source\policies\retention.json`, and raw/staging/meta/policies roots. `runs`, `cache`, `tmp`, `tmp-manual-pdfs`, and quarantine/evolution roots are on-demand workflow directories. Existing `_epi` roots remain legacy-readable. Obsidian graph views should ignore `_paper_source`; `_paper_source/raw/<slug>/mineru/<slug>.md` is source material, not a formal page. The default retention policy must cap lifecycle artifacts, including run dirs, `_paper_source\meta\run-lifecycle`, `_paper_source\meta\raw-cleanup`, `_paper_source\meta\repository-maintenance`, `_paper_source\meta\migrations`, `_paper_source\meta\wiki-reset`, `_paper_source\meta\formal-page-snapshots`, and `_paper_source\tmp-manual-pdfs`.
 
-Initialization also seeds the vault contract files used by final wiki-ingest agents: `AGENTS.md`, `_meta\agent-operating-contract.md`, `_meta\schema.md`, `_meta\taxonomy.md`, and `_meta\directory-structure.md`.
+Seed vault contract files for wiki-ingest agents: `AGENTS.md`, `_meta\agent-operating-contract.md`, `_meta\schema.md`, `_meta\taxonomy.md`, and `_meta\directory-structure.md`.
 
-These defaults are source-first for paper research: final wiki pages must read `mineru\<slug>.md`, `mineru\paper.tex`, `mineru\images\*`, and `mineru\mineru-manifest.json`, then use reader/critic outputs as evidence aids.
+Defaults are source-first for paper research: final pages read `mineru\<slug>.md`, `mineru\paper.tex`, `mineru\images\*`, and `mineru\mineru-manifest.json`; reader/critic outputs are aids.
 
 For existing vaults with old top-level operational roots, migrate before or after initialization:
 
@@ -63,13 +61,13 @@ python scripts\orchestrator.py paper-source-repository-migrate --vault <vault> -
 python scripts\orchestrator.py paper-source-repository-cleanup --vault <vault> --preview --json
 ```
 
-`paper-source-repository-cleanup --preview --json` is the no-write inspection path for Paper Source. Legacy `epi-repository-cleanup --preview --json` remains accepted for existing scripts. Preview must not refresh `_paper_source\manifest.json`, create missing directories, or seed policy files. The non-preview cleanup may delete only lifecycle-bounded, reproducible maintenance artifacts; it must preserve `_paper_source\\raw`, config files/history, final wiki pages, Zotero records, and source-first paper bundles.
+`paper-source-repository-cleanup --preview --json` is the no-write inspection path. Preview must not refresh `_paper_source\manifest.json`, create missing directories, or seed policy files. Non-preview cleanup may delete only lifecycle-bounded, reproducible maintenance artifacts; preserve `_paper_source\\raw`, config history, final pages, Zotero records, and source bundles.
 
 ## Literature Wiki Contract
 
-Initialization seeds formal wiki page families for paper research: `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`. Paper Source itself writes only `_paper_source/`; final pages are written by Paper Wiki `$paper-research-wiki` after handoff and approval. `wiki-ingest-brief.json` is the canonical Paper Source-to-Paper Wiki handoff. `wiki_deposition_task.json is legacy` compatibility only, and `paper-source-paper-deposition` is only the compatibility adapter for existing legacy handoff artifacts or records.
+Formal page families: `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`. Paper Source writes only `_paper_source/`; Paper Wiki `$paper-research-wiki` writes final pages after handoff and approval. `wiki-ingest-brief.json` is the canonical Paper Source-to-Paper Wiki handoff. `wiki_deposition_task.json is legacy` compatibility only; `paper-source-paper-deposition` is the compatibility adapter. external wiki skills are optional helpers / policy references.
 
-The vault contract should expect `wiki-ingest-brief.json` plus source bundle artifacts, human approval, `final-source-review.json`, and `record-wiki-ingest` closure. Required Paper Source/Paper Wiki skills are `$paper-research-wiki` and `paper-source-paper-deposition`; external wiki skills are optional helpers / policy references, including `llm-wiki`, `wiki-ingest`, `wiki-context-pack`, `wiki-lint`, `wiki-stage-commit`, `wiki-status`, `wiki-query`, `wiki-provenance`, and `tag-taxonomy`. `epi-wiki-deposition` is a legacy compatibility alias, not the primary adapter name.
+The vault contract expects source bundle artifacts, human approval, `final-source-review.json`, and `record-wiki-ingest` closure.
 
 Paper Wiki assumes this bootstrap exists. If Paper Wiki detects missing `_paper_source/`, `_meta/`, `.obsidian`, `.git`, or formal page roots, it should report the missing vault structure and send the user back to Paper Source `wiki-setup`; Paper Wiki should not initialize or reset the vault itself.
 

@@ -1,8 +1,7 @@
 ---
 name: mineru-paper-parser
 description: >
-  Use when parsing local Paper Source PDFs with MinerU, including "MinerU 解析",
-  "PDF 转 Markdown", parse-paper, TeX, images, and manifest generation.
+  Use when parsing papers with MinerU: "MinerU 解析", PDF 转 Markdown, parse-paper, TeX/images/manifest.
 ---
 
 # MinerU Paper Parser
