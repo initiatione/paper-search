@@ -192,6 +192,7 @@ def test_skill_bundle_has_the_expected_entrypoints():
         "paper-discovery",
         "paper-ingest",
         "paper-source-paper-deposition",
+        "research-grill-me",
         "run-lifecycle",
         "skill-aware-evolve",
         "topic-tracking",

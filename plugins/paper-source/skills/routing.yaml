@@ -45,6 +45,21 @@ routes:
       - paper-discovery/workflows/multi-source-discovery.md
     notes:
       - use profile-driven query planning, not fixed domain defaults
+  research_grill_me:
+    category: primary
+    triggers:
+      - clarify a research direction
+      - grill my research idea
+      - build a Research Brief
+      - 研究简报
+      - 帮我梳理科研方向
+      - 强追问科研问题
+      - 准备正式 Paper Source 检索
+    skill: research-grill-me/SKILL.md
+    notes:
+      - one decision point per turn with a recommended answer
+      - Research Briefs override Research Profile for the current task
+      - Research Briefs cannot bypass source-staging or Paper Wiki handoff gates
   topic_tracking:
     category: primary
     triggers:
