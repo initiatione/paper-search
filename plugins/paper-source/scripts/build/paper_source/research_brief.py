@@ -218,30 +218,30 @@ def _render_research_brief_markdown(payload: dict[str, Any]) -> str:
     lines = [
         f"# {payload['title']}",
         "",
-        f"Status: {payload['status']}",
-        f"Slug: {payload['slug']}",
-        f"Revision: {payload['revision_number']}",
+        f"状态：{payload['status']}",
+        f"标识：{payload['slug']}",
+        f"修订版本：{payload['revision_number']}",
         "",
-        "## Task",
+        "## 任务",
         payload["task"],
         "",
-        "## Domain Scope",
+        "## 领域范围",
         payload["domain_scope"],
         "",
-        "## Specific Questions",
+        "## 具体问题",
     ]
     lines.extend(f"- {question}" for question in payload["specific_questions"])
-    lines.extend(["", "## Keywords"])
+    lines.extend(["", "## 关键词"])
     lines.extend(f"- {keyword}" for keyword in payload["keywords"])
     if payload["exclusions"]:
-        lines.extend(["", "## Exclusions"])
+        lines.extend(["", "## 排除项"])
         lines.extend(f"- {exclusion}" for exclusion in payload["exclusions"])
     if payload["unknowns"]:
-        lines.extend(["", "## Unknowns"])
+        lines.extend(["", "## 未确认事项"])
         lines.extend(f"- {unknown}" for unknown in payload["unknowns"])
-    lines.extend(["", "## Policy", f"- Review policy: {payload['review_policy']['type']}"])
-    lines.append(f"- Source scope: {payload['source_scope']['type']}")
-    lines.append(f"- Output goal: {payload['output_goal']['type']}")
+    lines.extend(["", "## 策略", f"- 评审策略：{payload['review_policy']['type']}"])
+    lines.append(f"- 来源范围：{payload['source_scope']['type']}")
+    lines.append(f"- 输出目标：{payload['output_goal']['type']}")
     lines.append("")
     return "\n".join(lines)
 

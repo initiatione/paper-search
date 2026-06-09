@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 
@@ -42,8 +43,20 @@ def test_create_research_brief_writes_managed_artifacts(tmp_path):
     brief_dir = tmp_path / "_paper_source" / "research-briefs" / "20260609-auv-current-disturbance-control"
     assert result["brief_dir"] == str(brief_dir)
     assert (brief_dir / "research-brief.json").exists()
-    assert (brief_dir / "research-brief.md").read_text(encoding="utf-8").startswith("# AUV强海流扰动控制")
-    assert "Research Brief" in (brief_dir / "agent-brief.md").read_text(encoding="utf-8")
+    research_brief_markdown = (brief_dir / "research-brief.md").read_text(encoding="utf-8")
+    agent_brief_markdown = (brief_dir / "agent-brief.md").read_text(encoding="utf-8")
+    assert research_brief_markdown.startswith("# AUV强海流扰动控制")
+    assert "状态：" in research_brief_markdown
+    assert "## 任务" in research_brief_markdown
+    assert "## 领域范围" in research_brief_markdown
+    assert "## 具体问题" in research_brief_markdown
+    assert "## 关键词" in research_brief_markdown
+    assert "## 策略" in research_brief_markdown
+    assert not re.search(
+        r"(?m)^(Status:|## Task$|## Domain Scope$|## Specific Questions$|## Keywords$|## Policy$)",
+        research_brief_markdown,
+    )
+    assert "Research Brief" in agent_brief_markdown
     assert (brief_dir / "revisions").is_dir()
 
     payload = json.loads((brief_dir / "research-brief.json").read_text(encoding="utf-8"))
