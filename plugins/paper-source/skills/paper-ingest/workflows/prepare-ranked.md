@@ -57,7 +57,7 @@ Failed acquire attempts that never downloaded `paper.pdf` are not library entrie
 
 For slow MinerU jobs, pass `--mineru-timeout <seconds>` or set `PAPER_SOURCE_MINERU_TIMEOUT`. Legacy `EPI_MINERU_TIMEOUT` remains accepted for existing environments. Complete parse reuse requires `parse-record.json status=success`, not just a Markdown file.
 
-After MinerU parse success, Paper Source writes `_paper_source/raw/<slug>/evidence-index.json` and refreshes `_paper_source/meta/evidence-index.json`. Treat `evidence-index.json` as a full-text page/section/chunk locator for later claim support and wiki provenance; it is generated from MinerU Markdown and does not replace `paper.pdf`, `mineru/<slug>.md`, `mineru/paper.tex`, `mineru/images/*`, or `mineru/mineru-manifest.json`.
+After MinerU parse success, Paper Source writes `_paper_source/raw/<slug>/evidence-index.json` and refreshes `_paper_source/meta/evidence-index.json`. Treat `evidence-index.json` as a full-text page/section/chunk locator for later claim support and wiki provenance; it is generated from MinerU Markdown and does not replace `paper.pdf`, `mineru/<slug>.md`, `mineru/images/*`, `mineru/mineru-manifest.json`, figure/formula indexes, or optional native `mineru/paper.tex`.
 
 ## Source-First Handoff Check
 
@@ -73,7 +73,7 @@ The handoff must require source artifacts:
 - `paper.pdf`
 - `metadata.json`
 - `mineru/<slug>.md`
-- `mineru/paper.tex`
+- `mineru/paper.tex` when native TeX exists
 - `mineru/images/*`
 - `mineru/mineru-manifest.json`
 

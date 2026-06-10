@@ -28,6 +28,8 @@ python scripts\orchestrator.py prepare-ranked --run-id <run-id> --max-papers 10 
 python scripts\orchestrator.py prepare-ranked --run-id <run-id> --max-papers 10 --skip-existing --vault <vault> --json
 python scripts\orchestrator.py advance-ranked --run-id <run-id> --max-papers 3 --vault <vault>
 python scripts\orchestrator.py research-queue --vault <vault>
+python scripts\orchestrator.py normalize-mineru-assets --slug <paper-slug> --vault <vault>
+python scripts\orchestrator.py normalize-mineru-assets --slug <paper-slug> --vault <vault> --execute --json
 python scripts\orchestrator.py paper-gate --slug <paper-slug> --vault <vault>
 python scripts\orchestrator.py wiki-ingest-handoff --slug <paper-slug> --vault <vault>
 python scripts\orchestrator.py record-human-approval --slug <paper-slug> --approved-by <name> --scope run-wiki-ingest-agent --vault <vault>
@@ -56,7 +58,7 @@ Acquisition first tries MCP `download_with_fallback`; no direct PDF plus exhaust
 
 `acquire_failed` source folders with no `paper.pdf`, staging, wiki-ingest record, Zotero record, or identity-mismatch quarantine are cleaned from `_paper_source/raw/<slug>` and logged in `_paper_source/meta/raw-cleanup/` so failed attempts do not accumulate as library entries.
 
-After MinerU parse success, Paper Source writes `_paper_source/raw/<slug>/evidence-index.json` and refreshes `_paper_source/meta/evidence-index.json`; this locator aid does not replace source reread. Reader and critic details remain in `docs/paper-source-linkage.md`.
+After MinerU parse success, Paper Source normalizes raw MinerU assets, writes `_paper_source/raw/<slug>/figure-index.json`, `_paper_source/raw/<slug>/formula-index.json`, `_paper_source/raw/<slug>/asset-normalization-record.json`, writes `_paper_source/raw/<slug>/evidence-index.json`, and refreshes `_paper_source/meta/evidence-index.json`; these locator aids do not replace source reread. Use `normalize-mineru-assets` dry-run first for historical raw bundles, then add `--execute` only after reviewing the rename/drop plan. Reader and critic details remain in `docs/paper-source-linkage.md`.
 
 ## Human Gate And Recording
 

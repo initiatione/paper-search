@@ -54,9 +54,9 @@ Required reading before final wiki writing:
 - `_paper_source/README.md`
 - `_paper_source/staging/papers/<slug>/wiki-ingest-brief.json`
 - `mineru/paper.md` or `mineru/<slug>.md`
-- `mineru/paper.tex`
 - `mineru/images/*`
 - `mineru/mineru-manifest.json`
+- optional native `mineru/paper.tex` when present
 
 ## Obsidian math rendering
 
@@ -90,7 +90,7 @@ AGENT_OPERATING_CONTRACT_MD = """# Agent Operating Contract
 
 - Keep Markdown vault files as the source of truth.
 - Treat `reader/` and critic outputs as navigation and quality signals, not substitutes for the source paper.
-- Review `mineru/paper.md` or `mineru/<slug>.md`, `mineru/paper.tex`, `mineru/images/*`, and `mineru/mineru-manifest.json` before final wiki writing.
+- Review `mineru/paper.md` or `mineru/<slug>.md`, `mineru/images/*`, `mineru/mineru-manifest.json`, and optional native `mineru/paper.tex` before final wiki writing.
 - Preserve central formulas, figures, tables, and image evidence when distilling claims.
 - Render formulas with Obsidian math delimiters: inline `$...$`, block `$$...$$`. Never place final-page formulas in fenced `math`, `tex`, or `latex` code blocks.
 - Search existing pages before creating new ones.
@@ -214,9 +214,11 @@ def _manifest_payload(existing: dict | None = None) -> dict:
             "must_read_source_artifacts": [
                 "mineru/paper.md",
                 "mineru/<slug>.md",
-                "mineru/paper.tex",
                 "mineru/images/*",
                 "mineru/mineru-manifest.json",
+            ],
+            "optional_source_artifacts": [
+                "mineru/paper.tex",
             ],
             "handoff_artifacts": [
                 "wiki-ingest-brief.json",

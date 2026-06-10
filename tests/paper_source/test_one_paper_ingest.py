@@ -293,6 +293,9 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
     assert "reader/figures.md" in optional_aids
     assert "critic/critic-report.json" in optional_aids
     assert "critic/research-decision.json" in optional_aids
+    assert "figure-index.json" in optional_aids
+    assert "formula-index.json" in optional_aids
+    assert "asset-normalization-record.json" in optional_aids
     assert wiki_ingest_brief["source_bundle"]["primary_source_reading_order"][:5] == [
         "metadata.json",
         canonical_mineru_md,
@@ -300,13 +303,25 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
         "mineru/images/*",
         "mineru/mineru-manifest.json",
     ]
+    assert wiki_ingest_brief["source_bundle"]["primary_source_reading_order"][5:] == [
+        "figure-index.json",
+        "formula-index.json",
+        "asset-normalization-record.json",
+    ]
     formula_figure_review = wiki_ingest_brief["source_bundle"]["formula_figure_review"]
     assert "central formulas" in formula_figure_review["formulas"]
     assert "figures/tables/images" in formula_figure_review["figures_tables_images"]
+    assert "figure-index.json" in formula_figure_review["figures_tables_images"]
     assert "paper.pdf" in formula_figure_review["parse_uncertainty"]
     assert wiki_ingest_brief["source_bundle"]["evidence"]["claim_count"] >= 3
     assert wiki_ingest_brief["source_bundle"]["evidence"]["full_text_evidence_index"] == "evidence-index.json"
     assert wiki_ingest_brief["source_bundle"]["evidence"]["vault_evidence_index"] == "_paper_source/meta/evidence-index.json"
+    assert wiki_ingest_brief["source_bundle"]["evidence"]["figure_index"]["path"] == "figure-index.json"
+    assert wiki_ingest_brief["source_bundle"]["evidence"]["formula_index"]["path"] == "formula-index.json"
+    assert (
+        wiki_ingest_brief["source_bundle"]["evidence"]["asset_normalization_record"]["path"]
+        == "asset-normalization-record.json"
+    )
     assert wiki_ingest_brief["source_bundle"]["evidence"]["claim_support_artifact"] == "reader/claim-support.json"
     assert wiki_ingest_brief["source_bundle"]["evidence"]["reader_roles"] == [
         "nature-sci-editor",

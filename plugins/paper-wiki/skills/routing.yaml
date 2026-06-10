@@ -109,6 +109,32 @@ routes:
       - paper-research-wiki/workflows/update-wiki.md
     references:
       - paper-research-wiki/references/upstream-obsidian-wiki-map.md
+    notes:
+      - repair links, aliases, tags, duplicate concept owners, and relationship drift in small batches
+      - treat material formal page rewrites as graph-aware rewrite transactions with dependent-page impact analysis
+      - rerun check-wiki after writing
+  maintain_figures:
+    category: primary
+    triggers:
+      - 证据图维护
+      - 图谱命名
+      - 修复图片路径
+      - 修复证据图
+      - 公式截图
+      - figure maintenance
+      - repair figure evidence
+      - repair image paths
+      - normalize evidence figures
+      - formula screenshot cleanup
+    skill: paper-research-wiki/SKILL.md
+    workflows:
+      - paper-research-wiki/workflows/maintain-figures.md
+    references:
+      - paper-research-wiki/references/page-provenance.md
+    notes:
+      - consume Paper Source figure-index.json and formula-index.json
+      - do not rename raw MinerU image assets from Paper Wiki
+      - snapshot formal pages before material figure or formula evidence repairs
   language_gate:
     category: support
     triggers:

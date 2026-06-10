@@ -3,11 +3,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 
 from paper_source import research_brief
 from paper_source import cli_routes, orchestrator as workflows
-from paper_source.artifacts import file_sha256, raw_paper_root, runs_root, utc_now, write_json_atomic
+from paper_source.artifacts import existing_raw_paper_root, file_sha256, raw_paper_root, runs_root, utc_now, write_json_atomic
+from paper_source.asset_normalization import normalize_mineru_assets
 from paper_source.cli_parser import build_parser
 from paper_source.config import (
     apply_config_update,
@@ -28,6 +30,15 @@ from paper_source.wiki_reset import reset_wiki_vault
 
 def _load_json(path: Path) -> object:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _print_json(payload: object) -> None:
+    text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    if hasattr(sys.stdout, "buffer"):
+        sys.stdout.buffer.write(text.encode("utf-8"))
+        sys.stdout.flush()
+        return
+    print(text, end="")
 
 
 def _run_review_payload(run_dir: Path) -> dict | None:
@@ -437,6 +448,24 @@ def _handle_parse_paper(args: argparse.Namespace) -> int:
     if record.get("batch_id"):
         print(f"batch_id={record['batch_id']}")
     return 0 if record["status"] == "success" else 1
+
+
+def _handle_normalize_mineru_assets(args: argparse.Namespace) -> int:
+    paper_root = existing_raw_paper_root(args.vault, args.slug)
+    record = normalize_mineru_assets(paper_root, execute=args.execute)
+    if args.json:
+        _print_json(record)
+    else:
+        print(f"normalization_mode={record['mode']}")
+        print(f"paper_root={paper_root}")
+        print(f"rename_count={len(record.get('rename_plan') or [])}")
+        print(f"dropped_formula_image_count={len(record.get('dropped_formula_images') or [])}")
+        print(f"needs_review_count={len(record.get('needs_review') or [])}")
+        if record.get("warnings"):
+            print("warnings:")
+            for warning in record["warnings"]:
+                print(f"- {warning}")
+    return 0
 
 
 def _handle_promote_to_wiki(args: argparse.Namespace) -> int:

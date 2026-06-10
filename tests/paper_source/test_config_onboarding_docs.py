@@ -160,7 +160,7 @@ def test_paper_source_skills_document_precise_one_to_three_prepare_ranked_path()
     assert "mineru/images/*" in ingest_prepare
     assert "formula/figure review cues" in ingest_prepare
     assert "not source authority" in ingest
-    assert "tex_source=markdown-fallback" in mineru
+    assert "tex_source=paused-no-native-tex" in mineru
     assert "mineru-command\\paper" in mineru
     assert "mineru-command\\parsed" in mineru
     assert "MinerU reported done but produced no Markdown output" in mineru
@@ -304,6 +304,6 @@ def test_paper_ingest_source_first_reading_reference_exists():
     assert "references/source-first-reading.md" in ingest
     assert "Claim Cards" in source_first
     assert "Formula And Figure Rules" in source_first
-    assert "mineru/paper.tex" in source_first
+    assert "`mineru/paper.tex` only when native TeX exists" in source_first
     assert "mineru/images/*" in source_first
     assert "reader/claim-support.json" in source_first

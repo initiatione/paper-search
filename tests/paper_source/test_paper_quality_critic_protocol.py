@@ -196,7 +196,7 @@ def test_parse_quality_records_source_first_companion_artifacts_when_available(t
     assert any("mineru/images file_count=1" in item for item in reviewer["evidence"])
 
 
-def test_parse_quality_fails_successful_parse_without_tex_or_manifest(tmp_path):
+def test_parse_quality_warns_without_tex_but_fails_without_manifest(tmp_path):
     paper_root = _write_protocol_fixture(
         tmp_path,
         metadata=_stable_metadata(),
@@ -220,7 +220,7 @@ def test_parse_quality_fails_successful_parse_without_tex_or_manifest(tmp_path):
     assert report["parse_quality_checks"]["mineru_manifest_ready"] is False
     reviewer = _parse_reviewer(paper_root)
     assert reviewer["verdict"] == "fail"
-    assert any("mineru_paper_tex_ready" in item for item in reviewer["evidence"])
+    assert any("paper.tex generation is paused" in item for item in reviewer["warnings"])
     assert any("mineru_manifest_ready" in item for item in reviewer["evidence"])
 
 

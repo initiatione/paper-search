@@ -43,7 +43,7 @@ python scripts\orchestrator.py <command>
 - 安装与配置：`doctor`、`config-status`、`init-config`、`propose-config-update`、`apply-config-update`。
 - Wiki 库初始化/重置：`wiki-setup` skill 负责初始化和重置流程；初始化只补缺失结构，并在 `<vault>\.git` 缺失时自动 `git init`，但不自动创建首个 commit。初始化后的 Paper Source 内部产物只在 `_paper_source/` 下展开，根 `_meta/` 只保留 wiki contract 文件。重置必须先盘点、备份计划并要求用户二次确认 `确认重置 Paper Source wiki`。`wiki-reset --preview` 先列出会备份、删除、保留的路径；`wiki-reset` 是执行器，默认备份内容并保留 `_paper_source\meta\paper-source-config.yaml`、`_paper_source\meta\paper-source-config-state.json`、config history 目录，且不得触碰用户级 `%USERPROFILE%\.codex\plugins\paperflow\paper-source\runtime.json`。如需同时重置配置，必须另行确认 `确认同时重置 Paper Source config` 并显式传入 `--reset-config-confirmed-by`。若出现误删或误操作，先停止后续论文流程，用 `wiki-repair` 单入口检查恢复状态，或用 `config-recover` 查找候选配置，再用 `config-restore` 在确认后恢复。
 - 发现与推进：`dry-run`、`advance-ranked`、`advance-paper`、`advance-batch`、`ingest-one`、`acquire-paper`。
-- 解析与修复：`parse-paper`、`redo-acquire`、`redo-parse`、`redo-read`、`recritic`。
+- 解析与修复：`parse-paper`、`normalize-mineru-assets`、`redo-acquire`、`redo-parse`、`redo-read`、`recritic`。
 - Reader/Critic/Gate：推进命令内部生成 reader 和 critic；只读检查用 `paper-gate`。
 - Report：`report` 是公开读取入口；`report --run-id <run-id> [--json]` 读取已有 run report artifact；内部生成模块是 `report_run.py`，不是额外的 `run-report` CLI。
 - Staging 与 Wiki handoff：`stage_wiki.py` 生成 `wiki-ingest-brief.json` canonical Paper Source-to-Paper Wiki handoff 和 `promotion-plan.json`，只在显式 legacy compatibility 下生成 `wiki_deposition_task.json`；`wiki-ingest-handoff` 渲染 agent-mediated handoff；`record-human-approval` 记录外部 agent 写入前的人类批准；`wiki-ingest-trigger` 写继续任务；Paper Wiki `$paper-research-wiki` 是用户级正式论文 wiki 写入和维护入口；`paper-source-paper-deposition` 仅保留旧 handoff / record provenance 的 compatibility adapter；`record-wiki-ingest` 记录外部 agent 已完成的最终页路径、hash 和 formal page gate；`promote-to-wiki` 仅保留 legacy compiled-draft 兼容。
@@ -71,6 +71,7 @@ scripts/build/paper_source/
   fetch_plan.py
   acquire_papers.py
   run_mineru_parse.py
+  asset_normalization.py
   evidence_index.py
   generate_reader.py
   reader_*.py
@@ -115,7 +116,8 @@ scripts/build/paper_source/
 - `acquire_papers.py` 负责下载或复制 PDF，优先用 MCP `download_with_fallback` 做开放访问 fallback chain；若候选没有 direct PDF URL 且 OA fallback 无 PDF，会快速返回 `failure_class=manual-download-required` 和 `manual_download.candidate_manual_urls`，让 agent 直接给用户 DOI/出版商链接并要求通过 organization/institution 手动下载；有 direct PDF URL 时才继续回退 source-native MCP、CLI 和 direct URL。下载到 PDF 后会做轻量 DOI/title identity check：通过或无法提取时记录 `identity_check` 并继续；明确不匹配时写 `identity-check.json`、`failure_class=identity-mismatch`，把 PDF 隔离到 `_paper_source/quarantine/papers/<slug>/paper.pdf`，不进入 MinerU。成功 `acquire-record.json` 记录 `doi`、`title`、`use_scihub`、`fallback_chain`、`mcp_server_probe`、`upstream.tool` 和可选 `retrieval_preview`，并把 `paper-search-read-preview.txt` 写作 `_paper_source/raw/<slug>/` 下的 sidecar。该 sidecar 不是 source bundle 的权威解析，MinerU remains canonical parse，最终 wiki 仍必须重读 `paper.pdf`、MinerU Markdown/TeX/images/manifest；失败记录保留合并候选的 `candidate_pdf_urls`、`acquire_attempts`、`failure_class`、`retryable`、`recovery_hint` 和可选 `manual_download`，让后续 agent 区分重试、换源、手动补 PDF、identity mismatch quarantine 和跳过。
 - `raw_cleanup.py` 负责清理失败的 `_paper_source/raw/<slug>` 目录；只有在没有下载到 `paper.pdf`、没有 staging、没有 wiki-ingest/zotero 下游记录且路径仍直属 raw root 时才删除，并把 manifest 写到 `_paper_source/meta/raw-cleanup/`。
 - `rank_papers.py` 负责 paper type classification、ranking signals、ranking rubric、ranking protocol 和三角色排序解释。
-- `run_mineru_parse.py` 负责 MinerU 命令调用、失败记录和 fixture materialization；默认 7200 秒超时，可由 `--mineru-timeout` 或 `PAPER_SOURCE_MINERU_TIMEOUT` 覆盖；legacy `EPI_MINERU_TIMEOUT` 仅作为旧环境 fallback。成功 parse 会调用 `evidence_index.py` 写 `_paper_source/raw/<slug>/evidence-index.json` 并刷新 `_paper_source/meta/evidence-index.json`。
+- `run_mineru_parse.py` 负责 MinerU 命令调用、失败记录和 fixture materialization；默认 7200 秒超时，可由 `--mineru-timeout` 或 `PAPER_SOURCE_MINERU_TIMEOUT` 覆盖；legacy `EPI_MINERU_TIMEOUT` 仅作为旧环境 fallback。成功 parse 会调用 `asset_normalization.py` 规范化 MinerU raw 图片/公式截图，再调用 `evidence_index.py` 写 `_paper_source/raw/<slug>/evidence-index.json` 并刷新 `_paper_source/meta/evidence-index.json`。
+- `asset_normalization.py` 负责 raw MinerU asset normalization：按 `Fig.` / `Figure` / `图` 标签把 hash-like 图片重命名为 `fig-###-*`，把无法映射的图片标记为 `unmapped-*`，把有 Markdown/TeX LaTeX 证据的公式截图从 raw 图片中删除并从 Markdown 图片引用中移除，同时写 `figure-index.json`、`formula-index.json` 和 `asset-normalization-record.json`。公开 CLI `normalize-mineru-assets --slug <slug> [--execute] [--json]` 可对 `_paper_source/raw` 或 legacy `_epi/raw` 历史 bundle 做 dry-run-first 修复；它不修改正式 wiki 页面。
 - `evidence_index.py` 负责从 MinerU Markdown 建立 full-text locator index：按 heading/page marker/chunk 记录 page、section_path、source_locator、chunk hash、input hashes 和 warnings；它是 wiki provenance 的检索辅助，不替代 source-first reread。
 - `generate_reader.py`、`reader_outputs.py`、`reader_evidence.py`、`reader_protocol.py` 负责多角色 reader、evidence map 和证据地址校验；reader 会把 TeX、MinerU manifest 和 PDF fallback 作为 source-first 证据写入 evidence/claim-support，而不是只输出摘要。
 - `run_critic.py`、`paper_quality.py`、`role_critics.py` 负责 critic quorum、学术论文可靠性检查和三角色质量门；其中 `parse-quality-critic` 会检查 MinerU Markdown、TeX、images、manifest 和 `parse-record.json`，避免原文公式/图像证据在进入 reader/wiki 前被静默抹掉。
@@ -123,7 +125,7 @@ scripts/build/paper_source/
 - `research_decision.py`、`reader_revision_plan.py`、`reader_revision_guidance.py`、`reproduction_plan.py` 把 critic 结果翻译成决策、修复建议和紧凑复现 caveat。
 - `wiki_contracts.py` 固定七类正式页面、brief-first required Paper Source/Paper Wiki skills、frontmatter schema、quality gates、legacy alias 和 QMD collection boundary 等跨模块常量；`paper-research-wiki` qmd collection 允许正式页目录加 `AGENTS.md`、`index.md`、`hot.md`、`log.md`、`_meta/`，必须 ignore `_paper_source/**`、`.obsidian/**`、`.claude/**`，让 `_paper_source/meta/formal-page-snapshots/`、raw MinerU source Markdown 和 staging handoff 不进入 QMD。external wiki skills are optional helpers / policy references。
 - `stage_wiki.py` 负责 `_paper_source/staging` 内部证据包、轻阅读报告、`wiki-ingest-brief.json` canonical Paper Source-to-Paper Wiki handoff、`final_source_review_contract` 和 `promotion-plan.json`；默认新 staging 不需要 `wiki_deposition_task.json`，只在显式 legacy compatibility 下生成。它会把 `evidence-index.json`、chunk count、input hashes、warnings 和 `_paper_source/meta/evidence-index.json` 作为 locator aid 暴露给 handoff，但不得把审计页当成正式 wiki 页写到根目录。
-- `paper_gate.py` 是只读质量门面板，决定当前 slug 是 failure、waiting for human gate，还是允许进入下一动作；它调用 `source_bundle_audit.py` 检查 `paper.pdf`、`metadata.json`、MinerU Markdown、`mineru/paper.tex`、`mineru/images/*` 和 `mineru/mineru-manifest.json`，当 source bundle is incomplete 时阻止 final handoff。
+- `paper_gate.py` 是只读质量门面板，决定当前 slug 是 failure、waiting for human gate，还是允许进入下一动作；它调用 `source_bundle_audit.py` 检查 `paper.pdf`、`metadata.json`、MinerU Markdown、`mineru/images/*` 和 `mineru/mineru-manifest.json`，当 source bundle is incomplete 时阻止 final handoff；`mineru/paper.tex` 只在原生 TeX 存在时作为可选公式源进入审阅。
 - `source_bundle_audit.py` 负责 raw source bundle 的磁盘完整性审计和 image hash 明细，供 `paper_gate.py` 与 record provenance 复用。
 - `graph_visibility.py` 负责 Obsidian `.obsidian/graph.json` 的正式目录 filter 和 `collapse-filter` 修复，避免过度转义导致图谱只剩 index。
 - `wiki_language.py` 负责 formal page language gate：formal wiki page body prose defaults to Chinese；英文只保留论文题名、术语、缩写、证据字段和路径。
@@ -165,7 +167,7 @@ skills/
 - `paper-ingest`：推进已选论文进入 raw、source-staging 和 handoff；默认 `fast-ingest` 不跑 reader/critic，`reviewed-ingest` / `audited-ingest` 才按需加入。
   - `paper-ingest/references/source-first-reading.md` 是 source-staging/wiki handoff 的 source-first 阅读协议，要求最终沉淀前重读 MinerU Markdown、TeX、images、manifest 和必要时的 PDF，最终记录 `final-source-review.json`；`reader/claim-support.json` 只有在 reviewed/audited ingest 生成时才作为辅助区分源文摘取、metadata-only 与 inference。
 - `paper-source-paper-deposition`：legacy compatibility adapter；当旧 artifact 提到 `wiki_deposition_task.json` 或 `epi-wiki-deposition` 时，确认 `wiki-ingest-brief.json` exists 后转给 sibling 插件包 `paper-wiki` / `plugins/paper-wiki` 提供的 `$paper-research-wiki`。`llm-wiki`、`wiki-ingest`、`wiki-context-pack`、`wiki-lint`、`wiki-stage-commit`、`wiki-status`、`wiki-query`、`wiki-provenance` 和 `tag-taxonomy` 等 external wiki skills are optional helpers / policy references。
-- `mineru-paper-parser`：低层 PDF -> Markdown/TeX/images/manifest 解析能力；成功后最终产物只放在 `mineru/`，`paper.tex` 必须非空，必要时使用 Markdown fallback。
+- `mineru-paper-parser`：低层 PDF -> Markdown/images/manifest 解析能力；若 MinerU 返回原生 TeX，则保留 `paper.tex`，否则不再从 Markdown 生成 LaTeX fallback，公式以 Markdown 和可选 TeX 复核。
 - `wiki-provenance`：final wiki 页 provenance、claim support status、evidence address 和 round-trip retrieval hook；它承接“最终页上的这句话到底来自哪里”这类问题，`paper-ingest` 只保留 source-first handoff。
 - `skill-aware-evolve`：根据 evidence 和验证结果提出受控变更；配置问题必须走配置 proposal。
 - `wiki-setup`：初始化、检查、修复和重置 paper wiki vault。入口只保留边界和命令，详细恢复与误删清单见 `skills/wiki-setup/references/reset-recovery.md`。初始化会创建或保留 vault-local git repository，写入 `AGENTS.md` 和 `_meta/agent-operating-contract.md`、`_meta/schema.md`、`_meta/taxonomy.md`、`_meta/directory-structure.md`，默认要求 source-first paper ingest：最终 wiki 写入先读 `mineru/<slug>.md`、`mineru/paper.tex`、`mineru/images/*` 和 manifest。
@@ -218,6 +220,9 @@ Paper Source 默认 vault 形态。除根 `_meta/` wiki contract 文件外，Pap
         metadata.json
         acquire-record.json
         paper-search-read-preview.txt  # optional non-authoritative retrieval preview
+        figure-index.json
+        formula-index.json
+        asset-normalization-record.json
         evidence-index.json
         zotero-record.json
         mineru/

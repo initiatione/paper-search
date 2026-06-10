@@ -94,10 +94,11 @@ def _review_parse_materialization(paper_root: Path) -> dict:
 
     if tex_path.exists() and tex_path.stat().st_size > 0:
         evidence.append("mineru/paper.tex exists and is non-empty for formula/notation review")
-    elif strict_success:
-        failures.append("mineru_paper_tex_ready: successful parse lacks non-empty mineru/paper.tex")
     elif parse_record_present:
-        warnings.append("mineru_paper_tex_missing: formula/notation review may require PDF fallback")
+        warnings.append(
+            "mineru_paper_tex_missing: paper.tex generation is paused; review formulas from MinerU Markdown "
+            "and use PDF fallback when needed"
+        )
 
     if manifest_path.exists() and manifest_path.stat().st_size > 0:
         evidence.append("mineru/mineru-manifest.json exists for parse provenance")

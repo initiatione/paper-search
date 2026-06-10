@@ -193,7 +193,7 @@ These separate a strong page from a competent summary — they are what "分析�
 ### Source-map-first writing
 Write from the source bundle, not from reader or critic summaries. Treat MinerU Markdown / TeX /
 images / manifest as the first source map: `mineru/paper.md` or `mineru/<slug>.md`,
-`mineru/paper.tex`, `mineru/images/*`, and `mineru/mineru-manifest.json`.
+`mineru/images/*`, `mineru/mineru-manifest.json`, figure/formula indexes, and optional native `mineru/paper.tex`.
 Rule: reader/critic artifacts are secondary aids for orientation, critique, or quality checks; they
 cannot replace a direct pass over the MinerU source artifacts for load-bearing claims.
 

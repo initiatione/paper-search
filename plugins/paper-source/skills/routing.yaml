@@ -102,9 +102,14 @@ routes:
       - PDF 转 Markdown
       - paper.tex
       - mineru-manifest.json
+      - figure-index.json
+      - formula-index.json
+      - normalize-mineru-assets
+      - raw image normalization
     skill: mineru-paper-parser/SKILL.md
     notes:
       - support paper-ingest source bundle preparation
+      - owns raw MinerU asset normalization only; formal wiki page figure repairs route to Paper Wiki
   paper_source_paper_deposition:
     category: compatibility
     triggers:

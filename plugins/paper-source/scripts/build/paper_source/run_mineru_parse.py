@@ -12,6 +12,7 @@ from pathlib import Path
 
 from paper_source.artifacts import file_sha256, utc_now, write_json_atomic, write_text_atomic
 from paper_source.artifacts import LEGACY_EPI_ROOT_NAME, PAPER_SOURCE_ROOT_NAME
+from paper_source.asset_normalization import count_preserved_images, normalize_mineru_assets
 from paper_source.evidence_index import build_paper_evidence_index
 from paper_source.runtime_config import apply_runtime_config
 from paper_source.source_artifacts import canonical_mineru_markdown_path
@@ -221,6 +222,19 @@ def _markdown_to_latex(markdown: str) -> str:
     return "\n".join(lines)
 
 
+def _existing_tex_path(mineru_dir: Path) -> Path | None:
+    tex_path = mineru_dir / "paper.tex"
+    return tex_path if tex_path.is_file() else None
+
+
+def _record_tex_artifact(record: dict, output_hashes: dict[str, str], mineru_dir: Path, tex_source: str) -> None:
+    tex_path = _existing_tex_path(mineru_dir)
+    record["tex_path"] = str(tex_path) if tex_path else None
+    record["tex_source"] = tex_source
+    if tex_path:
+        output_hashes["paper.tex"] = file_sha256(tex_path)
+
+
 _DEFAULT_MINERU_TIMEOUT_SECONDS = 7200
 
 
@@ -394,15 +408,13 @@ def run_mineru_command(
         shutil.copyfile(tex_candidates[0], mineru_dir / "paper.tex")
         tex_source = "mineru-native"
     else:
-        tex_source = "markdown-fallback"
-        write_text_atomic(
-            mineru_dir / "paper.tex",
-            _markdown_to_latex(mineru_markdown_path.read_text(encoding="utf-8")),
-        )
+        tex_source = "paused-no-native-tex"
     image_dir = markdown_path.parent / "images"
     image_count = _copy_tree_contents(image_dir, mineru_dir / "images")
     if manifest_path:
         shutil.copyfile(manifest_path, mineru_dir / "mineru-manifest.json")
+    asset_record = normalize_mineru_assets(paper_root, execute=True)
+    image_count = count_preserved_images(paper_root)
     if input_dir.exists():
         shutil.rmtree(input_dir)
     if output_dir.exists():
@@ -421,10 +433,16 @@ def run_mineru_command(
         "stdout_path": str(stdout_path),
         "stderr_path": str(stderr_path),
         "markdown_path": str(mineru_markdown_path),
-        "tex_path": str(mineru_dir / "paper.tex"),
-        "tex_source": tex_source,
         "manifest_path": str(mineru_dir / "mineru-manifest.json") if manifest_path else None,
         "image_count": image_count,
+        "asset_normalization": {
+            "status": "success",
+            "path": str(paper_root / "asset-normalization-record.json"),
+            "renamed_count": len(asset_record.get("rename_plan") or []),
+            "dropped_formula_image_count": len(asset_record.get("dropped_formula_images") or []),
+            "needs_review_count": len(asset_record.get("needs_review") or []),
+            "warnings": asset_record.get("warnings") or [],
+        },
         "work_dir_retention": "logs-only",
     }
     record["input_artifact_hashes"] = {
@@ -432,12 +450,16 @@ def run_mineru_command(
     }
     output_hashes = {
         f"{paper_root.name}.md": file_sha256(mineru_markdown_path),
-        "paper.tex": file_sha256(mineru_dir / "paper.tex"),
         "stdout.txt": file_sha256(stdout_path),
         "stderr.txt": file_sha256(stderr_path),
     }
+    _record_tex_artifact(record, output_hashes, mineru_dir, tex_source)
     if manifest_path:
         output_hashes["mineru-manifest.json"] = file_sha256(mineru_dir / "mineru-manifest.json")
+    for artifact_name in ["figure-index.json", "formula-index.json", "asset-normalization-record.json"]:
+        artifact_path = paper_root / artifact_name
+        if artifact_path.exists():
+            output_hashes[artifact_name] = file_sha256(artifact_path)
     record["output_artifact_hashes"] = output_hashes
     record = _attach_evidence_index(record, paper_root)
     write_json_atomic(paper_root / "parse-record.json", record)
@@ -462,11 +484,7 @@ def materialize_mineru_fixture(
         shutil.copyfile(tex_path, mineru_dir / "paper.tex")
         tex_source = "fixture-native"
     else:
-        tex_source = "markdown-fallback"
-        write_text_atomic(
-            mineru_dir / "paper.tex",
-            _markdown_to_latex(mineru_markdown_path.read_text(encoding="utf-8")),
-        )
+        tex_source = "paused-no-native-tex"
     (mineru_dir / "images").mkdir(exist_ok=True)
     image_count = 0
     if images_dir and images_dir.exists():
@@ -474,6 +492,8 @@ def materialize_mineru_fixture(
             if image_path.is_file():
                 shutil.copyfile(image_path, mineru_dir / "images" / image_path.name)
                 image_count += 1
+    asset_record = normalize_mineru_assets(paper_root, execute=True)
+    image_count = count_preserved_images(paper_root)
     manifest_path = mineru_dir / "mineru-manifest.json"
     write_json_atomic(
         manifest_path,
@@ -499,10 +519,16 @@ def materialize_mineru_fixture(
         "parsed_at": utc_now(),
         "exit_status": 0,
         "markdown_path": str(mineru_markdown_path),
-        "tex_path": str(mineru_dir / "paper.tex"),
         "manifest_path": str(manifest_path),
-        "tex_source": tex_source,
         "image_count": image_count,
+        "asset_normalization": {
+            "status": "success",
+            "path": str(paper_root / "asset-normalization-record.json"),
+            "renamed_count": len(asset_record.get("rename_plan") or []),
+            "dropped_formula_image_count": len(asset_record.get("dropped_formula_images") or []),
+            "needs_review_count": len(asset_record.get("needs_review") or []),
+            "warnings": asset_record.get("warnings") or [],
+        },
     }
     input_hashes = {
         "fixture_markdown": file_sha256(markdown_path),
@@ -510,11 +536,15 @@ def materialize_mineru_fixture(
     if tex_path:
         input_hashes["fixture_tex"] = file_sha256(tex_path)
     parse_record["input_artifact_hashes"] = input_hashes
-    parse_record["output_artifact_hashes"] = {
+    output_artifact_hashes = {
         f"{paper_root.name}.md": file_sha256(mineru_markdown_path),
-        "paper.tex": file_sha256(mineru_dir / "paper.tex"),
         "mineru-manifest.json": file_sha256(manifest_path),
+        "figure-index.json": file_sha256(paper_root / "figure-index.json"),
+        "formula-index.json": file_sha256(paper_root / "formula-index.json"),
+        "asset-normalization-record.json": file_sha256(paper_root / "asset-normalization-record.json"),
     }
+    _record_tex_artifact(parse_record, output_artifact_hashes, mineru_dir, tex_source)
+    parse_record["output_artifact_hashes"] = output_artifact_hashes
     parse_record = _attach_evidence_index(parse_record, paper_root)
     write_json_atomic(paper_root / "parse-record.json", parse_record)
     return parse_record

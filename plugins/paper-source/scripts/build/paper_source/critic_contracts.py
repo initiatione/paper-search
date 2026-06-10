@@ -33,13 +33,11 @@ CORE_CRITIC_PROTOCOLS = {
         "consumes": [
             "paper.pdf",
             MINERU_MARKDOWN_ARTIFACT_LABEL,
-            "mineru/paper.tex",
             "mineru/images",
             "mineru/mineru-manifest.json",
         ],
         "hard_fail_checks": [
             "mineru_paper_markdown_exists",
-            "mineru_paper_tex_ready",
             "mineru_manifest_ready",
         ],
         "warning_checks": [

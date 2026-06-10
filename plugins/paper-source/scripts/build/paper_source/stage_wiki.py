@@ -3,8 +3,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from paper_source.artifacts import staging_paper_root, utc_now, wiki_batch_pending_root, write_json_atomic, write_text_atomic
-from paper_source.source_artifacts import canonical_source_first_artifacts
+from paper_source.artifacts import (
+    file_sha256,
+    staging_paper_root,
+    utc_now,
+    wiki_batch_pending_root,
+    write_json_atomic,
+    write_text_atomic,
+)
+from paper_source.source_artifacts import canonical_source_first_artifacts, source_first_artifacts
 from paper_source.wiki_contracts import (
     PAPER_SOURCE_DEPOSITION_SKILL,
     PAPER_WIKI_CANONICAL_SKILL,
@@ -37,7 +44,9 @@ ACCEPTED_WIKI_BATCH_INGEST_BRIEF_SCHEMA_VERSIONS = {
 }
 
 
-def _source_first_artifacts(slug: str) -> list[str]:
+def _source_first_artifacts(slug: str, paper_root: Path | None = None) -> list[str]:
+    if paper_root is not None:
+        return source_first_artifacts(paper_root)
     return canonical_source_first_artifacts(slug)
 
 
@@ -151,6 +160,28 @@ def _load_full_text_evidence_index(paper_root: Path) -> dict:
         "input_hashes": payload.get("input_hashes") or {},
         "warnings": payload.get("warnings") or [],
     }
+
+
+def _sidecar_status(paper_root: Path, artifact_name: str) -> dict:
+    path = paper_root / artifact_name
+    status = {"path": artifact_name, "status": "missing", "sha256": None, "warnings": []}
+    if not path.exists():
+        return status
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        return {**status, "status": "unreadable", "warnings": [str(exc)]}
+    warnings = payload.get("warnings") if isinstance(payload, dict) else []
+    return {
+        "path": artifact_name,
+        "status": "present",
+        "sha256": file_sha256(path),
+        "warnings": warnings if isinstance(warnings, list) else [],
+    }
+
+
+def _missing_sidecar_status(artifact_name: str) -> dict:
+    return {"path": artifact_name, "status": "missing", "sha256": None, "warnings": []}
 
 
 def _existing_artifacts(paper_root: Path, candidates: list[str]) -> list[str]:
@@ -494,7 +525,7 @@ def _method_idea(metadata: dict, title: str) -> str:
         return "论文围绕移动机器人（Mobile Robot）的导航控制（Navigation Control）组织方法，将规划、感知或反馈控制（Feedback Control）作为主要技术线索。"
     if abstract:
         return f"根据摘要，论文主题是：{_compact_text(abstract, limit=300)}"
-    return "当前 metadata 未给出足够摘要；正式沉淀前需要回到 canonical MinerU Markdown 与 paper.tex 复核核心方法。"
+    return "当前 metadata 未给出足够摘要；正式沉淀前需要回到 canonical MinerU Markdown 复核核心方法，并在存在 paper.tex 时补充核对公式。"
 
 
 def _validation_setup(metadata: dict) -> str:
@@ -743,12 +774,12 @@ def _wiki_rule_source_model() -> dict:
     }
 
 
-def _final_source_review_contract(slug: str) -> dict:
+def _final_source_review_contract(slug: str, paper_root: Path | None = None) -> dict:
     return {
         "schema_version": "paper-source-final-source-review-contract-v1",
         "required": True,
         "suggested_output_path": "final-source-review.json",
-        "required_artifacts": _source_first_artifacts(slug),
+        "required_artifacts": _source_first_artifacts(slug, paper_root),
         "must_record": final_source_review_must_record(),
         "required_wiki_skills": required_wiki_skills(),
         "formal_page_families": formal_page_family_names(),
@@ -758,6 +789,21 @@ def _final_source_review_contract(slug: str) -> dict:
         "record_command_flag": "--source-review <final-source-review.json>",
         "record_schema_version": "paper-source-final-source-review-v1",
     }
+
+
+def _primary_source_reading_order(source_markdown: str, paper_root: Path | None) -> list[str]:
+    order = [
+        "metadata.json",
+        source_markdown,
+        "mineru/images/*",
+        "mineru/mineru-manifest.json",
+        "figure-index.json",
+        "formula-index.json",
+        "asset-normalization-record.json",
+    ]
+    if paper_root is not None and (paper_root / "mineru" / "paper.tex").is_file():
+        order.insert(2, "mineru/paper.tex")
+    return order
 
 
 def _paper_deposition_paths(
@@ -777,7 +823,7 @@ def _paper_deposition_paths(
         "metadata": str(paper_root / "metadata.json"),
         "paper_pdf": str(paper_root / "paper.pdf"),
         "paper_md": str(paper_root / source_markdown),
-        "paper_tex": str(paper_root / "mineru" / "paper.tex"),
+        "paper_tex": str(paper_root / "mineru" / "paper.tex") if (paper_root / "mineru" / "paper.tex").is_file() else None,
         "images": str(paper_root / "mineru" / "images"),
         "mineru_manifest": str(paper_root / "mineru" / "mineru-manifest.json"),
         "formula_index": str(paper_root / "formula-index.json"),
@@ -867,14 +913,28 @@ def _build_wiki_ingest_brief(
     critic_artifacts: list[str] | None = None,
     wiki_deposition_task_path: str | None = None,
     full_text_evidence_index: dict | None = None,
+    paper_root: Path | None = None,
 ) -> dict:
     workflow_mode = normalize_ingest_mode(workflow_mode)
     reader_artifacts = reader_artifacts or []
     critic_artifacts = critic_artifacts or []
     full_text_evidence_index = full_text_evidence_index or {}
-    source_first_artifacts = _source_first_artifacts(slug)
+    figure_index = _sidecar_status(paper_root, "figure-index.json") if paper_root else _missing_sidecar_status("figure-index.json")
+    formula_index = _sidecar_status(paper_root, "formula-index.json") if paper_root else _missing_sidecar_status("formula-index.json")
+    asset_normalization = (
+        _sidecar_status(paper_root, "asset-normalization-record.json")
+        if paper_root
+        else _missing_sidecar_status("asset-normalization-record.json")
+    )
+    source_first_artifacts = _source_first_artifacts(slug, paper_root)
     source_markdown = _source_markdown_artifact(slug)
-    optional_evidence_aids = [*reader_artifacts, *critic_artifacts]
+    optional_evidence_aids = [
+        "figure-index.json",
+        "formula-index.json",
+        "asset-normalization-record.json",
+        *reader_artifacts,
+        *critic_artifacts,
+    ]
     claims = evidence_map.get("claims") if isinstance(evidence_map.get("claims"), list) else []
     roles = evidence_map.get("reader_roles") if isinstance(evidence_map.get("reader_roles"), list) else []
     quick_take = (
@@ -958,7 +1018,7 @@ def _build_wiki_ingest_brief(
                 "role": "personalized vault-contract and wiki-skill rules",
             },
         ],
-        "final_source_review_contract": _final_source_review_contract(slug),
+        "final_source_review_contract": _final_source_review_contract(slug, paper_root),
         "wiki_rule_source_model": _wiki_rule_source_model(),
         "qmd_collection_policy": qmd_collection_policy(),
         "ingest_policy": {
@@ -985,8 +1045,10 @@ def _build_wiki_ingest_brief(
             "source_of_truth": "Markdown vault plus Paper Source source bundle; QMD/search indexes are retrieval aids only.",
             "qmd_collection_policy": qmd_collection_policy(),
             "source_first_policy": (
-                f"Read the source paper artifacts ({source_markdown}, mineru/paper.tex, mineru/images/*, "
-                "and mineru/mineru-manifest.json) before final wiki writing; reader and critic outputs, "
+                f"Read the source paper artifacts ({source_markdown}, mineru/images/*, "
+                "mineru/mineru-manifest.json, figure-index.json, formula-index.json, and "
+                "asset-normalization-record.json) before final wiki writing; read mineru/paper.tex only when "
+                "that optional native TeX artifact exists. Reader and critic outputs, "
                 "when present, are optional navigation and quality signals, not substitutes for the source paper."
             ),
             "reader_critic_policy": (
@@ -1067,23 +1129,19 @@ def _build_wiki_ingest_brief(
         },
         "source_bundle": {
             "raw_artifacts": source_first_artifacts,
-            "primary_source_reading_order": [
-                "metadata.json",
-                source_markdown,
-                "mineru/paper.tex",
-                "mineru/images/*",
-                "mineru/mineru-manifest.json",
-            ],
+            "primary_source_reading_order": _primary_source_reading_order(source_markdown, paper_root),
             "optional_evidence_aids": optional_evidence_aids,
             "formula_figure_review": {
                 "formulas": (
-                    f"Review central formulas in {source_markdown} and mineru/paper.tex; preserve important "
-                    "definitions, assumptions, derivation steps, and notation rather than reducing them to prose."
+                    f"Review central formulas in {source_markdown}; when optional mineru/paper.tex exists, use it "
+                    "as an additional formula/notation source. Preserve important definitions, assumptions, "
+                    "derivation steps, and notation rather than reducing them to prose."
                 ),
                 "figures_tables_images": (
-                    "Interpret figures/tables/images from mineru/images/*; use reader/figures.md only when "
-                    "reviewed-ingest or audited-ingest produced it. Preserve what each visual shows, the "
-                    "task/metric/baseline context, and any uncertainty from the parse."
+                    "Interpret figures/tables/images from mineru/images/* with figure-index.json as the "
+                    "label/path map; use reader/figures.md only when reviewed-ingest or audited-ingest produced "
+                    "it. Preserve what each visual shows, the task/metric/baseline context, and any uncertainty "
+                    "from the parse."
                 ),
                 "parse_uncertainty": (
                     "If formulas, tables, or figures appear missing, ambiguous, or parse-limited, inspect paper.pdf "
@@ -1102,6 +1160,9 @@ def _build_wiki_ingest_brief(
                 "full_text_chunk_count": full_text_evidence_index.get("chunk_count", 0),
                 "full_text_input_hashes": full_text_evidence_index.get("input_hashes", {}),
                 "full_text_warnings": full_text_evidence_index.get("warnings", []),
+                "figure_index": figure_index,
+                "formula_index": formula_index,
+                "asset_normalization_record": asset_normalization,
                 "vault_evidence_index": "_paper_source/meta/evidence-index.json",
             },
         },
@@ -1344,6 +1405,7 @@ def stage_paper(
         reader_artifacts=reader_artifacts,
         critic_artifacts=critic_artifacts,
         full_text_evidence_index=full_text_evidence_index,
+        paper_root=paper_root,
     )
     wiki_deposition_task = None
     if emit_legacy_deposition_task:

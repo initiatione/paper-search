@@ -32,7 +32,6 @@ def _has_complete_parse(paper_root: Path) -> bool:
         parse_record.get("status") == "success"
         and (paper_root / "paper.pdf").is_file()
         and resolve_mineru_markdown_path(paper_root).is_file()
-        and (mineru_dir / "paper.tex").is_file()
         and (mineru_dir / "mineru-manifest.json").is_file()
         and (mineru_dir / "images").is_dir()
     )

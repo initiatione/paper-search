@@ -201,6 +201,12 @@ def build_parser() -> argparse.ArgumentParser:
     parse_paper.add_argument("--mineru-command", default=None)
     parse_paper.add_argument("--mineru-timeout", type=int, default=None)
 
+    normalize_assets = subparsers.add_parser("normalize-mineru-assets")
+    _add_common_vault(normalize_assets)
+    normalize_assets.add_argument("--slug", required=True)
+    normalize_assets.add_argument("--execute", action="store_true")
+    normalize_assets.add_argument("--json", action="store_true")
+
     promote = subparsers.add_parser("promote-to-wiki")
     _add_common_vault(promote)
     promote.add_argument("--slug", required=True)

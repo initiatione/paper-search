@@ -1993,15 +1993,12 @@ def _has_complete_mineru_parse(paper_root: Path) -> bool:
     paper_pdf = paper_root / "paper.pdf"
     mineru_dir = paper_root / "mineru"
     mineru_md = resolve_mineru_markdown_path(paper_root)
-    mineru_tex = mineru_dir / "paper.tex"
     mineru_manifest = mineru_dir / "mineru-manifest.json"
     mineru_images = mineru_dir / "images"
     files_complete = (
         paper_pdf.exists()
         and mineru_md.exists()
         and mineru_md.stat().st_size > 0
-        and mineru_tex.exists()
-        and mineru_tex.stat().st_size > 0
         and mineru_manifest.exists()
         and mineru_images.is_dir()
     )

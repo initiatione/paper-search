@@ -217,7 +217,6 @@ def _wiki_ingest_brief_check(plan: dict[str, Any]) -> dict[str, Any]:
     required_raw_artifacts = [
         "paper.pdf",
         "metadata.json",
-        "mineru/paper.tex",
         "mineru/images/*",
         "mineru/mineru-manifest.json",
     ]

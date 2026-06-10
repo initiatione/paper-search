@@ -17,6 +17,7 @@ WORKFLOWS = {
     "check-wiki.md",
     "update-wiki.md",
     "redo-extraction.md",
+    "maintain-figures.md",
 }
 PUBLIC_SKILLS = {"paper-research-wiki"}
 SUPPORT_SKILLS = {"paper-wiki-language"}
@@ -299,7 +300,15 @@ def test_paper_wiki_skill_routing_manifest_matches_public_workflows():
     assert "../rules/wiki-writing-standard.md" in routing["always_read"]
 
     routes = routing["routes"]
-    assert set(routes) == {"extract_papers", "check_wiki", "ask_wiki", "redo_extraction", "update_wiki", "language_gate"}
+    assert set(routes) == {
+        "extract_papers",
+        "check_wiki",
+        "ask_wiki",
+        "redo_extraction",
+        "update_wiki",
+        "maintain_figures",
+        "language_gate",
+    }
 
     routed_workflows = {
         Path(workflow).name
@@ -336,6 +345,12 @@ def test_paper_wiki_skill_routing_manifest_matches_public_workflows():
     assert "routing manifest" in skill
 
     assert "paper-wiki-language/references/style-guide.md" in routes["language_gate"].get("references", [])
+
+    maintain = routes["maintain_figures"]
+    assert maintain["workflows"] == ["paper-research-wiki/workflows/maintain-figures.md"]
+    assert "图谱命名" in maintain["triggers"]
+    assert "repair image paths" in maintain["triggers"]
+    assert any("do not rename raw MinerU image assets" in note for note in maintain.get("notes", []))
 
 
 def test_paper_wiki_routes_read_only_wiki_questions_to_ask_workflow():

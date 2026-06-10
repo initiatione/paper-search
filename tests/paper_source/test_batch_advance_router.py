@@ -415,7 +415,7 @@ def test_prepare_ranked_papers_repairs_incomplete_existing_parse_outputs(tmp_pat
     assert result["state"] == "staged"
     assert result["last_action"] == "staging"
     assert result["stage_record"]["status"] == "success"
-    assert (mineru_dir / "paper.tex").stat().st_size > 0
+    assert (mineru_dir / "paper.tex").stat().st_size == 0
     assert not (paper_root / "reader" / "reader.md").exists()
     assert (vault / "_paper_source" / "staging" / "papers" / "incomplete-parse" / "promotion-plan.json").is_file()
 

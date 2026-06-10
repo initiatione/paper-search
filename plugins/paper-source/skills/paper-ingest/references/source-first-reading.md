@@ -8,14 +8,14 @@ Read or inspect source artifacts in this order:
 
 1. `metadata.json` for identity, venue, year, DOI/arXiv, PDF/code/source hints.
 2. `mineru/<slug>.md` for section-level content and local evidence anchors.
-3. `mineru/paper.tex` for formulas, notation, and equation cues that Markdown may flatten.
+3. `mineru/paper.tex` only when native TeX exists; otherwise review formulas directly from MinerU Markdown and use PDF fallback when needed.
 4. `mineru/images/*` plus `reader/figures.md` for figure/table/image interpretation.
 5. `mineru/mineru-manifest.json` for parse completeness and uncertainty.
 6. `paper.pdf` when Markdown/TeX/images conflict or important content is missing.
 
 Reader and critic outputs are navigation aids; they never replace the source paper.
 
-Parse-quality review should treat `mineru/<slug>.md`, `paper.tex`, `images/*`, `mineru-manifest.json`, and `parse-record.json` as one evidence bundle when parse succeeded.
+Parse-quality review should treat `mineru/<slug>.md`, `images/*`, `mineru-manifest.json`, `parse-record.json`, figure/formula indexes, and optional native `paper.tex` as one evidence bundle when parse succeeded.
 
 ## Approval Report Rules
 
@@ -50,7 +50,7 @@ Final wiki ingest must read the source bundle again:
 - `paper.pdf`
 - `metadata.json`
 - `mineru/<slug>.md`
-- `mineru/paper.tex`
+- `mineru/paper.tex` when native TeX exists
 - `mineru/images/*`
 - `mineru/mineru-manifest.json`
 
@@ -58,7 +58,7 @@ Use `reader/evidence-map.json`, `reader/claim-support.json`, `reader/figures.md`
 
 Before `record-wiki-ingest`, write `final-source-review.json` near the staging handoff. Use schema `paper-source-final-source-review-v1` and include:
 
-- `reviewed_artifacts[]`: `paper.pdf`, `metadata.json`, `mineru/<slug>.md`, `mineru/paper.tex`, `mineru/images/*`, `mineru/mineru-manifest.json`; file artifacts need `status=reviewed` and `sha256`.
+- `reviewed_artifacts[]`: `paper.pdf`, `metadata.json`, `mineru/<slug>.md`, `mineru/images/*`, `mineru/mineru-manifest.json`, figure/formula indexes, and optional `mineru/paper.tex`; file artifacts need `status=reviewed` and `sha256`.
 - `mineru/images/*`: `status=reviewed`, `file_count`, and per-image `relative_path` plus `sha256` when images exist.
 - `formula_review`: `status=reviewed` and a short summary of formulas, notation, assumptions, derivations, or parse gaps.
 - `figure_table_image_review`: `status=reviewed` and a short summary of visual evidence and uncertainty.

@@ -465,7 +465,6 @@ def _source_first_confirmed(brief: dict[str, Any]) -> bool:
     return any(is_mineru_markdown_artifact(artifact) for artifact in source_bundle.get("raw_artifacts") or []) and all(
         artifact in raw_artifacts
         for artifact in [
-            "mineru/paper.tex",
             "mineru/images/*",
             "mineru/mineru-manifest.json",
         ]

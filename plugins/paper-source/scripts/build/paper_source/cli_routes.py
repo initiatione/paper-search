@@ -30,6 +30,7 @@ HANDLER_NAMES: dict[str, str] = {
     "advance-ranked": "_handle_advance_ranked",
     "prepare-ranked": "_handle_prepare_ranked",
     "parse-paper": "_handle_parse_paper",
+    "normalize-mineru-assets": "_handle_normalize_mineru_assets",
     "promote-to-wiki": "_handle_promote_to_wiki",
     "rollback-promotion": "_handle_rollback_promotion",
     "redo-acquire": "_handle_redo_acquire",

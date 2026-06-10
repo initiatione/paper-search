@@ -32,14 +32,16 @@ def is_mineru_markdown_artifact(value: str) -> bool:
 
 
 def source_first_artifacts(paper_root: Path) -> list[str]:
-    return [
+    artifacts = [
         "paper.pdf",
         "metadata.json",
         resolved_mineru_markdown_relative_path(paper_root),
-        "mineru/paper.tex",
         "mineru/images/*",
         "mineru/mineru-manifest.json",
     ]
+    if (paper_root / "mineru" / "paper.tex").is_file():
+        artifacts.insert(3, "mineru/paper.tex")
+    return artifacts
 
 
 def canonical_source_first_artifacts(slug: str) -> list[str]:
@@ -47,7 +49,6 @@ def canonical_source_first_artifacts(slug: str) -> list[str]:
         "paper.pdf",
         "metadata.json",
         canonical_mineru_markdown_relative_path(slug),
-        "mineru/paper.tex",
         "mineru/images/*",
         "mineru/mineru-manifest.json",
     ]

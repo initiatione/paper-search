@@ -73,8 +73,9 @@ def _ready_instruction(
         "Apply Paper Wiki provenance, tag, language, lint, and post-task-check policies through the Paper Wiki writing standard. "
         "Paper Source artifacts are source/evidence handoff only "
         "and Paper Source itself may write only internal underscore folders. Follow the source-first rule and re-read the source bundle before writing: "
-        "paper.pdf, metadata.json, mineru/<slug>.md, mineru/paper.tex, mineru/images/*, and "
-        "mineru/mineru-manifest.json. Compare this paper with the current batch or neighboring Paper Source source "
+        "paper.pdf, metadata.json, mineru/<slug>.md, mineru/images/*, mineru/mineru-manifest.json, "
+        "figure-index.json, formula-index.json, and asset-normalization-record.json; read optional mineru/paper.tex "
+        "only when present. Compare this paper with the current batch or neighboring Paper Source source "
         "bundles before creating reusable concept or synthesis pages. Route final knowledge into these page "
         "families when useful: "
         + ", ".join(formal_page_families)

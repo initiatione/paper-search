@@ -186,20 +186,18 @@ def test_mineru_command_keeps_single_canonical_slug_markdown(tmp_path):
     assert not (paper_root / "mineru" / "paper.md").exists()
 
 
-def test_mineru_command_generates_tex_fallback_and_removes_success_work_copies(tmp_path):
+def test_mineru_command_pauses_tex_fallback_and_removes_success_work_copies(tmp_path):
     paper_root = _seed_paper_root(tmp_path)
     command = [sys.executable, str(_write_markdown_only_success_command(tmp_path))]
 
     record = run_mineru_command(paper_root, command=command)
 
-    tex_path = paper_root / "mineru" / "paper.tex"
-    tex_text = tex_path.read_text(encoding="utf-8")
     assert record["status"] == "success"
-    assert record["tex_source"] == "markdown-fallback"
+    assert record["tex_source"] == "paused-no-native-tex"
+    assert record["tex_path"] is None
+    assert "paper.tex" not in record["output_artifact_hashes"]
     assert record["work_dir_retention"] == "logs-only"
-    assert "\\section{Parsed Paper}" in tex_text
-    assert "Evidence from Markdown-only MinerU" in tex_text
-    assert tex_path.stat().st_size > 0
+    assert not (paper_root / "mineru" / "paper.tex").exists()
     assert not (paper_root / "mineru-command" / "paper").exists()
     assert not (paper_root / "mineru-command" / "parsed").exists()
     assert (paper_root / "mineru-command" / "stdout.txt").is_file()
