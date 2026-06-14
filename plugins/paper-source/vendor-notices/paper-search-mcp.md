@@ -4,7 +4,7 @@ Upstream project: `openags/paper-search-mcp`.
 
 Paper Source uses this as an external discovery dependency and does not vendor upstream source.
 
-Verified on 2026-06-05: Paper Source prefers the upstream stdio MCP server through `python -m paper_search_mcp.server` or `PAPER_SOURCE_PAPER_SEARCH_MCP_COMMAND`. Discovery calls MCP `search_papers`, preserves `sources_used`, `source_results`, `errors`, and total counts in Paper Source run reports, and falls back to the `paper-search` CLI from upstream `main` or a `PAPER_SOURCE_PAPER_SEARCH_COMMAND` wrapper if MCP is unavailable, times out, returns an error, or returns no discoverable papers. Legacy `EPI_PAPER_SEARCH_MCP_COMMAND` and `EPI_PAPER_SEARCH_COMMAND` remain accepted for existing environments.
+Verified on 2026-06-05: Paper Source prefers the upstream stdio MCP server through `python -m paper_search_mcp.server` or `PAPER_SOURCE_PAPER_SEARCH_MCP_COMMAND`. Discovery calls MCP `search_papers`, preserves `sources_used`, `source_results`, `errors`, and total counts in Paper Source run reports, and falls back to the `paper-search` CLI from upstream `main` or a `PAPER_SOURCE_PAPER_SEARCH_COMMAND` wrapper if MCP is unavailable, times out, returns an error, or returns no discoverable papers.
 
 Acquisition policy: try MCP `download_with_fallback` first with Sci-Hub disabled by default, then source-native MCP `download_<source>`, then CLI/direct URL fallback when MCP cannot produce usable artifacts. Paper Source records MCP probe, fallback chain, `use_scihub`, upstream tool evidence, and raw response provenance, and keeps adaptation in `scripts/build/paper_source/paper_search_adapter.py`.
 

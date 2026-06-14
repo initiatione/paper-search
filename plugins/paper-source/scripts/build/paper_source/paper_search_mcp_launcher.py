@@ -38,10 +38,9 @@ def _drop_empty_provider_env() -> None:
 def build_launch_command() -> list[str]:
     _drop_empty_provider_env()
     apply_runtime_config()
-    command = os.environ.get("PAPER_SOURCE_PAPER_SEARCH_MCP_COMMAND") or os.environ.get("EPI_PAPER_SEARCH_MCP_COMMAND") or "python"
+    command = os.environ.get("PAPER_SOURCE_PAPER_SEARCH_MCP_COMMAND") or "python"
     args = shlex.split(
         os.environ.get("PAPER_SOURCE_PAPER_SEARCH_MCP_ARGS")
-        or os.environ.get("EPI_PAPER_SEARCH_MCP_ARGS")
         or "-m paper_search_mcp.server"
     )
     if _should_autodetect_python(command, args):
@@ -79,7 +78,6 @@ def _select_paper_search_python(configured_command: str) -> str | None:
 def _missing_paper_search_mcp_message() -> str:
     runtime_path = (
         os.environ.get("PAPER_SOURCE_RUNTIME_CONFIG")
-        or os.environ.get("EPI_RUNTIME_CONFIG")
         or "<CODEX_HOME>/plugins/paperflow/paper-source/runtime.json"
     )
     return (

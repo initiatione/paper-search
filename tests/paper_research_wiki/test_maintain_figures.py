@@ -22,7 +22,7 @@ def test_repair_page_replaces_multi_figure_block_without_source_line_drift(tmp_p
     module = _load_module()
     slug = "fixture-paper"
     vault = tmp_path / "vault"
-    raw_root = vault / "_epi" / "raw" / slug
+    raw_root = vault / "_paper_source" / "raw" / slug
     images_dir = raw_root / "mineru" / "images"
     page = vault / "references" / "fixture.md"
     images_dir.mkdir(parents=True)
@@ -70,8 +70,8 @@ def test_repair_page_replaces_multi_figure_block_without_source_line_drift(tmp_p
                 '<a id="F20"></a>',
                 "**原文 Fig. 20.** Controller response evidence.",
                 "<p>",
-                f'<img src="../_epi/raw/{slug}/mineru/images/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg" alt="old" width="32%">',
-                f'<img src="../_epi/raw/{slug}/mineru/images/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.jpg" alt="old" width="32%">',
+                f'<img src="../_paper_source/raw/{slug}/mineru/images/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg" alt="old" width="32%">',
+                f'<img src="../_paper_source/raw/{slug}/mineru/images/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.jpg" alt="old" width="32%">',
                 "</p>",
                 "**Source:** old hash image evidence.",
                 "",
@@ -109,7 +109,7 @@ def test_repair_page_does_not_change_updated_date_without_evidence_patch(tmp_pat
     module = _load_module()
     slug = "fixture-paper"
     vault = tmp_path / "vault"
-    raw_root = vault / "_epi" / "raw" / slug
+    raw_root = vault / "_paper_source" / "raw" / slug
     page = vault / "concepts" / "fixture.md"
     raw_root.mkdir(parents=True)
     page.parent.mkdir(parents=True)
@@ -120,7 +120,7 @@ def test_repair_page_does_not_change_updated_date_without_evidence_patch(tmp_pat
                 "updated: 2026-06-01",
                 "---",
                 "",
-                f"Source bundle: ../_epi/raw/{slug}/paper.pdf",
+                f"Source bundle: ../_paper_source/raw/{slug}/paper.pdf",
                 "",
             ]
         )
@@ -147,7 +147,7 @@ def test_repair_page_handles_plain_figure_heading_with_old_hash_path(tmp_path):
     module = _load_module()
     slug = "fixture-paper"
     vault = tmp_path / "vault"
-    raw_root = vault / "_epi" / "raw" / slug
+    raw_root = vault / "_paper_source" / "raw" / slug
     images_dir = raw_root / "mineru" / "images"
     page = vault / "references" / "fixture.md"
     images_dir.mkdir(parents=True)
@@ -177,7 +177,7 @@ def test_repair_page_handles_plain_figure_heading_with_old_hash_path(tmp_path):
                 "---",
                 "",
                 "原文 Fig. 4 展示算法结构。",
-                f'<img src="../_epi/raw/{slug}/mineru/images/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg" alt="Evidence image">',
+                f'<img src="../_paper_source/raw/{slug}/mineru/images/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg" alt="Evidence image">',
                 "",
             ]
         )
@@ -207,7 +207,7 @@ def test_repair_page_does_not_patch_foreign_raw_images_when_slug_is_mentioned(tm
     slug = "fixture-paper"
     foreign_slug = "other-paper"
     vault = tmp_path / "vault"
-    raw_root = vault / "_epi" / "raw" / slug
+    raw_root = vault / "_paper_source" / "raw" / slug
     images_dir = raw_root / "mineru" / "images"
     page = vault / "references" / "fixture.md"
     images_dir.mkdir(parents=True)
@@ -236,10 +236,10 @@ def test_repair_page_does_not_patch_foreign_raw_images_when_slug_is_mentioned(tm
                 "updated: 2026-06-01",
                 "---",
                 "",
-                f"This page mentions _epi/raw/{slug}/paper.pdf as background.",
+                f"This page mentions _paper_source/raw/{slug}/paper.pdf as background.",
                 "",
                 "原文 Fig. 4 展示另一个来源的图。",
-                f'<img src="../_epi/raw/{foreign_slug}/mineru/images/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.jpg" alt="Foreign image">',
+                f'<img src="../_paper_source/raw/{foreign_slug}/mineru/images/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.jpg" alt="Foreign image">',
                 "",
             ]
         )
@@ -267,7 +267,7 @@ def test_repair_page_replaces_stale_slug_image_path_without_figure_heading(tmp_p
     module = _load_module()
     slug = "fixture-paper"
     vault = tmp_path / "vault"
-    raw_root = vault / "_epi" / "raw" / slug
+    raw_root = vault / "_paper_source" / "raw" / slug
     images_dir = raw_root / "mineru" / "images"
     page = vault / "references" / "fixture.md"
     images_dir.mkdir(parents=True)
@@ -297,7 +297,7 @@ def test_repair_page_replaces_stale_slug_image_path_without_figure_heading(tmp_p
                 "---",
                 "",
                 "正文说明 Figure 12 的 success rate 变化。",
-                f'<img src="../_epi/raw/{slug}/mineru/images/cccccccccccccccccccccccccccccccc.jpg" alt="Evidence image">',
+                f'<img src="../_paper_source/raw/{slug}/mineru/images/cccccccccccccccccccccccccccccccc.jpg" alt="Evidence image">',
                 "",
             ]
         )
@@ -327,7 +327,7 @@ def test_repair_page_keeps_later_section_images_out_of_plain_figure_block(tmp_pa
     module = _load_module()
     slug = "fixture-paper"
     vault = tmp_path / "vault"
-    raw_root = vault / "_epi" / "raw" / slug
+    raw_root = vault / "_paper_source" / "raw" / slug
     images_dir = raw_root / "mineru" / "images"
     page = vault / "references" / "fixture.md"
     images_dir.mkdir(parents=True)
@@ -365,12 +365,12 @@ def test_repair_page_keeps_later_section_images_out_of_plain_figure_block(tmp_pa
                 "---",
                 "",
                 "原文 Fig. 8 给出任务结构：",
-                f'<img src="../_epi/raw/{slug}/mineru/images/88888888888888888888888888888888.jpg" alt="Fig 8">',
+                f'<img src="../_paper_source/raw/{slug}/mineru/images/88888888888888888888888888888888.jpg" alt="Fig 8">',
                 "",
                 "### Current strength robustness",
                 "",
                 "正文说明 Figure 12 的 success rate 变化。",
-                f'<img src="../_epi/raw/{slug}/mineru/images/12121212121212121212121212121212.jpg" alt="Fig 12">',
+                f'<img src="../_paper_source/raw/{slug}/mineru/images/12121212121212121212121212121212.jpg" alt="Fig 12">',
                 "",
             ]
         )
@@ -506,7 +506,6 @@ def test_refresh_sidecars_updates_canonical_paper_wiki_record_request(tmp_path):
 
     assert result["changed"] is True
     assert result["paper_wiki_record_request_changed"] is True
-    assert result["legacy_prw_record_request_changed"] is False
     assert request["paper_wiki_task"]["route"] == "maintain_figures"
     assert request["paper_wiki_task"]["snapshot"] == "_paper_source/meta/formal-page-snapshots/test/"
     assert request["final_pages"][0]["sha256"] != "stale"

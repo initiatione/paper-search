@@ -13,7 +13,6 @@ from paper_source.artifacts import (
 )
 from paper_source.source_artifacts import canonical_source_first_artifacts, has_nonempty_mineru_tex, source_first_artifacts
 from paper_source.wiki_contracts import (
-    PAPER_SOURCE_DEPOSITION_SKILL,
     PAPER_WIKI_CANONICAL_SKILL,
     deposition_skill_compatibility_aliases,
     final_source_review_must_record,
@@ -37,10 +36,8 @@ REVIEWED_INGEST_MODE = "reviewed-ingest"
 AUDITED_INGEST_MODE = "audited-ingest"
 INGEST_MODES = {FAST_INGEST_MODE, REVIEWED_INGEST_MODE, AUDITED_INGEST_MODE}
 WIKI_BATCH_INGEST_BRIEF_SCHEMA_VERSION = "paper-source-wiki-batch-ingest-brief-v1"
-LEGACY_WIKI_BATCH_INGEST_BRIEF_SCHEMA_VERSION = "epi-wiki-batch-ingest-brief-v1"
 ACCEPTED_WIKI_BATCH_INGEST_BRIEF_SCHEMA_VERSIONS = {
     WIKI_BATCH_INGEST_BRIEF_SCHEMA_VERSION,
-    LEGACY_WIKI_BATCH_INGEST_BRIEF_SCHEMA_VERSION,
 }
 
 
@@ -89,12 +86,11 @@ def _required_wiki_skill_loading_clause(load_prefix: str) -> str:
     remaining_skills = [
         skill
         for skill in required_wiki_skills()
-        if skill not in {PAPER_WIKI_CANONICAL_SKILL, PAPER_SOURCE_DEPOSITION_SKILL}
+        if skill != PAPER_WIKI_CANONICAL_SKILL
     ]
     remaining_clause = f", then load {_serial_join(remaining_skills)}" if remaining_skills else ""
     return (
-        f"{load_prefix} {PAPER_WIKI_CANONICAL_SKILL} first as the canonical paper wiki layer; "
-        f"keep {PAPER_SOURCE_DEPOSITION_SKILL} loaded as compatibility adapter"
+        f"{load_prefix} {PAPER_WIKI_CANONICAL_SKILL} first as the canonical paper wiki layer"
         f"{remaining_clause}"
     )
 
@@ -685,8 +681,7 @@ def _wiki_rule_source_model() -> dict:
             "contract and framework references; local installed skills are execution helpers. "
             "Keep Obsidian syntax, Paper Wiki paper-evidence semantics, and vault-local governance "
             "as separate layers. "
-            "The paper-research-wiki skill is the canonical paper wiki layer, while "
-            "paper-source-paper-deposition remains a compatibility adapter. "
+            "The paper-research-wiki skill is the canonical paper wiki layer. "
             "The final wiki executor is agent-neutral and may be Claude, Codex, or any other "
             "wiki-capable agent that follows the same contract."
         ),
@@ -766,10 +761,7 @@ def _wiki_rule_source_model() -> dict:
             {
                 "priority": 5,
                 "source": f"{PAPER_WIKI_CANONICAL_SKILL} (Paper Wiki canonical paper wiki layer)",
-                "role": (
-                    "canonical paper wiki workflow layer for Paper Source bundles; "
-                    f"{PAPER_SOURCE_DEPOSITION_SKILL} remains compatibility adapter"
-                ),
+                "role": "canonical paper wiki workflow layer for Paper Source bundles",
             },
             {
                 "priority": 6,

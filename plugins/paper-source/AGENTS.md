@@ -4,6 +4,7 @@ This is a thin shell for agents working inside the Paper Source plugin package. 
 
 <!-- ROUTING_BOOTSTRAP_START -->
 <always-applicable>
+- Before changing plugin code, skills, workflows, docs, tests, manifest, generated contracts, release checks, or marketplace-visible behavior, read `..\..\docs\plugin-development.md`.
 - Read `skills/routing.yaml` before changing code, docs, or skill behavior.
 - Match the current task route, then read only the routed skill/docs needed for that route.
 - re-match the route on every new user task; re-read routed files when the route changes, context was compacted, or you are unsure.

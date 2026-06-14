@@ -8,7 +8,6 @@ from paper_source.artifacts import (
     LEGACY_EPI_ROOT_NAME,
     PAPER_SOURCE_ROOT_NAME,
     paper_source_meta_root,
-    legacy_meta_root,
     utc_now,
     write_json_atomic,
 )
@@ -16,7 +15,9 @@ from paper_source.config import config_status
 from paper_source.config_protection import CONFIG_RESET_CONFIRMATION, PROTECTED_META_NAMES, WIKI_RESET_CONFIRMATION
 from paper_source.wiki_init import initialize_paper_wiki
 
-INTERNAL_REPOSITORY_ROOT_NAMES = {PAPER_SOURCE_ROOT_NAME, LEGACY_EPI_ROOT_NAME}
+ACTIVE_INTERNAL_REPOSITORY_ROOT_NAMES = {PAPER_SOURCE_ROOT_NAME}
+HISTORICAL_INTERNAL_ROOTS_RESET_CLEANUP = {LEGACY_EPI_ROOT_NAME}
+RESETTABLE_INTERNAL_ROOT_NAMES = ACTIVE_INTERNAL_REPOSITORY_ROOT_NAMES | HISTORICAL_INTERNAL_ROOTS_RESET_CLEANUP
 
 
 def _unique_target(parent: Path, name: str) -> Path:
@@ -103,7 +104,7 @@ def preview_wiki_reset(
     actions: list[dict[str, Any]] = []
     if vault_path.exists() and vault_path.is_dir():
         for child in sorted(vault_path.iterdir(), key=lambda item: item.name):
-            if child.name in INTERNAL_REPOSITORY_ROOT_NAMES:
+            if child.name in RESETTABLE_INTERNAL_ROOT_NAMES:
                 meta_dir = child / "meta"
                 if meta_dir.exists():
                     for meta_child in sorted(meta_dir.iterdir(), key=lambda item: item.name):
@@ -188,8 +189,8 @@ def reset_wiki_vault(
     before_config = config_status(vault_path)
     actions: list[dict[str, Any]] = []
     for child in sorted(vault_path.iterdir(), key=lambda item: item.name):
-        if child.name in {"_meta", *INTERNAL_REPOSITORY_ROOT_NAMES}:
-            if child.name in INTERNAL_REPOSITORY_ROOT_NAMES:
+        if child.name in {"_meta", *RESETTABLE_INTERNAL_ROOT_NAMES}:
+            if child.name in RESETTABLE_INTERNAL_ROOT_NAMES:
                 meta_dir = child / "meta"
                 if meta_dir.exists():
                     actions.extend(

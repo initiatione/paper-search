@@ -63,10 +63,7 @@ def _source_priority(source: str) -> int:
 
 
 def _paper_search_use_scihub() -> bool:
-    return (
-        os.environ.get("PAPER_SOURCE_PAPER_SEARCH_MCP_USE_SCIHUB")
-        or os.environ.get("EPI_PAPER_SEARCH_MCP_USE_SCIHUB", "")
-    ).strip().lower() in {
+    return os.environ.get("PAPER_SOURCE_PAPER_SEARCH_MCP_USE_SCIHUB", "").strip().lower() in {
         "1",
         "true",
         "yes",
@@ -611,10 +608,7 @@ def acquire_paper_from_url(
     if download_identity is not None:
         source, paper_id = download_identity
         use_scihub = _paper_search_use_scihub()
-        scihub_base_url = (
-            os.environ.get("PAPER_SOURCE_PAPER_SEARCH_MCP_SCIHUB_BASE_URL")
-            or os.environ.get("EPI_PAPER_SEARCH_MCP_SCIHUB_BASE_URL", "https://sci-hub.se")
-        )
+        scihub_base_url = os.environ.get("PAPER_SOURCE_PAPER_SEARCH_MCP_SCIHUB_BASE_URL", "https://sci-hub.se")
         with tempfile.TemporaryDirectory(prefix="paper-source-paper-search-") as temp_dir:
             download_record = download_paper_pdf(
                 source=source,

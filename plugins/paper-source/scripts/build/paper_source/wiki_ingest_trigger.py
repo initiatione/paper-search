@@ -69,7 +69,7 @@ def _ready_instruction(
     return (
         "Continue by invoking Paper Wiki $paper-research-wiki for formal paper wiki writing. "
         "Use wiki-ingest-brief.json as the canonical Paper Source source/evidence handoff; "
-        "keep paper-source-paper-deposition only as a legacy compatibility adapter. "
+        "use paper-source-paper-deposition only for historical handoff cleanup, not for new formal writes. "
         "Apply Paper Wiki provenance, tag, language, lint, and post-task-check policies through the Paper Wiki writing standard. "
         "Paper Source artifacts are source/evidence handoff only "
         "and Paper Source itself may write only internal underscore folders. Follow the source-first rule before writing: "
@@ -132,7 +132,7 @@ def _base_payload(
         },
         "executor_policy": handoff.get("execution_agent_policy") or {},
         "agent_context_policy": handoff.get("agent_context_policy") or {},
-        "paper_source_write_scope": handoff.get("paper_source_write_scope", handoff.get("epi_write_scope")),
+        "paper_source_write_scope": handoff.get("paper_source_write_scope"),
         "formal_routes_suggested": bool(handoff.get("formal_routes_suggested")),
         "wiki_batch_handoff_required": bool(handoff.get("wiki_batch_handoff_required")),
         "required_wiki_skills": handoff.get("required_wiki_skills") or [],

@@ -82,6 +82,9 @@ def test_linkage_doc_points_to_structure_progress_and_config_docs():
 
 def test_root_plugin_development_rules_require_version_and_doc_sync():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    root_agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    source_agents = (PLUGIN_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    wiki_agents = (ROOT / "plugins" / "paper-wiki" / "AGENTS.md").read_text(encoding="utf-8")
     rules_path = ROOT / "docs" / "plugin-development.md"
     rules = rules_path.read_text(encoding="utf-8")
 
@@ -101,12 +104,24 @@ def test_root_plugin_development_rules_require_version_and_doc_sync():
         "machine names",
         "`paper-source`",
         "`paper-wiki`",
-        "pre-Stage-2",
+        "旧别名不再作为用户入口",
         "PS/PW",
+        "PS/PW 是允许的自然语言别名和触发短语",
+        "旧别名禁用不包括 PS/PW",
         "开发完成后必须同步文档信息",
+        "参考来源与遵循顺序",
+        "外部项目只提供设计参考或语法权威",
+        "必须遵循的本地 source of truth",
+        "本地合同和测试优先于外部参考",
+        "两插件 + 多 skill + 中央 routing manifest",
+        "不冻结 commit 或本机 cache 路径",
         "$skill-creator",
         "D:\\paper-search\\.codex_tmp_refs\\skill-based-architecture",
         "rules/workflows/references 分层",
+        "kepano/obsidian-skills",
+        "Obsidian syntax authority",
+        "source-first",
+        "可点击 Obsidian PDF 链接",
         "禁止把安装 cache 当作开发源",
         "源码验证通过不等于用户运行态已更新",
         "Paper Wiki 不初始化、修复、reset 或静默创建 vault 结构",
@@ -123,8 +138,18 @@ def test_root_plugin_development_rules_require_version_and_doc_sync():
     ]:
         assert command in rules
 
+    assert "Before changing any plugin code" in root_agents
+    assert "docs/plugin-development.md" in root_agents
+    assert "plugins/paper-source/AGENTS.md" in root_agents
+    assert "plugins/paper-wiki/AGENTS.md" in root_agents
+    assert "Local contracts and tests override external references" in root_agents
+    assert "PS/PW are allowed natural-language aliases and trigger phrases" in root_agents
+    assert "installed runtime validation" in root_agents
+    assert "..\\..\\docs\\plugin-development.md" in source_agents
+    assert "..\\..\\docs\\plugin-development.md" in wiki_agents
 
-def test_root_readme_documents_paperflow_stage2_names_and_legacy_aliases():
+
+def test_root_readme_documents_current_paperflow_names_without_legacy_alias_entrypoints():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
     for phrase in [
@@ -136,16 +161,16 @@ def test_root_readme_documents_paperflow_stage2_names_and_legacy_aliases():
         "`paperflow`",
         "`paper-source`",
         "`paper-wiki`",
-        "`epi`",
-        "`prw`",
         "machine-facing",
-        "legacy alias",
-        "pre-Stage-2",
+        "旧别名不再作为用户入口",
+        "PS/PW 仍允许作为自然语言别名和触发短语",
     ]:
         assert phrase in readme
 
     assert "Paper Source 机器名" in readme
     assert "Paper Wiki 机器名" in readme
+    assert "`epi`" not in readme
+    assert "`prw`" not in readme
 
 
 def test_structure_doc_covers_current_plugin_boundaries():
@@ -155,7 +180,7 @@ def test_structure_doc_covers_current_plugin_boundaries():
     assert "<plugin-root>" in text
     assert ".codex-plugin/plugin.json" in text
     assert "scripts/build/paper_source/" in text
-    assert "legacy import shim" in text
+    assert "旧导入 shim" in text or "旧 import shim" in text
     assert "skills/" in text
     assert "config-setup" in text
     assert "paper type classification" in text
@@ -191,7 +216,7 @@ def test_progress_doc_records_status_verification_and_next_steps():
     text = _read("progress.md")
 
     assert "# Paper Source 插件进度说明" in text
-    assert "更新时间：2026-06-08" in text
+    assert "更新时间：2026-06-14" in text
     assert "高质量论文收集和整理" in text
     assert "config-setup" in text
     assert "paper-quality-critic" in text
@@ -384,8 +409,8 @@ def test_docs_document_paper_search_mcp_fallback_and_source_coverage():
         ]
     )
 
-    assert manifest["version"] == "0.2.5"
-    assert "v0.2.5" in manifest["interface"]["shortDescription"]
+    assert manifest["version"] == "1.0.0"
+    assert "v1.0.0" in manifest["interface"]["shortDescription"]
     for phrase in [
         "search_papers",
         "source_coverage",
@@ -437,6 +462,8 @@ def test_docs_document_paper_search_mcp_fallback_and_source_coverage():
         "source capability matrix",
         "wiki-ask",
         "read-only formal graph",
+        "0.2.6",
+        "1.0.0",
         "0.2.5",
         "0.2.4",
         "0.2.2",
@@ -514,7 +541,7 @@ def test_human_approval_requires_single_readable_approval_report():
         assert "raw JSON" in text
 
 
-def test_docs_document_prw_reviewed_record_correction_return_path():
+def test_docs_document_paper_wiki_reviewed_record_correction_return_path():
     workflow = _read("workflow.md")
     linkage = _read("paper-source-linkage.md")
     approval = (
@@ -542,7 +569,7 @@ def test_docs_document_prw_reviewed_record_correction_return_path():
         assert phrase in combined
 
 
-def test_docs_document_prw_record_request_ask_mode_automation():
+def test_docs_document_paper_wiki_record_request_ask_mode_automation():
     workflow = _read("workflow.md")
     linkage = _read("paper-source-linkage.md")
     approval = (
@@ -583,7 +610,7 @@ def test_paper_source_literature_wiki_contract_documents_seven_page_families_and
         encoding="utf-8"
     )
     progress = _read("progress.md")
-    epi_deposition = (
+    deposition = (
         PLUGIN_ROOT / "skills" / "paper-source-paper-deposition" / "SKILL.md"
     ).read_text(encoding="utf-8")
     combined = "\n".join(
@@ -596,7 +623,7 @@ def test_paper_source_literature_wiki_contract_documents_seven_page_families_and
             wiki_provenance,
             wiki_setup,
             progress,
-            epi_deposition,
+            deposition,
         ]
     )
 
@@ -631,7 +658,8 @@ def test_paper_source_literature_wiki_contract_documents_seven_page_families_and
     for phrase in [
         "wiki-ingest-brief.json",
         "canonical Paper Source-to-Paper Wiki handoff",
-        "wiki_deposition_task.json is legacy",
+        "wiki_deposition_task.json",
+        "historical handoff cleanup",
         "paper-research-wiki",
         "paper-source-paper-deposition",
         "external wiki skills are optional helpers",
@@ -652,8 +680,8 @@ def test_paper_source_literature_wiki_contract_documents_seven_page_families_and
         assert helper in combined
 
     assert "wiki_deposition_task.json" in combined
-    assert "epi-wiki-deposition" in combined
-    assert "compatibility" in epi_deposition or "alias" in epi_deposition
+    assert "epi-wiki-deposition" not in combined
+    assert "historical Paper Source handoff artifact" in deposition
 
     for field in [
         "title",
@@ -766,7 +794,7 @@ def test_marketplace_and_readme_describe_profile_driven_generic_paper_source():
     assert "Paper Source" in manifest_text
     assert "Paper Wiki" in manifest_text
     assert manifest["description"].startswith("Paper Source")
-    assert manifest["interface"]["shortDescription"].startswith("v0.2.5 | Paper Source:")
+    assert manifest["interface"]["shortDescription"].startswith("v1.0.0 | Paper Source:")
     assert "profile-driven discovery" in manifest_text
     assert "Paper Wiki handoff" in manifest_text
     assert "MinerU" in manifest_text
@@ -861,13 +889,14 @@ def test_paper_source_user_docs_use_paper_source_and_paper_wiki_stage2_names():
         "machine-facing name",
         "`paper-source`",
         "`paper-wiki`",
-        "pre-Stage-2",
+        "旧别名不再作为用户入口",
     ]:
         assert phrase in combined
 
     for phrase in [
         "wiki-ingest-brief.json",
-        "wiki_deposition_task.json is legacy",
+        "wiki_deposition_task.json",
+        "historical cleanup",
         "canonical Paper Source-to-Paper Wiki handoff",
     ]:
         assert phrase in combined
@@ -906,8 +935,8 @@ def test_handoff_artifact_contract_marks_brief_canonical_and_task_deprecated():
     assert "wiki-ingest-brief.json" in linkage
     assert "wiki_deposition_task.json" in linkage
     assert "canonical Paper Source-to-Paper Wiki handoff" in linkage
-    assert "wiki_deposition_task.json is legacy" in linkage
-    assert "deprecated" in linkage.lower() or "已废弃" in linkage
+    assert "historical cleanup" in linkage
+    assert "not a new-task entrypoint" in linkage
 
 
 def test_single_doc_map_in_linkage_others_point_to_it():
@@ -963,14 +992,14 @@ def test_progress_doc_names_s3b_as_current_boundary_work():
     assert "S3b brief-first machine-contract" in progress
     assert "wiki-ingest-brief.json" in progress
     assert "canonical Paper Source-to-Paper Wiki handoff" in progress
-    assert "wiki_deposition_task.json is legacy" in progress
+    assert "wiki_deposition_task.json" in progress
+    assert "历史 handoff 清理对象" in progress
     assert "external wiki skills are optional helpers" in progress
-    assert "REQUIRED_WIKI_SKILLS" in progress
     assert "S3a 文档/契约 canonical 化" in changelog
     assert "完成 S3a 文档/契约 canonical 化并验证" not in progress
 
 
-def test_paper_source_docs_point_to_prw_canonical_for_page_family_frontmatter():
+def test_paper_source_docs_point_to_paper_wiki_canonical_for_page_family_frontmatter():
     assert "rules/wiki-writing-standard.md" in _read("paper-source-linkage.md")
 
 
@@ -983,8 +1012,8 @@ def test_read_only_ask_ownership_documented_paper_source_side():
 
 def test_plugin_versions_track_current_plugin_changes():
     expected = {
-        "plugins/paper-source/.codex-plugin/plugin.json": "0.2.5",
-        "plugins/paper-wiki/.codex-plugin/plugin.json": "0.2.4",
+        "plugins/paper-source/.codex-plugin/plugin.json": "1.0.0",
+        "plugins/paper-wiki/.codex-plugin/plugin.json": "1.0.0",
     }
     for rel, version in expected.items():
         manifest = json.loads((ROOT / rel).read_text(encoding="utf-8"))

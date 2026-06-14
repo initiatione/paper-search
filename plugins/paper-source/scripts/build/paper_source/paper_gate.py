@@ -7,11 +7,9 @@ from pathlib import PurePosixPath
 from typing import Any
 
 from paper_source.artifacts import (
-    LEGACY_EPI_ROOT_NAME,
     PAPER_SOURCE_ROOT_NAME,
     existing_raw_paper_root,
     existing_staging_paper_root,
-    legacy_epi_root,
     paper_source_meta_root,
 )
 from paper_source.run_critic import HARD_RULE
@@ -35,16 +33,12 @@ _PAPER_WIKI_REVIEW_READY_STATUSES = {
     "paper-wiki-reviewed-ready-for-paper-source-record",
     "paper-wiki-reviewed-ready-for-record",
     "ready-for-paper-source-record",
-    # Legacy pre-Stage-2 labels accepted for old correction artifacts.
-    "prw-reviewed-ready-for-epi-record",
-    "prw-reviewed-ready-for-record",
-    "ready-for-epi-record",
 }
 PAPER_SOURCE_WRITE_SCOPE = "internal-underscore-artifacts-only"
 
 
 def _paper_source_write_scope(payload: dict[str, Any]) -> Any:
-    return payload.get("paper_source_write_scope", payload.get("epi_write_scope"))
+    return payload.get("paper_source_write_scope")
 
 
 def _read_json(path: Path) -> dict[str, Any] | None:
@@ -548,8 +542,7 @@ def _paper_wiki_repair_payload(correction: dict[str, Any]) -> dict[str, Any]:
     paper_wiki_repair = correction.get("paper_wiki_repair")
     if isinstance(paper_wiki_repair, dict):
         return paper_wiki_repair
-    legacy_prw_repair = correction.get("prw_repair")
-    return legacy_prw_repair if isinstance(legacy_prw_repair, dict) else {}
+    return {}
 
 
 def _record_supersedes_correction_repair(wiki_record: dict[str, Any], correction: dict[str, Any]) -> bool:
@@ -576,7 +569,6 @@ def _record_supersedes_correction_repair(wiki_record: dict[str, Any], correction
 def _correction_affects_slug(correction: dict[str, Any], slug: str) -> tuple[bool, dict[str, Any]]:
     expected_record_suffixes = {
         f"{PAPER_SOURCE_ROOT_NAME}/raw/{slug}/wiki-ingest-record.json",
-        f"{LEGACY_EPI_ROOT_NAME}/raw/{slug}/wiki-ingest-record.json",
     }
     if correction.get("paper_slug") == slug:
         return True, {}
@@ -599,7 +591,6 @@ def _correction_affects_slug(correction: dict[str, Any], slug: str) -> tuple[boo
 def _record_correction_check(vault_path: Path, slug: str, paper_root: Path) -> dict[str, Any] | None:
     correction_roots = [
         paper_source_meta_root(vault_path) / "record-corrections",
-        legacy_epi_root(vault_path) / "meta" / "record-corrections",
     ]
     matches: list[tuple[Path, dict[str, Any], dict[str, Any]]] = []
     correction_paths: list[Path] = []

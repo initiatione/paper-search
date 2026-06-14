@@ -37,9 +37,8 @@ def _write_fake_paper_search(tmp_path, payload: dict) -> str:
 @pytest.fixture(autouse=True)
 def _isolate_runtime_and_easyscholar_env(tmp_path, monkeypatch):
     monkeypatch.setenv("PAPER_SOURCE_RUNTIME_CONFIG", str(tmp_path / "missing-runtime.json"))
-    monkeypatch.delenv("EPI_RUNTIME_CONFIG", raising=False)
     monkeypatch.delenv("EASYSCHOLAR_SECRET_KEY", raising=False)
-    monkeypatch.setenv("EPI_PAPER_SEARCH_MCP_DISABLED", "1")
+    monkeypatch.setenv("PAPER_SOURCE_PAPER_SEARCH_MCP_DISABLED", "1")
 
 
 def test_ensure_candidate_metadata_uses_atomic_writer(tmp_path, monkeypatch):

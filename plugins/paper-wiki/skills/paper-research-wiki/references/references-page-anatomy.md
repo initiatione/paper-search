@@ -80,7 +80,7 @@ Field rules and *why*:
   exactly one Markdown link to the canonical PDF, displayed as the full paper title:
   `[<full paper title>](obsidian://open?vault=<vault>&file=_paper_source%2Fraw%2F<slug>%2Fpaper.pdf)`.
   The path is `_paper_source/raw/<slug>/paper.pdf` — **no `papers/` segment**. Do not use
-  `[[...]]` wikilinks, legacy `_epi` links, plain/relative PDF paths, DOI/arXiv URLs, GitHub URLs,
+  `[[...]]` wikilinks, plain/relative PDF paths, DOI/arXiv URLs, GitHub URLs,
   metadata, MinerU, manifest, or figure paths in frontmatter `sources`. Put DOI/arXiv/GitHub and
   source-map details in body evidence, provenance, sidecars, or dedicated properties such as
   `github:`. In `## 原文与证据入口`, repeat the canonical PDF URI as a Markdown link and use the

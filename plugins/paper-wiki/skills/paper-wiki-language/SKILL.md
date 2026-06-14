@@ -8,7 +8,7 @@ description: >
 
 # Paper Wiki Language
 
-Support gate for formal Paper Wiki pages and Paper Wiki/Paper Source legacy wording. It protects source-grounded Chinese research-wiki prose; it is not generic polishing.
+Support gate for formal Paper Wiki pages. It protects source-grounded Chinese research-wiki prose; it is not generic polishing.
 
 Before drafting, rewriting, or materially repairing formal page prose, load `references/style-guide.md`.
 

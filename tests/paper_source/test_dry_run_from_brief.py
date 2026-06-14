@@ -121,7 +121,7 @@ def test_query_planner_maps_research_brief_as_current_intent_over_profile():
 def test_dry_run_from_confirmed_brief_records_metadata_and_hash(tmp_path, monkeypatch):
     monkeypatch.setenv("PAPER_SOURCE_RUNTIME_CONFIG", str(tmp_path / "missing-runtime.json"))
     monkeypatch.delenv("EASYSCHOLAR_SECRET_KEY", raising=False)
-    monkeypatch.setenv("EPI_PAPER_SEARCH_MCP_DISABLED", "1")
+    monkeypatch.setenv("PAPER_SOURCE_PAPER_SEARCH_MCP_DISABLED", "1")
     plugin_root = tmp_path / "plugin"
     _write_minimal_plugin_template(plugin_root)
     brief = create_research_brief(tmp_path / "vault", _answers(), now="2026-06-09T12:00:00Z")
@@ -167,7 +167,7 @@ def test_dry_run_from_draft_brief_requires_override(tmp_path, monkeypatch):
 def test_brief_hash_changes_review_signature_and_prevents_resume(tmp_path, monkeypatch):
     monkeypatch.setenv("PAPER_SOURCE_RUNTIME_CONFIG", str(tmp_path / "missing-runtime.json"))
     monkeypatch.delenv("EASYSCHOLAR_SECRET_KEY", raising=False)
-    monkeypatch.setenv("EPI_PAPER_SEARCH_MCP_DISABLED", "1")
+    monkeypatch.setenv("PAPER_SOURCE_PAPER_SEARCH_MCP_DISABLED", "1")
     plugin_root = tmp_path / "plugin"
     _write_minimal_plugin_template(plugin_root)
     first = create_research_brief(tmp_path / "vault", _answers(), now="2026-06-09T12:00:00Z")

@@ -67,7 +67,7 @@ DEFAULT_RETENTION_POLICY: dict[str, Any] = {
 
 PAPER_SOURCE_REPOSITORY_README = """# Paper Source Internal Repository
 
-This `_paper_source` folder is the internal Paper Source workspace for source-first paper evidence, handoff, configuration, and maintenance records. It is not part of the formal Obsidian graph. Existing `_epi` folders are legacy Paper Source repositories and remain readable through compatibility fallbacks.
+This `_paper_source` folder is the internal Paper Source workspace for source-first paper evidence, handoff, configuration, and maintenance records. It is not part of the formal Obsidian graph. Historical `_epi` folders are migration inputs only; run explicit repository migration before normal Paper Source workflows.
 
 ## Core Structure
 
@@ -92,7 +92,7 @@ The following directories are created only when a workflow needs them, not as em
 1. Start here, then read `AGENTS.md` and root `_meta/*` before final wiki writing.
 2. Use Paper Source reader/critic/staging outputs as navigation and quality signals only.
 3. Final wiki pages must be distilled from original paper artifacts, formulas, figures, images, and batch-level comparison.
-4. Never promote `_paper_source/staging`, `_paper_source/runs`, legacy `_epi/staging`, legacy `_epi/runs`, or raw source Markdown as formal wiki pages.
+4. Never promote `_paper_source/staging`, `_paper_source/runs`, historical `_epi/staging`, historical `_epi/runs`, or raw source Markdown as formal wiki pages.
 5. New Paper Source writes must stay under `_paper_source`; root `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/` are wiki-skill-owned.
 """
 
@@ -168,9 +168,9 @@ def refresh_paper_source_manifest(vault_path: Path) -> dict[str, Any]:
         "schema_version": "paper-source-internal-repository-manifest-v1",
         "updated_at": utc_now(),
         "root": PAPER_SOURCE_ROOT_NAME,
-        "legacy_roots_readable": [LEGACY_EPI_ROOT_NAME],
+        "legacy_roots_migration_only": [LEGACY_EPI_ROOT_NAME],
         "write_scope": "Paper Source writes only under _paper_source; formal wiki pages are wiki-skill-owned.",
-        "graph_visibility": "ignore _paper_source and legacy _epi in Obsidian graph; use _paper_source/README.md for agent navigation.",
+        "graph_visibility": "ignore _paper_source and historical _epi in Obsidian graph; use _paper_source/README.md for agent navigation.",
         "core_sections": {
             "raw": "raw/<slug>/ source PDFs, MinerU markdown, TeX, images, manifests",
             "staging": "staging/papers/<slug>/ internal evidence and wiki handoff",
@@ -208,9 +208,9 @@ def inspect_paper_source_manifest(vault_path: Path) -> dict[str, Any]:
         "schema_version": "paper-source-internal-repository-manifest-v1",
         "updated_at": utc_now(),
         "root": PAPER_SOURCE_ROOT_NAME,
-        "legacy_roots_readable": [LEGACY_EPI_ROOT_NAME],
+        "legacy_roots_migration_only": [LEGACY_EPI_ROOT_NAME],
         "write_scope": "Paper Source writes only under _paper_source; formal wiki pages are wiki-skill-owned.",
-        "graph_visibility": "ignore _paper_source and legacy _epi in Obsidian graph; use _paper_source/README.md for agent navigation.",
+        "graph_visibility": "ignore _paper_source and historical _epi in Obsidian graph; use _paper_source/README.md for agent navigation.",
         "stats": {
             "raw": _dir_stats(raw_papers_root(vault_path)),
             "staging": _dir_stats(staging_papers_root(vault_path).parent),
@@ -325,12 +325,10 @@ def load_retention_policy(vault_path: Path, *, ensure: bool = True) -> dict[str,
     if ensure:
         ensure_paper_source_repository(vault_path)
     policy_path = policies_root(vault_path) / "retention.json"
-    legacy_policy_path = legacy_epi_root(vault_path) / "policies" / "retention.json"
-    read_policy_path = policy_path if policy_path.exists() or not legacy_policy_path.exists() else legacy_policy_path
     try:
         import json
 
-        payload = json.loads(read_policy_path.read_text(encoding="utf-8"))
+        payload = json.loads(policy_path.read_text(encoding="utf-8"))
     except Exception:
         payload = {}
     if not isinstance(payload, dict):
@@ -344,15 +342,15 @@ def load_retention_policy(vault_path: Path, *, ensure: bool = True) -> dict[str,
             policy[key] = merged
         else:
             policy[key] = value
-    if ensure and read_policy_path.exists() and payload:
+    if ensure and policy_path.exists() and payload:
         try:
             import json
 
-            current = json.loads(read_policy_path.read_text(encoding="utf-8"))
+            current = json.loads(policy_path.read_text(encoding="utf-8"))
         except Exception:
             current = {}
         if current != payload:
-            write_json_atomic(read_policy_path, payload)
+            write_json_atomic(policy_path, payload)
     return policy
 
 
@@ -609,12 +607,3 @@ def cleanup_paper_source_repository(vault_path: Path, *, dry_run: bool = False) 
         write_json_atomic(manifest_path, result)
         result["manifest_path"] = str(manifest_path)
     return result
-
-
-# Legacy names remain importable for existing scripts and cached plugin versions.
-REQUIRED_EPI_DIRS = REQUIRED_PAPER_SOURCE_DIRS
-ensure_epi_repository = ensure_paper_source_repository
-refresh_epi_manifest = refresh_paper_source_manifest
-inspect_epi_manifest = inspect_paper_source_manifest
-migrate_legacy_epi_roots = migrate_legacy_paper_source_roots
-cleanup_epi_repository = cleanup_paper_source_repository

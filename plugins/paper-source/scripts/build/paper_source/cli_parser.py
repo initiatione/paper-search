@@ -14,7 +14,7 @@ def _default_plugin_root() -> Path:
 
 
 def _default_vault() -> Path:
-    configured = os.environ.get("PAPER_SOURCE_VAULT") or os.environ.get("EPI_VAULT")
+    configured = os.environ.get("PAPER_SOURCE_VAULT")
     if configured:
         return Path(configured)
     return Path.cwd() / "paper-research-wiki"
@@ -112,16 +112,6 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_vault(paper_source_cleanup)
     paper_source_cleanup.add_argument("--preview", action="store_true")
     paper_source_cleanup.add_argument("--json", action="store_true")
-
-    epi_migrate = subparsers.add_parser("epi-repository-migrate")
-    _add_common_vault(epi_migrate)
-    epi_migrate.add_argument("--preview", action="store_true")
-    epi_migrate.add_argument("--json", action="store_true")
-
-    epi_cleanup = subparsers.add_parser("epi-repository-cleanup")
-    _add_common_vault(epi_cleanup)
-    epi_cleanup.add_argument("--preview", action="store_true")
-    epi_cleanup.add_argument("--json", action="store_true")
 
     dry_run = subparsers.add_parser("dry-run")
     dry_run_query_input = dry_run.add_mutually_exclusive_group(required=True)
@@ -368,7 +358,6 @@ def build_parser() -> argparse.ArgumentParser:
     record_wiki_ingest.add_argument("--notes", default=None)
     record_wiki_ingest.add_argument("--source-review", default=None)
     record_wiki_ingest.add_argument("--from-paper-wiki-request", dest="from_paper_wiki_request", type=Path, default=None)
-    record_wiki_ingest.add_argument("--from-prw-request", dest="from_prw_request", type=Path, default=None)
     record_wiki_ingest.add_argument("--json", action="store_true")
 
     paper_gate = subparsers.add_parser("paper-gate")

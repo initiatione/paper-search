@@ -170,9 +170,7 @@ def _check_paper_search_mcp_server() -> dict:
 
 
 def _check_paper_search(command: str | None) -> dict:
-    selected_command = command or os.environ.get("PAPER_SOURCE_PAPER_SEARCH_COMMAND") or os.environ.get(
-        "EPI_PAPER_SEARCH_COMMAND"
-    ) or "paper-search"
+    selected_command = command or os.environ.get("PAPER_SOURCE_PAPER_SEARCH_COMMAND") or "paper-search"
     probe = probe_paper_search_mcp(selected_command)
     if probe.get("available"):
         return {

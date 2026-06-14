@@ -37,6 +37,6 @@ Load `references/page-provenance.md` for the full page and final-source-review c
 
 ## Literature Wiki Contract
 
-Apply provenance across `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`. `wiki-ingest-brief.json` is the canonical Paper Source-to-Paper Wiki handoff; `wiki_deposition_task.json is legacy` compatibility only. Paper Wiki `$paper-research-wiki` owns final writing; `paper-source-paper-deposition` is the compatibility adapter. external wiki skills are optional helpers / policy references.
+Apply provenance across `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`. `wiki-ingest-brief.json` is the canonical Paper Source-to-Paper Wiki handoff; `wiki_deposition_task.json` is historical cleanup only, not a new-task entrypoint. Paper Wiki `$paper-research-wiki` owns final writing; `paper-source-paper-deposition` is only for retired handoff cleanup. external wiki skills are optional helpers / policy references.
 
 `final-source-review.json` preserves `theory_reconstruction`, `formula_derivation`, `figure_table_evidence`, `novelty_type`, `implementability`, `reproducibility_risk`, `research_gap`, and `cost_level`. Mark checks complete only after source reread, formula/figure review, and complete evidence paths; formal page lifecycle remains governed by the target vault.

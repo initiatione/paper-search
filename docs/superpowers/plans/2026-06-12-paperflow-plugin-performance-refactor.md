@@ -29,7 +29,7 @@
 
 ## Boundaries
 
-- Preserve plugin names, marketplace names, skill names, command names, and legacy compatibility aliases unless a task explicitly adds a tested migration.
+- Preserve current plugin names, marketplace names, skill names, and command names. Do not reintroduce retired alias entrypoints; historical names may appear only in explicit migration or rejection tests.
 - Do not remove `docs/paper-source-linkage.md`; it is the Chinese source-of-truth chain contract even though it increases deferred static cost.
 - Do not split the central plugin routing manifests into one routing file per skill.
 - Do not make Paper Source write formal wiki pages.
@@ -39,7 +39,7 @@
 - Do not add ordinary pytest tests that require plugin package directories to contain no generated `__pycache__` after Python imports. That invariant belongs in release/package hygiene checks that clean bytecode after test execution.
 - Do not invent Obsidian syntax rules inside PaperFlow. Any rule about frontmatter properties, wikilinks, embeds, callouts, tags, or Obsidian rendering must cite or preserve the behavior from upstream `kepano/obsidian-skills`.
 - Do not degrade source links into plain text for current formal pages. Frontmatter `sources` and body `## 原文与证据入口` PDF entries must remain clickable in Obsidian, matching the current target vault behavior.
-- Do not make internal evidence artifacts graph-visible. Formal page wikilinks may point only to formal wiki page families; `_paper_source/**`, `_epi/**`, MinerU files, and raw evidence paths stay as source/evidence addresses or clickable PDF URI targets, not formal graph nodes.
+- Do not make internal evidence artifacts graph-visible. Formal page wikilinks may point only to formal wiki page families; `_paper_source/**`, historical `_epi/**` migration inputs, MinerU files, and raw evidence paths stay as source/evidence addresses or clickable PDF URI targets, not formal graph nodes.
 - When a rule appears to conflict with the current target vault behavior and the issue is uncertain, stop and ask before changing the rule. Treat the current vault as the expected baseline unless concrete evidence shows a bug.
 
 ## Target Outcome

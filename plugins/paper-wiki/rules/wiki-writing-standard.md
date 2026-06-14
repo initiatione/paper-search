@@ -1,6 +1,6 @@
 # Paper Wiki Writing Standard
 
-This file is the canonical human-readable contract for Paper Wiki formal page families and frontmatter. Paper Source docs and other Paper Wiki rules/references should point here instead of copying the field list. PW/PS are conversational aliases; legacy `prw`/`epi` wording is compatibility-only.
+This file is the canonical human-readable contract for Paper Wiki formal page families and frontmatter. Paper Source docs and other Paper Wiki rules/references should point here instead of copying the field list. PW/PS are conversational aliases only; historical aliases are not Paper Wiki user entrypoints, route triggers, or new artifact contracts.
 
 This rule is mandatory for every Paper Wiki formal paper wiki write. It adapts Ar9av/obsidian-wiki `wiki-ingest`, `llm-wiki`, `wiki-lint`, `cross-linker`, `tag-taxonomy`, and `wiki-update` into the paper research wiki contract.
 
@@ -46,12 +46,12 @@ For a graph-aware rewrite:
 4. Update dependent formal pages when the rewrite changes claim/evidence boundaries, formula or figure/table evidence, evidence-tier wording, relationships, or downstream synthesis.
 5. Create a new `derivations/` or `concepts/` page when the rewrite exposes a reusable formula chain, mechanism, dataset, metric, or distinction that should not stay buried in a reference page.
 6. Refresh manifest or `.manifest.json`, `final-source-review.json`, `index.md`, `log.md`, and `hot.md` in the same run as the markdown rewrite. Read previous `wiki-ingest-record.json` only as provenance and reverse-dependency evidence.
-7. Report Paper Source record readiness. Paper Wiki records readiness; Paper Source writes or replaces `wiki-ingest-record.json` through `record-wiki-ingest`. For ask-mode automation, write `_paper_source/staging/papers/<paper-slug>/paper-wiki-record-request.json` with `schema_version: paper-wiki-record-request-v1`, `automation_mode: ask`, final page hashes, `final-source-review.json` hash, and `record-wiki-ingest --from-paper-wiki-request ...`; Paper Wiki writes the request artifact; Paper Source consumes it. Legacy `_epi/staging/papers/<paper-slug>/prw-record-request.json`, `schema_version: prw-record-request-v1`, and `--from-prw-request` remain accepted only for existing artifacts.
+7. Report Paper Source record readiness. Paper Wiki records readiness; Paper Source writes or replaces `wiki-ingest-record.json` through `record-wiki-ingest`. For ask-mode automation, write `_paper_source/staging/papers/<paper-slug>/paper-wiki-record-request.json` with `schema_version: paper-wiki-record-request-v1`, `automation_mode: ask`, final page hashes, `final-source-review.json` hash, and `record-wiki-ingest --from-paper-wiki-request ...`; Paper Wiki writes the request artifact; Paper Source consumes it.
 8. Run `qmd update` and `qmd embed` when QMD is in scope, or report the fallback to direct Markdown inventory.
 
 Snapshots and internal review copies must not create Obsidian graph edges back into live formal pages. When a formal-page snapshot or staged internal Markdown copy is written under an underscore directory, detach every `[[wikilink]]` into plain text while preserving readable labels and evidence addresses.
 
-Internal audit trees such as `_epi/meta/formal-page-snapshots`, `_paper_source/meta/formal-page-snapshots`, and `premature-formal-pages` must stay outside the formal graph and must stay outside QMD. Literal page_family/category/lifecycle markers under underscore roots are audit copies, not formal pages.
+Internal audit trees such as `_paper_source/meta/formal-page-snapshots` and `premature-formal-pages` must stay outside the formal graph and must stay outside QMD. Literal page_family/category/lifecycle markers under underscore roots are audit copies, not formal pages.
 
 ## Page Families
 
@@ -65,7 +65,7 @@ Formal paper pages may be written only to:
 - `reports/`
 - `opportunities/`
 
-Never write formal graph pages under `_paper_source/`, legacy `_epi/`, `_raw/`, `_staging/`, `_runs/`, `_quarantine/`, `.obsidian/`, or source bundle folders. Staged writes may use the target vault staging contract, but staged/internal copies must not retain Obsidian `[[wikilink]]` edges into the formal graph.
+Never write formal graph pages under `_paper_source/`, `_raw/`, `_staging/`, `_runs/`, `_quarantine/`, `.obsidian/`, or source bundle folders. Staged writes may use the target vault staging contract, but staged/internal copies must not retain Obsidian `[[wikilink]]` edges into the formal graph.
 
 ## Page Template
 
@@ -136,7 +136,7 @@ Required frontmatter fields:
 
 Do not use `reviewed`, `verified`, `source-reviewed`, or old `review-needed` as formal page lifecycle states in the new contract. New agent-written pages start as `lifecycle: draft`, and `draft` is the only steady-state lifecycle value Paper Wiki/Paper Source should emit. Old pages with `lifecycle: review-needed` are legacy repair inputs and should be migrated to `draft` during formal-page property repair, not preserved as a steady-state status.
 
-Frontmatter `sources:` is the paper source entry list. Each entry must be a Markdown link whose target is the canonical source PDF and whose visible text is the source paper title: `[<full paper title>](obsidian://open?vault=<vault>&file=_paper_source%2Fraw%2F<slug>%2Fpaper.pdf)`. Use the path `_paper_source/raw/<slug>/paper.pdf`, with no `papers/` segment. For `references/` pages use exactly one source PDF link. For non-reference families, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/` may use one or more title-display source PDF links for materially used papers. Do not use `[[...]]` wikilinks, legacy `_epi` links, plain/relative PDF paths, DOI/arXiv URLs, GitHub URLs, metadata paths, MinerU paths, or figure paths in `sources:`. DOI/arXiv/GitHub/MinerU/metadata/image evidence belongs in body evidence, provenance, sidecars, or dedicated properties such as `github:`, not in `sources:`. Do not write `[[...]]` wikilinks to `_paper_source/` from frontmatter or formal-page body links. In `## 原文与证据入口`, include the same canonical PDF URI as a Markdown link and use the paper title as the clickable text, not `原论文 PDF`. The bullet label may remain `原论文 PDF：`, but the link text must be the paper title. Plain path text may appear only as an audit address in body provenance, not as a graph link.
+Frontmatter `sources:` is the paper source entry list. Each entry must be a Markdown link whose target is the canonical source PDF and whose visible text is the source paper title: `[<full paper title>](obsidian://open?vault=<vault>&file=_paper_source%2Fraw%2F<slug>%2Fpaper.pdf)`. Use the path `_paper_source/raw/<slug>/paper.pdf`, with no `papers/` segment. For `references/` pages use exactly one source PDF link. For non-reference families, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/` may use one or more title-display source PDF links for materially used papers. Do not use `[[...]]` wikilinks, plain/relative PDF paths, DOI/arXiv URLs, GitHub URLs, metadata paths, MinerU paths, or figure paths in `sources:`. DOI/arXiv/GitHub/MinerU/metadata/image evidence belongs in body evidence, provenance, sidecars, or dedicated properties such as `github:`, not in `sources:`. Do not write `[[...]]` wikilinks to `_paper_source/` from frontmatter or formal-page body links. In `## 原文与证据入口`, include the same canonical PDF URI as a Markdown link and use the paper title as the clickable text, not `原论文 PDF`. The bullet label may remain `原论文 PDF：`, but the link text must be the paper title. Plain path text may appear only as an audit address in body provenance, not as a graph link.
 
 Frontmatter `provenance` is a compact status summary; in plain property wording, frontmatter `provenance` is a compact status summary. Detailed source bundle paths belong in the body `## Provenance` block or sidecar; detailed source bundle paths belong in the body `## Provenance` block or sidecar, where evidence addresses can stay readable without polluting properties or formal wikilinks.
 
@@ -165,7 +165,7 @@ Every formal page should connect to the graph:
 5. Allowed relationship types are `extends`, `implements`, `contradicts`, `derived_from`, `uses`, `replaces`, and `related_to`.
 6. Do not fabricate typed relationships. Use `related_to` or omit the entry when uncertain.
 
-Formal page `[[wikilink]]` targets may point only to the formal page families: `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`. `## Related` must obey the same rule. Never use Obsidian wikilinks from a formal page to `_paper_source/`, legacy `_epi/`, `_raw/`, `_staging/`, `_runs/`, `_quarantine/`, `.obsidian/`, snapshots, or source bundle files. Evidence paths under internal roots may appear as `obsidian://` URIs, `file:///` image addresses, or code/plain text paths only; they must not become graph links.
+Formal page `[[wikilink]]` targets may point only to the formal page families: `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`. `## Related` must obey the same rule. Never use Obsidian wikilinks from a formal page to `_paper_source/`, `_raw/`, `_staging/`, `_runs/`, `_quarantine/`, `.obsidian/`, snapshots, or source bundle files. Evidence paths under internal roots may appear as `obsidian://` URIs, `file:///` image addresses, or code/plain text paths only; they must not become graph links.
 
 ## Tracking Files
 

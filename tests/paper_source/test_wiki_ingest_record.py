@@ -9,16 +9,13 @@ from paper_source import orchestrator as orchestrator_module
 from paper_source.orchestrator import main, record_human_approval, record_wiki_ingest
 from paper_source.paper_gate import build_paper_gate
 from paper_source.wiki_ingest_record import (
-    LEGACY_PRW_RECORD_REQUEST_SCHEMA_VERSION,
     PAPER_WIKI_RECORD_REQUEST_SCHEMA_VERSION,
-    PRW_RECORD_REQUEST_SCHEMA_VERSION,
     create_wiki_ingest_record,
 )
 
 
 EXPECTED_RESEARCH_WIKI_SKILLS = [
     "paper-research-wiki",
-    "paper-source-paper-deposition",
 ]
 
 EXPECTED_RESEARCH_REVIEW_FIELDS = [
@@ -86,9 +83,8 @@ EXPECTED_GOVERNANCE_LAYERS = [
 ]
 
 
-def test_prw_schema_alias_points_to_current_paper_wiki_contract():
-    assert PRW_RECORD_REQUEST_SCHEMA_VERSION == PAPER_WIKI_RECORD_REQUEST_SCHEMA_VERSION
-    assert PRW_RECORD_REQUEST_SCHEMA_VERSION != LEGACY_PRW_RECORD_REQUEST_SCHEMA_VERSION
+def test_paper_wiki_record_request_uses_current_contract_name_only():
+    assert PAPER_WIKI_RECORD_REQUEST_SCHEMA_VERSION == "paper-wiki-record-request-v1"
 
 
 def test_orchestrator_reexports_wiki_record_workflow_entrypoints():
@@ -212,7 +208,7 @@ def _seed_agent_handoff(vault, slug="fixture-paper"):
                     {"source": "_meta/schema.md", "role": "routing"},
                     {
                         "source": "paper-research-wiki (Paper Wiki canonical paper wiki layer)",
-                        "role": "canonical paper wiki workflow layer; paper-source-paper-deposition remains compatibility adapter",
+                        "role": "canonical paper wiki workflow layer for Paper Source bundles",
                     },
                     {"source": "Ar9av/obsidian-wiki", "role": "framework"},
                     {"source": "kepano/obsidian-skills", "role": "format"},
@@ -786,7 +782,48 @@ def test_record_wiki_ingest_consumes_paper_wiki_record_request(tmp_path):
     assert run_state["input_artifact_hashes"]["paper-wiki-record-request.json"] == file_sha256(request_path)
 
 
-def test_create_wiki_ingest_record_accepts_legacy_approval_and_source_review_schema_versions(tmp_path):
+@pytest.mark.parametrize(
+    ("field", "value", "match"),
+    [
+        ("schema_version", "prw-record-request-v1", "unsupported schema_version"),
+        ("status", "ready_for_epi_record", "ready_for_paper_source_record"),
+    ],
+)
+def test_record_wiki_ingest_from_paper_wiki_request_rejects_old_alias_contracts(
+    tmp_path,
+    field,
+    value,
+    match,
+):
+    vault = tmp_path / "vault"
+    slug = _seed_agent_handoff(vault)
+    reference = _write_final_page(
+        vault,
+        "references/fixture-paper.md",
+        _formal_page_content("references", "Fixture Paper"),
+    )
+    source_review = _write_final_source_review(vault, slug, [reference])
+    _approve_handoff(vault, slug)
+    request_path = _write_paper_wiki_record_request(vault, slug, [reference], source_review)
+    payload = json.loads(request_path.read_text(encoding="utf-8"))
+    payload[field] = value
+    _write_json(request_path, payload)
+
+    with pytest.raises(ValueError, match=match):
+        record_wiki_ingest(
+            vault,
+            None,
+            [],
+            approved_by=None,
+            from_paper_wiki_request=str(request_path),
+        )
+
+
+@pytest.mark.parametrize("old_schema_target", ["approval", "source_review"])
+def test_create_wiki_ingest_record_rejects_old_alias_approval_and_source_review_schema_versions(
+    tmp_path,
+    old_schema_target,
+):
     vault = tmp_path / "vault"
     slug = _seed_agent_handoff(vault)
     page = _write_final_page(
@@ -799,21 +836,21 @@ def test_create_wiki_ingest_record_accepts_legacy_approval_and_source_review_sch
     approval_path = vault / "_paper_source" / "staging" / "papers" / slug / "human-approval.json"
     approval = json.loads(approval_path.read_text(encoding="utf-8"))
     review = json.loads(source_review.read_text(encoding="utf-8"))
-    approval["schema_version"] = "epi-human-approval-v1"
-    review["schema_version"] = "epi-final-source-review-v1"
+    if old_schema_target == "approval":
+        approval["schema_version"] = "epi-human-approval-v1"
+    else:
+        review["schema_version"] = "epi-final-source-review-v1"
     _write_json(approval_path, approval)
     _write_json(source_review, review)
 
-    record = create_wiki_ingest_record(
-        vault,
-        slug,
-        [str(page)],
-        approved_by="codex-test",
-        source_review_path=str(source_review),
-    )
-
-    assert record["status"] == "recorded"
-    assert record["final_source_review"]["schema_version"] == "epi-final-source-review-v1"
+    with pytest.raises(ValueError, match="unsupported schema_version|paper gate has failure checks: human-approval"):
+        create_wiki_ingest_record(
+            vault,
+            slug,
+            [str(page)],
+            approved_by="codex-test",
+            source_review_path=str(source_review),
+        )
 
 
 def test_record_wiki_ingest_from_paper_wiki_request_rejects_stale_page_hash(tmp_path):
@@ -1069,6 +1106,33 @@ def test_create_wiki_ingest_record_accepts_obsidian_uri_pdf_source(tmp_path):
 
     assert record["status"] == "recorded"
     assert record["relative_page_paths"] == ["references/fixture-paper.md"]
+
+
+def test_create_wiki_ingest_record_rejects_retired_source_review_roots(tmp_path):
+    vault = tmp_path / "vault"
+    slug = _seed_agent_handoff(vault)
+    page = _write_final_page(
+        vault,
+        "references/fixture-paper.md",
+        _formal_page_content("references", "Fixture Paper"),
+    )
+    _approve_handoff(vault, slug)
+
+    retired_absolute = vault / "_epi" / "staging" / "papers" / slug / "final-source-review.json"
+    for retired_path in [
+        f"_epi/staging/papers/{slug}/final-source-review.json",
+        str(retired_absolute),
+        f"_staging/papers/{slug}/final-source-review.json",
+        f"_raw/papers/{slug}/final-source-review.json",
+    ]:
+        with pytest.raises(ValueError, match="retired internal root"):
+            create_wiki_ingest_record(
+                vault,
+                slug,
+                [str(page)],
+                approved_by="codex-test",
+                source_review_path=retired_path,
+            )
 
 
 def test_create_wiki_ingest_record_accepts_nested_provenance_yaml_lists(tmp_path):
@@ -1479,7 +1543,7 @@ def test_create_wiki_ingest_record_requires_research_review_contract(tmp_path):
     source_review = _write_final_source_review(vault, slug, [page])
     _approve_handoff(vault, slug)
     payload = json.loads(source_review.read_text(encoding="utf-8"))
-    payload["wiki_batch_ingest"]["wiki_skill_used"] = ["epi-wiki-deposition", "wiki-ingest", "wiki-provenance"]
+    payload["wiki_batch_ingest"]["wiki_skill_used"] = ["retired-paper-wiki-skill", "wiki-ingest", "wiki-provenance"]
     payload.pop("formula_derivation")
     payload["page_lifecycle"]["status"] = "not-a-real-state"
     _write_json(source_review, payload)

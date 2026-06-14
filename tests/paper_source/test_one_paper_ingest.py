@@ -9,7 +9,6 @@ from paper_source.stage_wiki import stage_paper
 
 EXPECTED_RESEARCH_WIKI_SKILLS = [
     "paper-research-wiki",
-    "paper-source-paper-deposition",
 ]
 
 EXPECTED_FORMAL_PAGE_FAMILIES = [
@@ -251,13 +250,13 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
     paper_wiki_index = next(index for index, source in enumerate(rule_sources) if "paper-research-wiki" in source)
     local_index = rule_sources.index("local llm-wiki / wiki-ingest / obsidian-markdown skills")
     assert paper_wiki_index < local_index
-    prw_role = next(
+    paper_wiki_role = next(
         item["role"]
         for item in rule_source_model["resolution_order"]
         if "paper-research-wiki" in item["source"]
     )
-    assert "canonical" in prw_role
-    assert "compatibility adapter" in prw_role
+    assert "canonical" in paper_wiki_role
+    assert "compatibility adapter" not in paper_wiki_role
     local_skill_role = next(
         item["role"]
         for item in rule_source_model["resolution_order"]
@@ -289,8 +288,8 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
     for skill in EXPECTED_RESEARCH_WIKI_SKILLS:
         assert skill in minimum_role
     assert "load paper-research-wiki first" in minimum_role
-    assert "paper-source-paper-deposition" in minimum_role
-    assert "compatibility adapter" in minimum_role
+    assert "paper-source-paper-deposition" not in minimum_role
+    assert "compatibility adapter" not in minimum_role
     assert "load paper-source-paper-deposition, llm-wiki" not in minimum_role
     assert wiki_ingest_brief["wiki_skill_handoff"]["formal_page_families"] == EXPECTED_FORMAL_PAGE_FAMILIES
     assert wiki_ingest_brief["source_bundle"]["raw_artifacts"] == [
@@ -373,8 +372,8 @@ def test_one_paper_ingest_preserves_raw_artifacts_and_stages_after_critic_pass(t
     for skill in EXPECTED_RESEARCH_WIKI_SKILLS:
         assert skill in batch_handoff["wiki_skill_instruction"]
     assert "Load paper-research-wiki first" in batch_handoff["wiki_skill_instruction"]
-    assert "paper-source-paper-deposition" in batch_handoff["wiki_skill_instruction"]
-    assert "compatibility adapter" in batch_handoff["wiki_skill_instruction"]
+    assert "paper-source-paper-deposition" not in batch_handoff["wiki_skill_instruction"]
+    assert "compatibility adapter" not in batch_handoff["wiki_skill_instruction"]
     assert "Load paper-source-paper-deposition," not in batch_handoff["wiki_skill_instruction"]
     assert batch_handoff["formal_page_families"] == EXPECTED_FORMAL_PAGE_FAMILIES
     assert batch_handoff["research_review_fields"] == EXPECTED_RESEARCH_REVIEW_FIELDS

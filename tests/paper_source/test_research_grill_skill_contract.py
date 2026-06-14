@@ -80,5 +80,5 @@ def test_research_grill_docs_preserve_paper_source_and_paper_wiki_boundaries():
         assert phrase in combined
 
     assert "must not write Paper Wiki formal pages directly from a Research Brief" in combined
-    assert "Old EPI/PRW names are legacy-only" in combined
+    assert "Retired names may appear only when quoting historical artifacts" in combined
     assert "academic_search" not in combined

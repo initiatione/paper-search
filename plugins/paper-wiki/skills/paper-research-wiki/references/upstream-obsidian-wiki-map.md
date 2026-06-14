@@ -14,7 +14,7 @@ Ar9av/obsidian-wiki is a design source, not a runtime source of truth. During no
 
 ## Internalized Repair Patterns
 
-Paper Wiki handles link repair locally. Check for broken wikilinks, ambiguous aliases, duplicate concept owners, forbidden internal links from formal pages into `_paper_source/`, legacy `_epi/`, or other internal folders, stale redirects, fragmented tags, and relationship direction mistakes before and after maintenance writes.
+Paper Wiki handles link repair locally. Check for broken wikilinks, ambiguous aliases, duplicate concept owners, forbidden internal links from formal pages into `_paper_source/` or other internal folders, stale redirects, fragmented tags, and relationship direction mistakes before and after maintenance writes.
 
 QMD is optional. If available, use it to accelerate lookup and refresh discoverability with `qmd update` and `qmd embed` after wiki writes. If QMD is missing, stale, slow, or noisy, fallback to manifest, `.manifest.json`, `index.md`, `log.md`, `hot.md`, and direct file search; do not block on qmd query.
 

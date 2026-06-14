@@ -1,6 +1,6 @@
 # Domain Ontology
 
-Use this lightweight ontology as examples for synonym and evidence-term expansion. It is not a fixed taxonomy and must not override `_meta\epi-config.yaml`; load a section only when the user's profile or current request matches it. For other disciplines, derive equivalent blocks from the user's config, field vocabulary, and venue prior.
+Use this lightweight ontology as examples for synonym and evidence-term expansion. It is not a fixed taxonomy and must not override `_paper_source\meta\paper-source-config.yaml`; load a section only when the user's profile or current request matches it. For other disciplines, derive equivalent blocks from the user's config, field vocabulary, and venue prior.
 
 ## AUV / Marine Control
 

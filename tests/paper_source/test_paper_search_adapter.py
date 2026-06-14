@@ -603,7 +603,7 @@ def test_download_can_stop_after_oa_fallback_without_source_native_or_cli(tmp_pa
 
 
 def test_download_treats_cli_timeout_as_upstream_failure(tmp_path, monkeypatch):
-    monkeypatch.setenv("EPI_PAPER_SEARCH_MCP_DISABLED", "1")
+    monkeypatch.setenv("PAPER_SOURCE_PAPER_SEARCH_MCP_DISABLED", "1")
     monkeypatch.setattr("paper_source.paper_search_adapter._resolve_command", lambda command: command)
 
     def _run_command(resolved_command, args, timeout_seconds):
@@ -671,7 +671,7 @@ def test_read_preview_prefers_paper_search_mcp_read_tool(tmp_path, monkeypatch):
 
 
 def test_read_preview_soft_fails_when_mcp_and_cli_are_unavailable(tmp_path, monkeypatch):
-    monkeypatch.setenv("EPI_PAPER_SEARCH_MCP_DISABLED", "1")
+    monkeypatch.setenv("PAPER_SOURCE_PAPER_SEARCH_MCP_DISABLED", "1")
 
     result = paper_search_adapter.read_paper_preview(
         source="semantic",
@@ -761,7 +761,7 @@ def test_read_preview_falls_back_to_cli_when_mcp_read_fails(tmp_path, monkeypatc
 
 
 def test_live_cli_discovery_invokes_paper_search_and_maps_records(tmp_path, monkeypatch):
-    monkeypatch.setenv("EPI_PAPER_SEARCH_MCP_DISABLED", "1")
+    monkeypatch.setenv("PAPER_SOURCE_PAPER_SEARCH_MCP_DISABLED", "1")
     fake_command = _write_fake_paper_search(
         tmp_path,
         {
@@ -849,7 +849,7 @@ def test_live_cli_discovery_invokes_paper_search_and_maps_records(tmp_path, monk
 
 
 def test_live_cli_discovery_fails_closed_when_command_is_missing(tmp_path, monkeypatch):
-    monkeypatch.setenv("EPI_PAPER_SEARCH_MCP_DISABLED", "1")
+    monkeypatch.setenv("PAPER_SOURCE_PAPER_SEARCH_MCP_DISABLED", "1")
     result = discover(
         query="robotics",
         max_results=2,
@@ -864,7 +864,7 @@ def test_live_cli_discovery_fails_closed_when_command_is_missing(tmp_path, monke
 
 
 def test_live_cli_discovery_treats_empty_stdout_with_stderr_as_upstream_failure(tmp_path, monkeypatch):
-    monkeypatch.setenv("EPI_PAPER_SEARCH_MCP_DISABLED", "1")
+    monkeypatch.setenv("PAPER_SOURCE_PAPER_SEARCH_MCP_DISABLED", "1")
     script = tmp_path / "paper-search-empty.ps1"
     script.write_text(
         "if ($args -contains '--version') { Write-Output 'paper-search 0.1.4'; exit 0 }\n"
@@ -888,7 +888,7 @@ def test_live_cli_discovery_treats_empty_stdout_with_stderr_as_upstream_failure(
 
 
 def test_live_cli_discovery_treats_search_timeout_as_upstream_failure(tmp_path, monkeypatch):
-    monkeypatch.setenv("EPI_PAPER_SEARCH_MCP_DISABLED", "1")
+    monkeypatch.setenv("PAPER_SOURCE_PAPER_SEARCH_MCP_DISABLED", "1")
     raw_response_path = tmp_path / "raw-search.json"
     monkeypatch.setattr("paper_source.paper_search_adapter._resolve_command", lambda command: command)
 

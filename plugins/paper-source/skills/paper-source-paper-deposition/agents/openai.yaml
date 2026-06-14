@@ -1,4 +1,4 @@
 interface:
   display_name: "Paper Source Paper Deposition"
-  short_description: "Bridge legacy Paper Source bundles to Paper Wiki"
-  default_prompt: "Use $paper-source-paper-deposition to bridge legacy Paper Source bundles to Paper Wiki."
+  short_description: "Clean up retired Paper Source handoff artifacts"
+  default_prompt: "Use $paper-source-paper-deposition only to regenerate current wiki-ingest-brief handoffs from retired task files."

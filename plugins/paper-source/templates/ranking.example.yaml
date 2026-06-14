@@ -7,7 +7,7 @@ weights:
   code_available: 0.08
   reproducibility_signal: 0.06
 protocol:
-  schema_version: epi-ranking-protocol-v1
+  schema_version: paper-source-ranking-protocol-v1
   lenses:
     editorial: ["venue_tier", "freshness", "topic_relevance"]
     peer_review: ["citation_signal", "benchmark_signal", "pdf_available"]

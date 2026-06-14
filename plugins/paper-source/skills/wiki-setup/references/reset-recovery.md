@@ -21,7 +21,7 @@ For 误删, 误操作, missing config, or mistaken reset:
 1. Stop search, ingest, MinerU, staging, promotion, and wiki writing.
 2. Explain the likely boundary error.
 3. Actively ask whether the user wants help restoring important settings from backups or history.
-4. Search safe sources first: reset backups, `_meta\epi-config-history\`, `_meta\config-history\`, plugin git history, non-secret Codex logs, and `%USERPROFILE%\.codex\plugins\paperflow\paper-source\runtime.json`.
+4. Search safe sources first: reset backups, `_paper_source\meta\config-history\`, plugin git history, non-secret Codex logs, and `%USERPROFILE%\.codex\plugins\paperflow\paper-source\runtime.json`.
 5. Show path, timestamp, and non-secret summary before restore.
 6. If no backup exists, use `config-setup` and state unrecovered settings.
 

@@ -131,8 +131,8 @@ def _run_orchestrator_cli(monkeypatch, capsys, *args, codex_home=None):
 
 def test_doctor_text_reports_ok_with_external_dependency_warnings(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("MINERU_TOKEN", raising=False)
-    monkeypatch.delenv("EPI_PAPER_SEARCH_COMMAND", raising=False)
-    monkeypatch.setenv("EPI_PAPER_SEARCH_MCP_DISABLED", "1")
+    monkeypatch.delenv("PAPER_SOURCE_PAPER_SEARCH_COMMAND", raising=False)
+    monkeypatch.setenv("PAPER_SOURCE_PAPER_SEARCH_MCP_DISABLED", "1")
     plugin_root = _seed_plugin_root(tmp_path)
 
     exit_code, output = _run_orchestrator_cli(
@@ -166,11 +166,11 @@ def test_doctor_text_reports_ok_with_external_dependency_warnings(tmp_path, monk
 
 def test_doctor_json_reports_structured_checks(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("MINERU_TOKEN", raising=False)
-    monkeypatch.delenv("EPI_PAPER_SEARCH_COMMAND", raising=False)
+    monkeypatch.delenv("PAPER_SOURCE_PAPER_SEARCH_COMMAND", raising=False)
     monkeypatch.delenv("PAPER_SEARCH_MCP_UNPAYWALL_EMAIL", raising=False)
     monkeypatch.delenv("PAPER_SEARCH_MCP_CORE_API_KEY", raising=False)
     monkeypatch.delenv("PAPER_SEARCH_MCP_GOOGLE_SCHOLAR_PROXY_URL", raising=False)
-    monkeypatch.setenv("EPI_PAPER_SEARCH_MCP_DISABLED", "1")
+    monkeypatch.setenv("PAPER_SOURCE_PAPER_SEARCH_MCP_DISABLED", "1")
     plugin_root = _seed_plugin_root(tmp_path)
 
     exit_code, output = _run_orchestrator_cli(
@@ -373,7 +373,7 @@ def test_doctor_reports_ok_when_paper_source_config_exists(tmp_path, monkeypatch
 
 def test_doctor_default_does_not_open_setup_pages(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("MINERU_TOKEN", raising=False)
-    monkeypatch.delenv("EPI_PAPER_SEARCH_COMMAND", raising=False)
+    monkeypatch.delenv("PAPER_SOURCE_PAPER_SEARCH_COMMAND", raising=False)
     plugin_root = _seed_plugin_root(tmp_path)
     opened = []
     monkeypatch.setattr("paper_source.cli.open_setup_links", lambda report: opened.append(report), raising=False)
@@ -397,7 +397,7 @@ def test_doctor_default_does_not_open_setup_pages(tmp_path, monkeypatch, capsys)
 
 def test_doctor_open_setup_opens_only_missing_dependency_pages(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("MINERU_TOKEN", raising=False)
-    monkeypatch.delenv("EPI_PAPER_SEARCH_COMMAND", raising=False)
+    monkeypatch.delenv("PAPER_SOURCE_PAPER_SEARCH_COMMAND", raising=False)
     plugin_root = _seed_plugin_root(tmp_path)
     opened_reports = []
 

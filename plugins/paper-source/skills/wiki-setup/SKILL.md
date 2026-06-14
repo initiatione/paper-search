@@ -16,7 +16,7 @@ Initialize or inspect here; load `workflows/reset-repair.md` for destructive res
 
 ## Reset Boundary
 
-wiki structure reset and Paper Source config reset are separate operations. Default reset preserves config even when the user says 不需要备份. Preserve `_paper_source\meta\paper-source-config.yaml`, `_paper_source\meta\paper-source-config-state.json`, `_paper_source\meta\config-history\`, legacy `_epi\meta\paper-source-config.yaml`, legacy `_epi\meta\epi-config-state.json`, legacy `_epi\meta\epi-config-history\`, and `%USERPROFILE%\.codex\plugins\paperflow\paper-source\runtime.json`. Before/after destructive actions, report non-secret state with `config-status --vault <vault> --json --include-values --include-runtime`.
+wiki structure reset and Paper Source config reset are separate operations. Default reset preserves config even when the user says 不需要备份. Preserve `_paper_source\meta\paper-source-config.yaml`, `_paper_source\meta\paper-source-config-state.json`, `_paper_source\meta\config-history\`, and `%USERPROFILE%\.codex\plugins\paperflow\paper-source\runtime.json`. Before/after destructive actions, report non-secret state with `config-status --vault <vault> --json --include-values --include-runtime`.
 
 ## Initialize
 
@@ -30,7 +30,7 @@ python scripts\init_paper_wiki.py --vault <vault>
 
 Expected roots: `_paper_source`, `_meta`, formal wiki roots, `.obsidian`, `.git`, `index.md`, `log.md`, `hot.md`, `.manifest.json`; do not create top-level `_raw`, `_staging`, `_runs`, `_quarantine`, or `_evolution`.
 
-core `_paper_source` bootstrap: `_paper_source\README.md`, `_paper_source\manifest.json`, `_paper_source\policies\retention.json`, raw/staging/meta/policies roots, and on-demand `runs`, `cache`, `tmp`, `tmp-manual-pdfs`, quarantine/evolution. Existing `_epi` roots remain legacy-readable. `_paper_source/raw/<slug>/mineru/<slug>.md` is source material, not a formal page.
+core `_paper_source` bootstrap: `_paper_source\README.md`, `_paper_source\manifest.json`, `_paper_source\policies\retention.json`, raw/staging/meta/policies roots, and on-demand `runs`, `cache`, `tmp`, `tmp-manual-pdfs`, quarantine/evolution. Historical `_epi` roots are migration inputs only; run repository migration before normal workflows. `_paper_source/raw/<slug>/mineru/<slug>.md` is source material, not a formal page.
 
 The retention policy must cap lifecycle artifacts: run dirs, `_paper_source\meta\run-lifecycle`, `_paper_source\meta\raw-cleanup`, `_paper_source\meta\repository-maintenance`, `_paper_source\meta\migrations`, `_paper_source\meta\wiki-reset`, `_paper_source\meta\formal-page-snapshots`, and `_paper_source\tmp-manual-pdfs`.
 
@@ -50,7 +50,7 @@ python scripts\orchestrator.py paper-source-repository-cleanup --vault <vault> -
 
 ## Literature Wiki Contract
 
-Formal page families are `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`. Paper Source writes only `_paper_source/`; Paper Wiki `$paper-research-wiki` writes final pages after handoff and approval. `wiki-ingest-brief.json` is the canonical Paper Source-to-Paper Wiki handoff. `wiki_deposition_task.json is legacy` compatibility only; `paper-source-paper-deposition` is the compatibility adapter. external wiki skills are optional helpers / policy references.
+Formal page families are `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`. Paper Source writes only `_paper_source/`; Paper Wiki `$paper-research-wiki` writes final pages after handoff and approval. `wiki-ingest-brief.json` is the canonical Paper Source-to-Paper Wiki handoff. `wiki_deposition_task.json` is historical cleanup only, not a new-task entrypoint; `paper-source-paper-deposition` is only for retired handoff cleanup. external wiki skills are optional helpers / policy references.
 
 Paper Wiki assumes this bootstrap exists. If `_paper_source/`, `_meta/`, `.obsidian`, `.git`, or formal roots are missing, it reports missing vault structure and sends the user back to Paper Source `wiki-setup`; Paper Wiki does not initialize or reset the vault.
 

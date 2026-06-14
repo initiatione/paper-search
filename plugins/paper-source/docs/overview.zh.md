@@ -27,6 +27,20 @@ Paper Source 当前分三层工作：
 
 三层分别保证广度、深度和可信回溯。reader/critic 是辅助导航和审计层，不替代 MinerU Markdown 主证据；PDF、figure/formula indexes、images 和 manifest 只在 Markdown 缺失、错误、歧义或视觉证据需要时回退复核，非空原生 TeX（若存在）只是可选交叉核对。
 
+## 用户黄金路径
+
+日常使用优先走这一条路径，不从单个底层命令或旧 handoff artifact 开始：
+
+1. 先检查环境和配置：`doctor --json`，配置缺失时走 `config-setup`。
+2. 方向不清楚时先用 `research-grill-me` 形成 Research Brief；方向明确时直接 `dry-run --query "<topic>"`。
+3. 用 `report --run-id <run-id>` 查看排序结果，并把持续追踪、coverage、backlog 交给 `topic-tracking`。
+4. 用 `prepare-ranked --run-id <run-id> --max-papers 10 --skip-existing` 推进高价值论文到 raw/source-staging。
+5. 从 `briefs/reading-report.md` 看一份中文审批报告；同意后运行 `record-human-approval` 和 `wiki-ingest-trigger`。
+6. 由 Paper Wiki `$paper-research-wiki` 或当前 wiki-capable agent 按 `wiki-ingest-brief.json` 写正式页面和 `final-source-review.json`。
+7. 用 `record-wiki-ingest` 回填最终页路径、hash、source review 和可选 Zotero record。
+
+新任务只使用 `wiki-ingest-brief.json` 作为 Paper Source-to-Paper Wiki handoff；不要从 `wiki_deposition_task.json` 或旧别名入口启动正式写入。
+
 ## 常用入口
 
 ```powershell
@@ -47,6 +61,7 @@ python scripts\orchestrator.py record-wiki-ingest --slug <slug> --page <final-pa
 | Skill | 何时使用 | 边界 |
 | --- | --- | --- |
 | `config-setup` | 首次配置、修改 profile/runtime/确认门 | 不跑论文流程 |
+| `research-grill-me` | 研究方向不清、需要 Research Brief 或 deep-research prompt | 不绕过 discovery、staging、approval gate |
 | `paper-discovery` | 单轮检索、query plan、排序、报告 | 不维护长期主题账本 |
 | `topic-tracking` | 持续追踪、net-new、coverage/backlog | 不替代底层检索 |
 | `paper-ingest` | 已选论文进入 raw、MinerU、source-staging、handoff | 不写最终 Obsidian 页面 |
@@ -54,7 +69,9 @@ python scripts\orchestrator.py record-wiki-ingest --slug <slug> --page <final-pa
 | `wiki-provenance` | 最终页 claim support 和 evidence route | 不替代源论文重读 |
 | `wiki-setup` | 初始化、检查、修复、重置 paper wiki vault | 不检索论文、不写最终知识页 |
 | `run-lifecycle` | 清理 `_paper_source/runs` 过渡态 | 不删 raw/staging/final wiki |
+| `zotero-sync` | 写本地 Zotero sidecar 或按配置记录文献 | 默认不调外部 Zotero API |
 | `skill-aware-evolve` | 基于证据提出受控优化 | 不直接改用户配置 |
+| `paper-source-paper-deposition` | 清理或转接历史 `wiki_deposition_task.json` 残留 | 新任务不要用它启动正式写入 |
 
 ## 文献 Wiki 七类页面契约
 
@@ -64,7 +81,7 @@ page-family/frontmatter 的人读 canonical 是 Paper Wiki `plugins/paper-wiki/r
 
 正式页 frontmatter 至少覆盖 `title`、`category`、`page_family`、`tags`、`aliases`、`sources`、`summary`、`provenance`、`base_confidence`、`lifecycle`、`lifecycle_changed`、`tier`、`created`、`updated`。record 前的研究审阅字段包括 `theory_reconstruction`、`formula_derivation`、`figure_table_evidence`、`novelty_type`、`implementability`、`reproducibility_risk`、`research_gap`、`cost_level`。
 
-Paper Wiki `$paper-research-wiki` 是正式论文 wiki 写入和维护的用户级入口；`wiki-ingest-brief.json` 是 canonical Paper Source-to-Paper Wiki handoff。`wiki_deposition_task.json is legacy` compatibility only，`paper-source-paper-deposition` 只作为旧 handoff 和 record provenance 的 compatibility adapter，旧名 `epi-wiki-deposition` 只是兼容 alias。
+Paper Wiki `$paper-research-wiki` 是正式论文 wiki 写入和维护的用户级入口；`wiki-ingest-brief.json` 是 canonical Paper Source-to-Paper Wiki handoff。`wiki_deposition_task.json` 只作为历史残留清理对象，新任务不要生成或依赖它。
 
 ## 安全边界
 

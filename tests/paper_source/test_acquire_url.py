@@ -233,7 +233,7 @@ def test_acquire_paper_from_url_rejects_html_without_pdf_link(tmp_path):
 
 
 def test_acquire_paper_from_candidate_prefers_paper_search_cli_download(tmp_path, monkeypatch):
-    monkeypatch.setenv("EPI_PAPER_SEARCH_MCP_DISABLED", "1")
+    monkeypatch.setenv("PAPER_SOURCE_PAPER_SEARCH_MCP_DISABLED", "1")
     fake_command = tmp_path / "paper-search-download.ps1"
     args_path = tmp_path / "download-args.json"
     fake_command.write_text(
@@ -249,7 +249,7 @@ def test_acquire_paper_from_candidate_prefers_paper_search_cli_download(tmp_path
         "exit 0\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("EPI_PAPER_SEARCH_COMMAND", str(fake_command))
+    monkeypatch.setenv("PAPER_SOURCE_PAPER_SEARCH_COMMAND", str(fake_command))
     candidate = _candidate("https://example.org/fallback.pdf", slug="paper-search-cli-paper")
     candidate["sources"] = ["arxiv"]
     candidate["raw_records"] = [

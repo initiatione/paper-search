@@ -55,6 +55,30 @@ def test_config_status_reports_missing_config(tmp_path, monkeypatch, capsys):
     assert payload["config_path"].replace("\\", "/").endswith("_paper_source/meta/paper-source-config.yaml")
 
 
+def test_config_status_ignores_retired_config_names(tmp_path, monkeypatch, capsys):
+    vault = tmp_path / "vault"
+    retired_config = vault / "_paper_source" / "meta" / "epi-config.yaml"
+    retired_state = vault / "_paper_source" / "meta" / "epi-config-state.json"
+    retired_config.parent.mkdir(parents=True)
+    retired_config.write_text("profile: retired_profile\n", encoding="utf-8")
+    _write_json(retired_state, {"configured": True})
+
+    exit_code, output = _run_orchestrator_cli(
+        monkeypatch,
+        capsys,
+        "config-status",
+        "--vault",
+        str(vault),
+        "--json",
+    )
+    payload = json.loads(output)
+
+    assert exit_code == 1
+    assert payload["configured"] is False
+    assert payload["needs_onboarding"] is True
+    assert "legacy_config" not in payload
+
+
 def test_config_status_can_include_values_and_fast_runtime_status(tmp_path, monkeypatch, capsys):
     vault = tmp_path / "vault"
     answers_path = tmp_path / "answers.json"
@@ -63,7 +87,7 @@ def test_config_status_can_include_values_and_fast_runtime_status(tmp_path, monk
     _write_json(
         runtime_path,
         {
-            "schema_version": "epi-runtime-config-v1",
+            "schema_version": "paper-source-runtime-config-v1",
             "paper_search_mcp": {"command": "python", "args": ["-m", "paper_search_mcp.server"]},
             "paper_search_cli": {"command": "paper-search"},
             "mineru": {"env_file": str(tmp_path / "missing-mineru.env")},
@@ -353,6 +377,9 @@ def test_config_recover_lists_backup_candidates_and_restore_requires_confirmatio
     backup_config = backup_root / "old-run" / "_paper_source/meta" / "paper-source-config.yaml"
     backup_config.parent.mkdir(parents=True)
     backup_config.write_text("profile: recovered_profile\nbudget:\n  max_results: 9\n", encoding="utf-8")
+    retired_backup_config = backup_root / "retired-run" / "_paper_source/meta" / "epi-config.yaml"
+    retired_backup_config.parent.mkdir(parents=True)
+    retired_backup_config.write_text("profile: retired_profile\n", encoding="utf-8")
 
     recover_exit, recover_output = _run_orchestrator_cli(
         monkeypatch,
@@ -369,6 +396,7 @@ def test_config_recover_lists_backup_candidates_and_restore_requires_confirmatio
     assert recover_exit == 0
     assert recover_payload["candidate_count"] == 1
     assert recover_payload["candidates"][0]["profile"] == "recovered_profile"
+    assert "retired_profile" not in recover_output
     assert "secret" not in recover_output.lower()
 
     restore_exit, restore_output = _run_orchestrator_cli(

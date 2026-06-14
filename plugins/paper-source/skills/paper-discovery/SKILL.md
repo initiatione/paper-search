@@ -22,10 +22,10 @@ Use for Paper Source / PS discovery and reading-priority ranking: search, normal
 - High-quality/latest/non-review discovery with high recall before precision filtering: `workflows/multi-source-discovery.md`.
 - Prepare PDFs, MinerU artifacts, and source-staging handoff from a ranked run: `paper-ingest/workflows/prepare-ranked.md`.
 - Ongoing monitoring, deltas, backlog, or coverage: `topic-tracking/SKILL.md`.
-- Formal wiki deposition after source-staging and approval: Paper Wiki `$paper-research-wiki`; compatibility fallback `paper-source-paper-deposition/SKILL.md`.
+- Formal wiki deposition after source-staging and approval: Paper Wiki `$paper-research-wiki`. Use `paper-source-paper-deposition/SKILL.md` only for retired `wiki_deposition_task.json` cleanup.
 
 Reference map: `references/query-planner.md`, `references/mode-routing.md`, `references/paper-type-taxonomy.md`, `references/search-protocol.md`, `references/source-tiers.md`, `references/dedup-engine.md`, `references/venue-prior.md`, `references/two-stage-retrieval.md`, `references/ranking-rubric.md`, `references/quality-gate.md`, `references/output-format.md`, `references/citation-graph.md`, `references/domain-ontology.md`, `references/anti-patterns.md`, `references/evaluation-set.md`.
 
 ## Source Boundary
 
-`dry-run` writes only `_paper_source/runs/<run-id>/`. `prepare-ranked` belongs to `paper-ingest` and stops at source-staging. Final pages are written by Paper Wiki `$paper-research-wiki` or compatibility adapter `paper-source-paper-deposition`; discovery never writes them.
+`dry-run` writes only `_paper_source/runs/<run-id>/`. `prepare-ranked` belongs to `paper-ingest` and stops at source-staging. Final pages are written by Paper Wiki `$paper-research-wiki`; discovery never writes them.

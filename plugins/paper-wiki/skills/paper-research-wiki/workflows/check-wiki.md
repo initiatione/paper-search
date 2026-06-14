@@ -9,8 +9,8 @@ This adapts Ar9av/obsidian-wiki `wiki-status` and `wiki-lint`: report state, del
 Check the target vault contract, pending Paper Source handoffs, staged pages, source-review sidecars, graph health, and QMD compatibility.
 
 - Bootstrap: core `_paper_source` roots (`_paper_source/`, `_paper_source/raw/`, `_paper_source/staging/`, `_paper_source/meta/`, `_paper_source/policies/`), `_meta/`, `.obsidian`, `.git`, and seven formal page roots. Paper Source `runs`, `cache`, `tmp`, `tmp-manual-pdfs`, `quarantine`, and `evolution` are on-demand, not bootstrap requirements.
-- Handoffs: pending Paper Source handoffs using `_paper_source/staging/papers/*/wiki-ingest-brief.json` as canonical; legacy `_epi/.../wiki-ingest-brief.json` is fallback; task-only `wiki_deposition_task.json` means brief repair is needed.
-- Formal graph: orphan pages, broken wikilinks, ambiguous aliases, duplicate concept owners, duplicate concept candidates, forbidden internal links from formal pages into `_paper_source/`, legacy `_epi/`, `_raw/`, `_staging/`, `_runs/`, `_quarantine/`, or `.obsidian/`, plus relationship direction and relationship type mistakes.
+- Handoffs: pending Paper Source handoffs using `_paper_source/staging/papers/*/wiki-ingest-brief.json` as the only Paper Source-to-Paper Wiki handoff contract. Paper Source owns paper-level deduplication before handoff; Paper Wiki checks graph-level integration risks.
+- Formal graph: orphan pages, broken wikilinks, ambiguous aliases, duplicate concept owners, duplicate concept candidates, forbidden internal links from formal pages into `_paper_source/`, `_raw/`, `_staging/`, `_runs/`, `_quarantine/`, or `.obsidian/`, plus relationship direction and relationship type mistakes.
 - Provenance: missing `final-source-review.json`, sidecar hashes in `final-source-review.json` and previous `wiki-ingest-record.json`, provenance gaps, weak evidence addresses, formula/figure review gaps, page template drift, stale tags/aliases, fragmented tag clusters, stale core pages, and staged writes waiting for review.
 - QMD: status of QMD, whether `qmd update` and `qmd embed` should run, lookup reliability, fallback to manifest, `.manifest.json`, `index.md`, `log.md`, `hot.md`, and direct file search; do not block on qmd query.
 
@@ -26,7 +26,7 @@ Use Quick + Targeted by default.
 
 Return:
 
-1. Overview: target vault, pending Paper Source handoffs, ready papers, blocked papers, already recorded papers.
+1. Overview: target vault, pending Paper Source handoffs, ready papers, blocked-source-artifacts, needs-human-approval items, and graph-conflict items.
 2. Wiki health: orphan pages, broken wikilinks, ambiguous aliases, duplicate concept owners, forbidden internal links, missing frontmatter, relationship direction issues, provenance gaps, stale pages, staged writes.
 3. Paper-specific gaps: missing `final-source-review.json`, weak evidence addresses, formula/figure review gaps, template drift.
 4. Bootstrap gaps: missing vault structure that requires Paper Source `wiki-setup`; Paper Wiki should not initialize or reset the vault.

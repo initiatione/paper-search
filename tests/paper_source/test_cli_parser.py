@@ -1,6 +1,8 @@
 import argparse
 import importlib
 
+import pytest
+
 from paper_source import cli
 from paper_source.cli import build_parser
 
@@ -758,20 +760,16 @@ def test_record_wiki_ingest_parser_accepts_paper_wiki_record_request():
     assert args.json is True
 
 
-def test_record_wiki_ingest_parser_accepts_legacy_prw_record_request():
-    args = build_parser().parse_args(
-        [
-            "record-wiki-ingest",
-            "--from-prw-request",
-            "_epi/staging/papers/fixture-paper/prw-record-request.json",
-            "--json",
-        ]
-    )
-
-    assert args.command == "record-wiki-ingest"
-    assert args.from_prw_request.name == "prw-record-request.json"
-    assert args.from_paper_wiki_request is None
-    assert args.json is True
+def test_record_wiki_ingest_parser_rejects_old_prw_record_request_flag():
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(
+            [
+                "record-wiki-ingest",
+                "--from-prw-request",
+                "_paper_source/staging/papers/fixture-paper/paper-wiki-record-request.json",
+                "--json",
+            ]
+        )
 
 
 def test_repository_maintenance_parser_uses_paper_source_commands():
@@ -790,12 +788,11 @@ def test_repository_maintenance_parser_uses_paper_source_commands():
     assert cleanup.json is True
 
 
-def test_repository_maintenance_parser_accepts_legacy_epi_commands():
-    migrate = build_parser().parse_args(["epi-repository-migrate", "--vault", "vault", "--preview"])
-    cleanup = build_parser().parse_args(["epi-repository-cleanup", "--vault", "vault", "--preview"])
-
-    assert migrate.command == "epi-repository-migrate"
-    assert cleanup.command == "epi-repository-cleanup"
+def test_repository_maintenance_parser_rejects_old_epi_commands():
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(["epi-repository-migrate", "--vault", "vault", "--preview"])
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(["epi-repository-cleanup", "--vault", "vault", "--preview"])
 
 
 def test_record_human_approval_parser_accepts_scope_notes_and_json():

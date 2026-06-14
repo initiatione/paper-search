@@ -18,11 +18,11 @@ routes:
   paper_ingest: {category: primary, triggers: [用 PS 推进论文, 推进论文, 生成阅读报告, 准备 wiki handoff, prepare-ranked, advance-paper], skill: paper-ingest/SKILL.md, workflows: [paper-ingest/workflows/prepare-ranked.md, paper-ingest/workflows/approval-and-trigger.md], notes: [source_bundle_audit blocks incomplete handoff, final prose defaults to Chinese]}
   mineru_paper_parser: {category: support, triggers: [MinerU 解析, PDF 转 Markdown, parse-paper, mineru-manifest.json, figure-index.json, formula-index.json, normalize-mineru-assets], skill: mineru-paper-parser/SKILL.md, notes: [raw asset normalization; formal figure repairs route to Paper Wiki]}
   paper_source_paper_deposition:
-    category: compatibility
-    triggers: [wiki_deposition_task.json, 兼容旧沉淀任务, legacy Paper Source wiki deposition, epi-wiki-deposition]
+    category: maintenance
+    triggers: [历史 handoff 修复, retired handoff cleanup, 重建 wiki-ingest-brief]
     skill: paper-source-paper-deposition/SKILL.md
     workflows: [paper-source-paper-deposition/workflows/formal-wiki-write.md]
-    notes: [formal wiki work routes to $paper-research-wiki, bridge for wiki_deposition_task.json and legacy epi-wiki-deposition, formal_page_language_policy by paper-wiki-language]
+    notes: [new formal wiki work routes to $paper-research-wiki, retired task files are historical cleanup objects only, formal_page_language_policy by paper-wiki-language]
   wiki_provenance: {category: support, triggers: [claim 能否回溯, 证据地址, provenance, final-source-review, record-wiki-ingest], skill: wiki-provenance/SKILL.md}
   run_lifecycle: {category: maintenance, triggers: [清理 runs, run index audit, dashboard pruning], skill: run-lifecycle/SKILL.md, notes: [index.json and research-queue.json use atomic writes]}
   wiki_setup: {category: primary, triggers: [PS 初始化 vault, 初始化 vault, 修复 vault, 重置 vault, graph visibility], skill: wiki-setup/SKILL.md, workflows: [wiki-setup/workflows/reset-repair.md], notes: [Paper Source owns bootstrap; Paper Wiki reports gaps here]}

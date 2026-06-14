@@ -1,6 +1,13 @@
 import json
 import subprocess
 
+from paper_source.artifacts import (
+    existing_paper_source_root,
+    existing_raw_paper_root,
+    existing_run_dir,
+    existing_runs_root,
+    existing_staging_paper_root,
+)
 from paper_source.paper_source_repository import cleanup_paper_source_repository, load_retention_policy, migrate_legacy_paper_source_roots
 from paper_source.wiki_init import initialize_paper_wiki
 
@@ -353,6 +360,51 @@ def test_load_retention_policy_upgrades_legacy_default_policy_without_preview_wr
     assert "meta/epi-config.yaml" not in stored["protected"]
     assert "meta/epi-config-state.json" not in stored["protected"]
     assert "lifecycle" in stored
+
+
+def test_current_path_helpers_do_not_fallback_to_retired_roots(tmp_path):
+    vault = tmp_path / "paper-research-wiki"
+    (vault / "_epi" / "raw" / "paper-a").mkdir(parents=True)
+    (vault / "_epi" / "staging" / "papers" / "paper-a").mkdir(parents=True)
+    (vault / "_epi" / "runs" / "run-a").mkdir(parents=True)
+    (vault / "_raw" / "papers" / "paper-a").mkdir(parents=True)
+    (vault / "_staging" / "papers" / "paper-a").mkdir(parents=True)
+    (vault / "_runs" / "run-a").mkdir(parents=True)
+
+    assert existing_paper_source_root(vault) == vault.resolve() / "_paper_source"
+    assert existing_raw_paper_root(vault, "paper-a") == (
+        vault.resolve() / "_paper_source" / "raw" / "paper-a"
+    )
+    assert existing_staging_paper_root(vault, "paper-a") == (
+        vault.resolve() / "_paper_source" / "staging" / "papers" / "paper-a"
+    )
+    assert existing_runs_root(vault) == vault.resolve() / "_paper_source" / "runs"
+    assert existing_run_dir(vault, "run-a") == vault.resolve() / "_paper_source" / "runs" / "run-a"
+
+
+def test_load_retention_policy_ignores_retired_epi_policy(tmp_path):
+    vault = tmp_path / "paper-research-wiki"
+    legacy_policy = vault / "_epi" / "policies" / "retention.json"
+    legacy_policy.parent.mkdir(parents=True)
+    legacy_policy.write_text(
+        json.dumps(
+            {
+                "schema_version": "paper-source-retention-policy-v1",
+                "auto_cleanup_enabled": False,
+                "max_total_files": 42,
+                "max_total_bytes": 43,
+                "protected": ["legacy-only"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    preview_policy = load_retention_policy(vault, ensure=False)
+
+    assert preview_policy["auto_cleanup_enabled"] is True
+    assert preview_policy["max_total_files"] == 3000
+    assert preview_policy["max_total_bytes"] == 1024 * 1024 * 1024
+    assert "legacy-only" not in preview_policy["protected"]
 
 
 def test_repository_cleanup_prunes_lifecycle_artifacts_even_when_under_budget(tmp_path):

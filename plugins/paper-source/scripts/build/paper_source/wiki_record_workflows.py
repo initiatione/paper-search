@@ -349,15 +349,13 @@ def record_wiki_ingest(
     notes: str | None = None,
     source_review_path: str | Path | None = None,
     from_paper_wiki_request: str | Path | None = None,
-    from_prw_request: str | Path | None = None,
 ) -> dict:
     vault_path = vault_path.resolve()
     started_at = utc_now()
-    source_request_path = from_paper_wiki_request or from_prw_request
-    if source_request_path is not None:
+    if from_paper_wiki_request is not None:
         record = create_wiki_ingest_record_from_paper_wiki_request(
             vault_path,
-            source_request_path,
+            from_paper_wiki_request,
             notes=notes,
         )
         slug = str(record.get("paper_slug") or "").strip()

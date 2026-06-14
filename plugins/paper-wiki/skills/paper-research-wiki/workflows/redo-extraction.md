@@ -10,7 +10,7 @@ If the paper is a survey/review, route `references/` writing through `../referen
 
 1. Read `../../../rules/wiki-writing-standard.md` and `../../paper-wiki-language/SKILL.md`.
 2. Resolve the target vault; read `AGENTS.md`, `_meta/schema.md`, `_meta/taxonomy.md`, and `_meta/directory-structure.md` when present.
-3. Locate `_paper_source/staging/papers/*/wiki-ingest-brief.json` as canonical; legacy `_epi/.../wiki-ingest-brief.json` is readable fallback. Task-only `wiki_deposition_task.json` means stop for Paper Source brief repair.
+3. Locate `_paper_source/staging/papers/*/wiki-ingest-brief.json` as the only Paper Source-to-Paper Wiki handoff contract.
 4. Check `paper-gate` or handoff status; stop if source artifacts are missing or human approval is the only unresolved gate.
 5. Read existing formal pages named by prior `wiki-ingest-record.json`, `final-source-review.json`, page `sources:`, or search hits in `references/`, `concepts/`, `derivations/`, `experiments/`, `synthesis/`, `reports/`, and `opportunities/`.
 
@@ -33,7 +33,7 @@ Redo work that materially changes formal claims is a material rewrite and graph-
 - Refresh manifest or `.manifest.json`, `final-source-review.json`, `index.md`, `log.md`, and `hot.md`; read previous `wiki-ingest-record.json` only as provenance and reverse-dependency evidence.
 - This is the formal knowledge maintenance layer: maintain formal page content relationships, content relationship maintenance, claim staleness, split or merge pages, reverse dependencies, evidence-tier drift, derived concepts, derivations, and synthesis.
 
-Report Paper Source record readiness. Paper Wiki records readiness; Paper Source writes or replaces `wiki-ingest-record.json` through `record-wiki-ingest`. If record-ready, write `_paper_source/staging/papers/<paper-slug>/paper-wiki-record-request.json` with `schema_version: paper-wiki-record-request-v1`, `automation_mode: ask`, final page hashes, `final-source-review.json` hash, and `record-wiki-ingest --from-paper-wiki-request ...`; Paper Wiki writes the request artifact; Paper Source consumes it. Legacy `_epi/.../prw-record-request.json` is compatibility-only. do not write human approval; Paper Source owns human approval records and `record-wiki-ingest`.
+Report Paper Source record readiness. Paper Wiki records readiness; Paper Source writes or replaces `wiki-ingest-record.json` through `record-wiki-ingest`. If record-ready, write `_paper_source/staging/papers/<paper-slug>/paper-wiki-record-request.json` with `schema_version: paper-wiki-record-request-v1`, `automation_mode: ask`, final page hashes, `final-source-review.json` hash, and `record-wiki-ingest --from-paper-wiki-request ...`; Paper Wiki writes the request artifact; Paper Source consumes it. Do not write human approval; Paper Source owns human approval records and `record-wiki-ingest`.
 
 ## Depth And Close
 

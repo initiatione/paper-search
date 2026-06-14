@@ -33,7 +33,8 @@ def test_paper_source_linkage_doc_defines_scope_pipeline_and_sync_rule():
     assert "证据强度与可信状态" in text
     assert "wiki-ingest-brief.json" in text
     assert "canonical Paper Source-to-Paper Wiki handoff" in text
-    assert "wiki_deposition_task.json is legacy" in text
+    assert "wiki_deposition_task.json` is historical cleanup only" in text
+    assert "not a new-task entrypoint" in text
     assert "Wiki 沉淀价值" in text
     assert "wiki-ingest agent" in text
     assert "Claude" in text

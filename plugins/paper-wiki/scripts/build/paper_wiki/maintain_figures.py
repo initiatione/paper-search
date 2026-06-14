@@ -74,18 +74,10 @@ def _write_text(path: Path, text: str) -> None:
 
 
 def _raw_root(vault: Path, slug: str) -> Path:
-    for root_name in ("_paper_source", "_epi"):
-        candidate = vault / root_name / "raw" / slug
-        if candidate.exists():
-            return candidate
     return vault / "_paper_source" / "raw" / slug
 
 
 def _staging_root(vault: Path, slug: str) -> Path:
-    for root_name in ("_paper_source", "_epi"):
-        candidate = vault / root_name / "staging" / "papers" / slug
-        if candidate.exists():
-            return candidate
     return vault / "_paper_source" / "staging" / "papers" / slug
 
 
@@ -593,7 +585,6 @@ def refresh_sidecars(
     staging = _staging_root(vault, slug)
     review_path = staging / "final-source-review.json"
     request_path = staging / "paper-wiki-record-request.json"
-    legacy_request_path = staging / "prw-record-request.json"
     if not review_path.exists():
         return {"changed": False, "warning": "missing final-source-review.json"}
 
@@ -613,7 +604,6 @@ def refresh_sidecars(
     review_hash = _sha256(review_path)
 
     request_changed = False
-    legacy_request_changed = False
     if request_path.exists():
         request = _read_json(request_path)
         _refresh_page_hashes(request, page_records)
@@ -628,27 +618,12 @@ def refresh_sidecars(
         request.setdefault("final_source_review", {})["sha256"] = review_hash
         _write_json(request_path, request)
         request_changed = True
-    if legacy_request_path.exists():
-        legacy_request = _read_json(legacy_request_path)
-        _refresh_page_hashes(legacy_request, page_records)
-        task = legacy_request.setdefault("prw_task", {})
-        task["route"] = "maintain_figures"
-        task["snapshot"] = snapshot
-        task["refreshed_at"] = _utc_now()
-        task["summary"] = (
-            "Legacy PRW request refreshed during figure maintenance; regenerate the canonical "
-            "paper-wiki-record-request.json when the staging bundle is migrated."
-        )
-        legacy_request.setdefault("final_source_review", {})["sha256"] = review_hash
-        _write_json(legacy_request_path, legacy_request)
-        legacy_request_changed = True
 
     return {
         "changed": True,
         "final_source_review": str(review_path),
         "final_source_review_sha256": review_hash,
         "paper_wiki_record_request_changed": request_changed,
-        "legacy_prw_record_request_changed": legacy_request_changed,
     }
 
 

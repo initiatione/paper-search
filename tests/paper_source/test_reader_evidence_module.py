@@ -123,7 +123,7 @@ def test_reader_evidence_module_validates_claim_support_statuses(tmp_path):
     assert evidence == ["Validated 3 claim-support record(s) across 3 support status(es)"]
 
 
-def test_reader_evidence_module_accepts_legacy_schema_versions(tmp_path):
+def test_reader_evidence_module_rejects_legacy_schema_versions(tmp_path):
     paper_root = _write_reader_evidence_fixture(tmp_path)
     reader_dir = paper_root / "reader"
     evidence_map_path = reader_dir / "evidence-map.json"
@@ -138,8 +138,8 @@ def test_reader_evidence_module_accepts_legacy_schema_versions(tmp_path):
     map_passed, _ = validate_evidence_map(paper_root)
     support_passed, _ = validate_claim_support_map(paper_root, required=True)
 
-    assert map_passed is True
-    assert support_passed is True
+    assert map_passed is False
+    assert support_passed is False
 
 
 def test_reader_evidence_module_validates_tex_manifest_and_pdf_sources(tmp_path):

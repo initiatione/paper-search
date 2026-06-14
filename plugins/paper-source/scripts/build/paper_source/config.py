@@ -8,8 +8,6 @@ from pathlib import Path
 from typing import Any
 
 from paper_source.artifacts import (
-    legacy_epi_root,
-    legacy_meta_root,
     paper_source_meta_root,
     runs_root,
     utc_now,
@@ -118,22 +116,6 @@ def config_paths(vault_path: Path) -> PaperSourceConfigPaths:
         state_path=meta_dir / "paper-source-config-state.json",
         history_dir=meta_dir / "config-history",
     )
-
-
-def legacy_config_paths(vault_path: Path) -> list[Path]:
-    return [
-        paper_source_meta_root(vault_path) / "epi-config.yaml",
-        legacy_epi_root(vault_path) / "meta" / "epi-config.yaml",
-        legacy_meta_root(vault_path) / "epi-config.yaml",
-    ]
-
-
-def legacy_state_paths(vault_path: Path) -> list[Path]:
-    return [
-        paper_source_meta_root(vault_path) / "epi-config-state.json",
-        legacy_epi_root(vault_path) / "meta" / "epi-config-state.json",
-        legacy_meta_root(vault_path) / "epi-config-state.json",
-    ]
 
 
 def _parse_yaml_scalar(raw: str) -> Any:
@@ -378,32 +360,21 @@ def load_wiki_config(vault_path: Path) -> dict[str, Any] | None:
     paths = config_paths(vault_path)
     if paths.config_path.exists():
         return _parse_simple_yaml(paths.config_path)
-    for legacy_config_path in legacy_config_paths(vault_path):
-        if legacy_config_path.exists():
-            return _parse_simple_yaml(legacy_config_path)
     return None
 
 
 def config_status(vault_path: Path) -> dict[str, Any]:
     paths = config_paths(vault_path)
-    legacy_config_path = next((path for path in legacy_config_paths(vault_path) if path.exists()), legacy_config_paths(vault_path)[-1])
-    legacy_state_path = next((path for path in legacy_state_paths(vault_path) if path.exists()), legacy_state_paths(vault_path)[-1])
-    config_path = paths.config_path if paths.config_path.exists() or not legacy_config_path.exists() else legacy_config_path
-    state_path = paths.state_path if paths.state_path.exists() or not legacy_state_path.exists() else legacy_state_path
     state: dict[str, Any] = {}
-    if state_path.exists():
-        state = json.loads(state_path.read_text(encoding="utf-8"))
-    configured = config_path.exists() and state.get("configured", True) is not False
+    if paths.state_path.exists():
+        state = json.loads(paths.state_path.read_text(encoding="utf-8"))
+    configured = paths.config_path.exists() and state.get("configured", True) is not False
     return {
         "configured": configured,
         "needs_onboarding": not configured,
-        "config_path": str(config_path),
-        "state_path": str(state_path),
+        "config_path": str(paths.config_path),
+        "state_path": str(paths.state_path),
         "history_dir": str(paths.history_dir),
-        "current_config_path": str(paths.config_path),
-        "legacy_config_path": str(legacy_config_path),
-        "legacy_config_paths": [str(path) for path in legacy_config_paths(vault_path)],
-        "legacy_config_present": legacy_config_path.exists(),
         "state": state,
     }
 
@@ -533,7 +504,6 @@ def recover_config_candidates(vault_path: Path, *, backup_root: Path | None = No
     search_roots = [
         ("current", 0, paths.config_path),
         ("config-history", 10, paths.history_dir),
-        ("legacy-config-history", 20, paths.meta_dir / "epi-config-history"),
     ]
     if backup_root is not None:
         search_roots.append(("provided-backup-root", 30, backup_root))
@@ -549,8 +519,11 @@ def recover_config_candidates(vault_path: Path, *, backup_root: Path | None = No
         paths_to_check = [root] if root.is_file() else sorted(root.rglob("*.yaml"))
         for candidate_path in paths_to_check:
             resolved = candidate_path.resolve()
-            allowed_config_names = {"paper-source-config.yaml", "epi-config.yaml"}
-            if resolved in seen or (resolved.name not in allowed_config_names and not resolved.name.endswith(".yaml")):
+            if resolved in seen:
+                continue
+            if resolved.name == "epi-config.yaml" or "epi-config-history" in resolved.parts:
+                continue
+            if not resolved.name.endswith(".yaml"):
                 continue
             seen.add(resolved)
             summary = _config_candidate_summary(resolved, source_type=source_type, priority=priority)
@@ -652,8 +625,3 @@ def load_config(plugin_root: Path, vault_path: Path, max_results: int | None) ->
         easyscholar_cache_ttl_days=int(easyscholar.get("cache_ttl_days", 30)),
         easyscholar_max_candidates_per_run=int(easyscholar.get("max_candidates_per_run", 50)),
     )
-
-
-# Legacy aliases retained for old imports.
-EpiConfigPaths = PaperSourceConfigPaths
-DEFAULT_EPI_CONFIG = DEFAULT_PAPER_SOURCE_CONFIG

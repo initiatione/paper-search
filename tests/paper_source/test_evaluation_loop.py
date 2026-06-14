@@ -12,22 +12,22 @@ def _write_json(path: Path, payload: dict) -> Path:
     return path
 
 
-def test_improvement_brief_accepts_legacy_quality_gate_metric_alias(tmp_path):
+def test_improvement_brief_ignores_retired_quality_gate_metric_names(tmp_path):
     metric_pack = _write_json(
         tmp_path / "paper-source-quality-gates.json",
         {"metrics": [{"id": "epi-quality-gate-pass-rate", "value": 1.0}]},
     )
 
     brief = build_improvement_brief(
-        brief_id="brief-legacy-metric-alias",
+        brief_id="brief-retired-metric-name",
         target_asset="templates/ranking.example.yaml",
-        rationale="Read old metric pack reports while writing current Paper Source metric ids.",
+        rationale="Do not treat retired metric names as current Paper Source quality evidence.",
         proposed_change={"weights": {"topic_relevance": 0.41}},
         before_metrics={"paper-source-quality-gate-pass-rate": 0.75},
         metric_pack_path=metric_pack,
     )
 
-    assert brief["after_metrics"]["paper-source-quality-gate-pass-rate"] == 1.0
+    assert "paper-source-quality-gate-pass-rate" not in brief["after_metrics"]
     assert "epi-quality-gate-pass-rate" not in brief["after_metrics"]
 
 

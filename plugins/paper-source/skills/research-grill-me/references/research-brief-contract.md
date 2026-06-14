@@ -103,4 +103,4 @@ python scripts\orchestrator.py dry-run --from-brief <research-brief.json> --vaul
 
 Research Briefs override Research Profile for the current task, but they are not Paper Wiki handoffs. They must not write Paper Wiki formal pages directly from a Research Brief. Formal wiki work still goes through source-staging, `wiki-ingest-brief.json`, approval, and Paper Wiki.
 
-Use current terms: Paper Source and Paper Wiki. Old EPI/PRW names are legacy-only if an existing artifact uses them. Paper Source uses `paper-search-mcp`; avoid legacy or alternate backend names.
+Use current terms: Paper Source and Paper Wiki. Retired names may appear only when quoting historical artifacts. Paper Source uses `paper-search-mcp`; avoid legacy or alternate backend names.

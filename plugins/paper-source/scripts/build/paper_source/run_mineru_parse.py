@@ -10,8 +10,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from paper_source.artifacts import file_sha256, utc_now, write_json_atomic, write_text_atomic
-from paper_source.artifacts import LEGACY_EPI_ROOT_NAME, PAPER_SOURCE_ROOT_NAME
+from paper_source.artifacts import PAPER_SOURCE_ROOT_NAME, file_sha256, utc_now, write_json_atomic, write_text_atomic
 from paper_source.asset_normalization import count_preserved_images, normalize_mineru_assets
 from paper_source.evidence_index import build_paper_evidence_index
 from paper_source.runtime_config import apply_runtime_config
@@ -24,7 +23,7 @@ def _plugin_root() -> Path:
 
 def _command_tokens(command: str | Sequence[str] | None, plugin_root: Path) -> list[str]:
     if command is None:
-        command = os.environ.get("PAPER_SOURCE_MINERU_COMMAND") or os.environ.get("EPI_MINERU_COMMAND")
+        command = os.environ.get("PAPER_SOURCE_MINERU_COMMAND")
     if command is None:
         bundled = plugin_root / "skills" / "mineru-paper-parser" / "scripts" / "mineru_batch_to_md.py"
         return [sys.executable, str(bundled)] if bundled.exists() else ["mineru_batch_to_md.py"]
@@ -248,7 +247,7 @@ def _resolve_mineru_timeout(timeout_seconds: int | None) -> int:
 
     if isinstance(timeout_seconds, int) and not isinstance(timeout_seconds, bool) and timeout_seconds > 0:
         return timeout_seconds
-    raw = os.environ.get("PAPER_SOURCE_MINERU_TIMEOUT") or os.environ.get("EPI_MINERU_TIMEOUT")
+    raw = os.environ.get("PAPER_SOURCE_MINERU_TIMEOUT")
     if raw is not None:
         try:
             value = int(str(raw).strip())
@@ -261,7 +260,7 @@ def _resolve_mineru_timeout(timeout_seconds: int | None) -> int:
 
 def _vault_path_from_paper_root(paper_root: Path) -> Path | None:
     parts = paper_root.resolve().parts
-    if len(parts) >= 3 and parts[-3] in {PAPER_SOURCE_ROOT_NAME, LEGACY_EPI_ROOT_NAME} and parts[-2] == "raw":
+    if len(parts) >= 3 and parts[-3] == PAPER_SOURCE_ROOT_NAME and parts[-2] == "raw":
         return Path(*parts[:-3])
     return None
 

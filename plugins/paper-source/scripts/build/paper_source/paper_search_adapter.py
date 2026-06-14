@@ -349,17 +349,11 @@ def _split_command_line(command_line: str) -> list[str]:
 
 
 def _paper_search_mcp_disabled() -> bool:
-    return (
-        os.environ.get("PAPER_SOURCE_PAPER_SEARCH_MCP_DISABLED")
-        or os.environ.get("EPI_PAPER_SEARCH_MCP_DISABLED", "")
-    ).strip().lower() in {"1", "true", "yes", "on"}
+    return os.environ.get("PAPER_SOURCE_PAPER_SEARCH_MCP_DISABLED", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _mcp_empty_fallback_enabled() -> bool:
-    return (
-        os.environ.get("PAPER_SOURCE_PAPER_SEARCH_MCP_EMPTY_FALLBACK")
-        or os.environ.get("EPI_PAPER_SEARCH_MCP_EMPTY_FALLBACK", "1")
-    ).strip().lower() not in {
+    return os.environ.get("PAPER_SOURCE_PAPER_SEARCH_MCP_EMPTY_FALLBACK", "1").strip().lower() not in {
         "0",
         "false",
         "no",
@@ -368,11 +362,9 @@ def _mcp_empty_fallback_enabled() -> bool:
 
 
 def _mcp_command_tokens(command: str | None = None) -> list[str]:
-    selected_command = command or os.environ.get("PAPER_SOURCE_PAPER_SEARCH_MCP_COMMAND") or os.environ.get(
-        "EPI_PAPER_SEARCH_MCP_COMMAND"
-    )
+    selected_command = command or os.environ.get("PAPER_SOURCE_PAPER_SEARCH_MCP_COMMAND")
     tokens = _split_command_line(selected_command) if selected_command else list(DEFAULT_MCP_COMMAND_ARGS)
-    extra_args = os.environ.get("PAPER_SOURCE_PAPER_SEARCH_MCP_ARGS") or os.environ.get("EPI_PAPER_SEARCH_MCP_ARGS")
+    extra_args = os.environ.get("PAPER_SOURCE_PAPER_SEARCH_MCP_ARGS")
     if extra_args:
         tokens.extend(_split_command_line(extra_args))
     return tokens
@@ -1075,9 +1067,7 @@ def discover(
                     "raw_response": mcp_result.get("raw_response", {}),
                 },
             }
-    selected_command = command or os.environ.get("PAPER_SOURCE_PAPER_SEARCH_COMMAND") or os.environ.get(
-        "EPI_PAPER_SEARCH_COMMAND"
-    ) or "paper-search"
+    selected_command = command or os.environ.get("PAPER_SOURCE_PAPER_SEARCH_COMMAND") or "paper-search"
     probe = probe_paper_search_mcp(selected_command)
     if not probe["available"]:
         return {
@@ -1406,9 +1396,7 @@ def download_paper_pdf(
             "error": "paper-search MCP download produced no PDF",
             "raw_response": mcp_result.get("raw_response", {}),
         }
-    selected_command = command or os.environ.get("PAPER_SOURCE_PAPER_SEARCH_COMMAND") or os.environ.get(
-        "EPI_PAPER_SEARCH_COMMAND"
-    ) or "paper-search"
+    selected_command = command or os.environ.get("PAPER_SOURCE_PAPER_SEARCH_COMMAND") or "paper-search"
     probe = probe_paper_search_mcp(selected_command)
     if not probe["available"]:
         return {
@@ -1564,9 +1552,7 @@ def read_paper_preview(
             "error": "paper-search MCP read preview produced no meaningful text",
         }
 
-    selected_command = command or os.environ.get("PAPER_SOURCE_PAPER_SEARCH_COMMAND") or os.environ.get(
-        "EPI_PAPER_SEARCH_COMMAND"
-    ) or "paper-search"
+    selected_command = command or os.environ.get("PAPER_SOURCE_PAPER_SEARCH_COMMAND") or "paper-search"
     probe = probe_paper_search_mcp(selected_command)
     if not probe["available"]:
         return {

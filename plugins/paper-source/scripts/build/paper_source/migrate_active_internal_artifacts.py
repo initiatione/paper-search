@@ -134,7 +134,7 @@ STRING_REPLACEMENTS = (
     ),
     (
         "canonical paper wiki workflow layer for EPI source bundles; epi-paper-deposition remains compatibility adapter",
-        "canonical paper wiki workflow layer for Paper Source source bundles; paper-source-paper-deposition remains compatibility adapter",
+        "canonical paper wiki workflow layer for Paper Source source bundles; paper-source-paper-deposition is a historical cleanup entry",
     ),
     (
         "PRW refreshed formal pages/provenance under Paper Wiki 0.2.1 rules. EPI should consume this request with record-wiki-ingest after user approval.",

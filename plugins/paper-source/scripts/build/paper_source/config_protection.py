@@ -8,8 +8,5 @@ CONFIG_RESTORE_CONFIRMATION = "确认恢复 Paper Source config"
 PROTECTED_META_NAMES = {
     "paper-source-config.yaml",
     "paper-source-config-state.json",
-    "epi-config.yaml",
-    "epi-config-state.json",
     "config-history",
-    "epi-config-history",
 }

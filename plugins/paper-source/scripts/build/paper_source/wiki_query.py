@@ -29,17 +29,25 @@ FORMAL_PAGE_ROOTS = (
 WIKILINK_PATTERN = re.compile(r"(?<!!)\[\[([^\]]+)\]\]")
 TOKEN_PATTERN = re.compile(r"[a-z0-9]+|[\u4e00-\u9fff]{2,}", re.IGNORECASE)
 RAW_PAPER_PATH_PATTERN = re.compile(
-    rf"(?:{re.escape(PAPER_SOURCE_ROOT_NAME)}|{re.escape(LEGACY_EPI_ROOT_NAME)})/raw/(?P<slug>[^/\]\|\s)]+)/paper\.pdf",
+    rf"{re.escape(PAPER_SOURCE_ROOT_NAME)}/raw/(?P<slug>[^/\]\|\s)]+)/paper\.pdf",
     re.IGNORECASE,
 )
 
 INTERNAL_SOURCE_PREFIXES = (f"{PAPER_SOURCE_ROOT_NAME}/", f"{LEGACY_EPI_ROOT_NAME}/")
 RAW_PAPER_URI_PATTERN = re.compile(
-    rf"file=(?:{re.escape(PAPER_SOURCE_ROOT_NAME)}|{re.escape(LEGACY_EPI_ROOT_NAME)})%2Fraw%2F(?P<slug>[^%/)]+)%2Fpaper\.pdf",
+    rf"file={re.escape(PAPER_SOURCE_ROOT_NAME)}%2Fraw%2F(?P<slug>[^%/)]+)%2Fpaper\.pdf",
+    re.IGNORECASE,
+)
+LEGACY_RAW_PAPER_URI_PATTERN = re.compile(
+    rf"file={re.escape(LEGACY_EPI_ROOT_NAME)}%2Fraw%2F(?P<slug>[^%/)]+)%2Fpaper\.pdf",
     re.IGNORECASE,
 )
 SOURCE_PDF_MARKDOWN_LINK_PATTERN = re.compile(
-    rf"\[(?P<label>[^\]\n]+)\]\(obsidian://open\?[^)\n]*file=(?P<root>{re.escape(PAPER_SOURCE_ROOT_NAME)}|{re.escape(LEGACY_EPI_ROOT_NAME)})%2Fraw%2F(?P<slug>[^%/)]+)%2Fpaper\.pdf(?:[&#][^)\n]*)?\)",
+    rf"\[(?P<label>[^\]\n]+)\]\(obsidian://open\?[^)\n]*file=(?P<root>{re.escape(PAPER_SOURCE_ROOT_NAME)})%2Fraw%2F(?P<slug>[^%/)]+)%2Fpaper\.pdf(?:[&#][^)\n]*)?\)",
+    re.IGNORECASE,
+)
+LEGACY_SOURCE_PDF_MARKDOWN_LINK_PATTERN = re.compile(
+    rf"\[(?P<label>[^\]\n]+)\]\(obsidian://open\?[^)\n]*file={re.escape(LEGACY_EPI_ROOT_NAME)}%2Fraw%2F(?P<slug>[^%/)]+)%2Fpaper\.pdf(?:[&#][^)\n]*)?\)",
     re.IGNORECASE,
 )
 
@@ -196,10 +204,12 @@ def _source_evidence_values(page: dict) -> list[tuple[str, str]]:
     body = str(page.get("body") or "")
     values.extend(_raw_paper_paths_from_text(body))
 
-    # Legacy compatibility only: old formal pages sometimes stored source PDFs as
-    # internal wikilinks. They remain readable evidence inputs but are correction
-    # candidates under the new frontmatter contract.
+    # Current-root internal PDF wikilinks can be parsed as evidence inputs, but
+    # they are correction candidates under the frontmatter contract. Retired
+    # roots are reported by repair checks and are not used as evidence fallback.
     for link in page.get("links", []):
+        if str(link).startswith(f"{LEGACY_EPI_ROOT_NAME}/"):
+            continue
         raw_path = _raw_paper_path_from_source(str(link))
         if raw_path:
             values.append((raw_path, str(link)))
@@ -537,6 +547,7 @@ def _source_frontmatter_corrections(vault_path: Path, pages: dict[str, dict], se
                     or source.startswith("_epi/")
                     or "_paper_source/raw/" in source
                     or "_epi/raw/" in source
+                    or "_epi%2fraw" in source.casefold()
                     or "paper.pdf" in source.casefold()
                 ):
                     message = (
@@ -602,6 +613,15 @@ def _source_frontmatter_corrections(vault_path: Path, pages: dict[str, dict], se
                         "message": "Body source PDF link text must be the source paper title, not `原论文 PDF`.",
                     }
                 )
+        for match in LEGACY_SOURCE_PDF_MARKDOWN_LINK_PATTERN.finditer(body_text):
+            corrections.append(
+                {
+                    "kind": "source_pdf_body_link_missing",
+                    "source": relative,
+                    "target": match.group(0),
+                    "message": "Body source PDF link must use canonical _paper_source/raw/<slug>/paper.pdf, not retired _epi links.",
+                }
+            )
         for raw_path in body_source_paths:
             if not (vault_path / raw_path).is_file():
                 corrections.append(

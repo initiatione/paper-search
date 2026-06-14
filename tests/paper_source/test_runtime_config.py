@@ -54,7 +54,7 @@ def test_plugin_mcp_registration_uses_runtime_config_launcher():
     assert (plugin_root / "scripts" / "paper_search_mcp_launcher.cmd").exists()
 
 
-def test_windows_cmd_launcher_is_cache_compatibility_only():
+def test_windows_cmd_launcher_uses_current_environment_names_only():
     plugin_root = Path(__file__).resolve().parents[2] / "plugins" / "paper-source"
     cmd_launcher = (plugin_root / "scripts" / "paper_search_mcp_launcher.cmd").read_text(encoding="utf-8")
 
@@ -67,13 +67,13 @@ def test_windows_cmd_launcher_is_cache_compatibility_only():
         "PAPER_SOURCE_PAPER_SEARCH_MCP_LAUNCHER_DEBUG_LOG",
     ]:
         assert current_name in cmd_launcher
-    for legacy_name in [
+    for old_name in [
         "EPI_RUNTIME_CONFIG",
         "EPI_PAPER_SEARCH_MCP_LAUNCHER_PYTHON",
         "EPI_PAPER_SEARCH_MCP_COMMAND",
         "EPI_PAPER_SEARCH_MCP_LAUNCHER_DEBUG_LOG",
     ]:
-        assert legacy_name in cmd_launcher
+        assert old_name not in cmd_launcher
 
 
 def test_paper_search_mcp_launcher_detects_installed_python_when_configured_python_lacks_package(

@@ -1,6 +1,6 @@
 # Extract Papers
 
-Use when the user asks to extract, process, or deposit Paper Source-collected papers. `epi` is only a legacy alias for Paper Source.
+Use when the user asks to extract, process, or deposit Paper Source-collected papers.
 
 This workflow adapts Ar9av/obsidian-wiki `wiki-ingest`: Do not summarize papers in isolation; distill and integrate source-grounded paper knowledge into the existing wiki graph.
 
@@ -8,11 +8,11 @@ Before planning or writing, read `../../../rules/wiki-writing-standard.md`, `../
 
 ## Preflight
 
-1. Resolve the target vault and check Paper Source `wiki-setup` bootstrap: core `_paper_source` roots, `_meta/`, `.obsidian`, `.git`, and seven formal roots. If missing core vault structure blocks safe work, stop and point to Paper Source `wiki-setup`; Paper Wiki does not initialize or reset. Legacy `_epi/` and on-demand `_paper_source/runs|cache|tmp|tmp-manual-pdfs|quarantine|evolution` are not bootstrap requirements.
+1. Resolve the target vault and check Paper Source `wiki-setup` bootstrap: core `_paper_source` roots, `_meta/`, `.obsidian`, `.git`, and seven formal roots. If missing core vault structure blocks safe work, stop and point to Paper Source `wiki-setup`; Paper Wiki does not initialize or reset. On-demand `_paper_source/runs|cache|tmp|tmp-manual-pdfs|quarantine|evolution` are not bootstrap requirements.
 2. Read target `AGENTS.md`, `_meta/schema.md`, `_meta/taxonomy.md`, and `_meta/directory-structure.md` when present.
-3. Locate `_paper_source/staging/papers/*/wiki-ingest-brief.json` as the canonical handoff; legacy `_epi/staging/papers/*/wiki-ingest-brief.json` is readable fallback.
-4. Do not treat task-only legacy handoffs as ready. Treat `_paper_source/staging/papers/*/wiki_deposition_task.json` and legacy `_epi/.../wiki_deposition_task.json` as compatibility artifacts that need Paper Source brief repair.
-5. Group papers as ready, needs human approval, blocked, already recorded, or legacy-needs-brief-repair.
+3. Locate `_paper_source/staging/papers/*/wiki-ingest-brief.json` as the only Paper Source-to-Paper Wiki handoff contract.
+4. Treat Paper Source handoffs as paper-level deduplicated before they reach Paper Wiki; do graph-level merge-before-create against existing formal pages instead of paper deduplication.
+5. Group papers as ready, needs human approval, blocked-source-artifacts, or graph-conflict.
 6. For ready papers, read metadata, MinerU Markdown, images, manifest, figure/formula indexes, reading report, and `wiki-ingest-brief.json`; use PDF, indexes, and image evidence only as fallback when MinerU Markdown is missing, wrong, ambiguous, or insufficient. Non-empty native `mineru/paper.tex` is optional cross-check only.
 
 ## Plan
@@ -25,7 +25,7 @@ Read manifest or `.manifest.json`, `index.md`, `log.md`, and `hot.md`; search ex
 2. Preserve support status, evidence addresses, formula/figure grounding, and `relationships:` only when direction/type are clear.
 3. Frontmatter `sources:` must be title-display Markdown links to canonical source PDFs. `references/ pages` use exactly one source PDF link: `[<paper title>](obsidian://open?vault=<vault>&file=_paper_source%2Fraw%2F<slug>%2Fpaper.pdf)`. Non-reference families use one or more title-display source PDF links for materially used papers.
 4. Use `_paper_source/raw/<slug>/paper.pdf`, no `papers/` segment. In `## 原文与证据入口`, use the same canonical PDF URI with the paper title as clickable text, not `原论文 PDF`.
-5. Do not write `[[...]]` wikilinks, legacy `_epi` links, plain/relative PDF paths, DOI/arXiv URLs, GitHub URLs, metadata paths, MinerU paths, or figure paths in frontmatter `sources`. Do not write `[[...]]` wikilinks to `_paper_source/` from frontmatter or formal-page body links.
+5. Do not write `[[...]]` wikilinks, plain/relative PDF paths, DOI/arXiv URLs, GitHub URLs, metadata paths, MinerU paths, or figure paths in frontmatter `sources`. Do not write `[[...]]` wikilinks to `_paper_source/` from frontmatter or formal-page body links.
 6. Link only to existing formal pages; keep internal evidence paths as URI, file URL, code, or plain text.
 7. Write or update `final-source-review.json`.
 8. Run `workflows/check-wiki.md` after writing as the post-task check.

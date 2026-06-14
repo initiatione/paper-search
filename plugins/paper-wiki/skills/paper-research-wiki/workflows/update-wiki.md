@@ -13,7 +13,7 @@ Use this lightweight path only when metadata changes do not alter claims, formul
 1. Confirm the formal page and source paper identity are unchanged.
 2. Verify against Paper Source artifacts such as `_paper_source/raw/<slug>/code-verification.json`, metadata, or prior source review; otherwise do one targeted repository/DOI/arXiv check and report whether the code was run locally.
 3. Add a verified `github:` property only when supported. Preserve `sources:` as title-display Markdown links to the canonical source PDFs; repository links belong in `github:` or body evidence.
-4. do not add GitHub, DOI, arXiv, README, metadata, MinerU paths, figure paths, plain/relative PDF paths, legacy `_epi` links, internal wikilinks, or non-PDF URLs to frontmatter `sources:`.
+4. do not add GitHub, DOI, arXiv, README, metadata, MinerU paths, figure paths, plain/relative PDF paths, internal wikilinks, or non-PDF URLs to frontmatter `sources:`.
 5. Do not automatically run the full graph-aware rewrite path, dependent-page rewrite, `final-source-review.json` refresh, or `paper-wiki-record-request.json` creation. Escalate to Graph-Aware Rewrite only if the metadata changes a claim, evidence boundary, relationship, lifecycle, or downstream synthesis.
 6. Still run a targeted post-task check for frontmatter validity, changed paths, source PDF link preservation, and next Paper Source/Paper Wiki action.
 
@@ -29,7 +29,7 @@ Use for material rewrite work. A graph-aware rewrite treats the target page and 
 6. Create a new `derivations/` or `concepts/` node when reusable knowledge would otherwise stay trapped in one reference page.
 7. Refresh manifest or `.manifest.json`, `final-source-review.json`, `index.md`, `log.md`, and `hot.md`; read previous `wiki-ingest-record.json` only as provenance and reverse-dependency evidence.
 8. Report Paper Source record readiness. Paper Wiki records readiness; Paper Source writes or replaces `wiki-ingest-record.json` through `record-wiki-ingest`. If pages are record-ready, write `_paper_source/staging/papers/<paper-slug>/paper-wiki-record-request.json` with `schema_version: paper-wiki-record-request-v1`, `automation_mode: ask`, final page hashes, `final-source-review.json` hash, and `record-wiki-ingest --from-paper-wiki-request ...`; Paper Wiki writes the request artifact; Paper Source consumes it.
-9. Run or report `qmd update` and `qmd embed`; confirm `_paper_source/` and legacy `_epi/` remain outside the formal graph/index.
+9. Run or report `qmd update` and `qmd embed`; confirm `_paper_source/` remains outside the formal graph/index.
 
 Graph-aware updates also operate as the formal knowledge maintenance layer: maintain formal page content relationships, content relationship maintenance, claim staleness, split or merge pages, reverse dependencies, evidence-tier drift, derived concepts, derivations, and synthesis.
 

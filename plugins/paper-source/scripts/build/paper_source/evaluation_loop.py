@@ -28,9 +28,10 @@ NON_REGRESSION_METRICS = [
     "benchmark_pass_rate",
 ]
 BENCHMARK_CASE_STATUSES = {"pass", "fail", "skip", "warning"}
-LEGACY_METRIC_ALIASES = {
-    "epi-quality-gate-pass-rate": "paper-source-quality-gate-pass-rate",
-    "epi_quality_gate_pass_rate": "paper-source-quality-gate-pass-rate",
+# Retired metric ids are ignored so historical reports cannot satisfy current gates.
+RETIRED_METRIC_NAMES = {
+    "epi-quality-gate-pass-rate",
+    "epi_quality_gate_pass_rate",
 }
 
 
@@ -52,15 +53,18 @@ def _coerce_number(value: Any) -> float | None:
         return None
 
 
-def _normalize_metric_name(name: str) -> str:
+def _normalize_metric_name(name: str) -> str | None:
     normalized = name.strip().replace(" ", "_")
-    return LEGACY_METRIC_ALIASES.get(normalized, normalized)
+    if normalized in RETIRED_METRIC_NAMES:
+        return None
+    return normalized
 
 
 def _collect_metric(metrics: dict[str, Any], name: str, value: Any) -> None:
     number = _coerce_number(value)
-    if number is not None:
-        metrics[_normalize_metric_name(name)] = number
+    normalized_name = _normalize_metric_name(name)
+    if normalized_name is not None and number is not None:
+        metrics[normalized_name] = number
 
 
 def extract_metrics(payload: dict[str, Any], *, source_kind: str = "generic") -> dict[str, float]:

@@ -2,9 +2,23 @@
 
 Use `doctor --json` when install, dependency, or vault state is unclear.
 
-命名说明：Paper Source 是本插件的用户可见名，当前 machine-facing name 是 `paper-source`；`epi` 只作为 pre-Stage-2 legacy alias 和旧 artifact/schema 兼容词保留。Paper Wiki 是 sibling wiki 插件的用户可见名，当前 machine-facing name 是 `paper-wiki`；`prw` 只作为 pre-Stage-2 legacy alias 和旧 artifact/schema 兼容词保留。PS/PW 只是自然语言别名，不新增 dollar-prefixed plugin or skill entrypoint。
+命名说明：Paper Source 是本插件的用户可见名，machine-facing name 是 `paper-source`。Paper Wiki 是 sibling wiki 插件的用户可见名，machine-facing name 是 `paper-wiki`。PS/PW 只是自然语言短称，不新增 dollar-prefixed plugin or skill entrypoint；旧别名不再作为用户入口或路由触发条件。
 
 中文总览入口见 `docs/overview.zh.md`；主链路和维护契约见 `docs/paper-source-linkage.md`。本文档是安装后短入口，不复制完整 runbook。
+
+## User Golden Path
+
+日常使用优先走这条主线：
+
+1. `doctor --json` 检查安装、依赖和 vault 状态；配置缺失时先完成 `config-setup`。
+2. 方向模糊时先生成 Research Brief；方向明确时运行 `dry-run --query "<your topic>" --max-results 20 --vault <vault> --json`。
+3. 用 `report --run-id <run-id> --vault <vault>` 查看推荐优先级；持续追踪、net-new、coverage 和 backlog 交给 `topic-tracking` / `research-queue`。
+4. 用 `prepare-ranked --run-id <run-id> --max-papers 10 --skip-existing --vault <vault> --json` 推进高价值论文到 source-staging。
+5. 先读一份中文 approval report；同意后运行 `record-human-approval`，再用 `wiki-ingest-trigger` 生成 wiki agent resume package。
+6. 由 Paper Wiki `$paper-research-wiki` 或当前 wiki-capable agent 消费 `wiki-ingest-brief.json`，写正式页面和 `final-source-review.json`。
+7. 最后运行 `record-wiki-ingest`，让 Paper Source 记录最终页路径、hash、source review 和可选 Zotero sidecar。
+
+新任务只使用 `wiki-ingest-brief.json` 作为 handoff。`wiki_deposition_task.json` 只属于历史残留清理，不是黄金路径的一步。
 
 ## Skill-Based Routing And Task Closure
 
@@ -68,9 +82,9 @@ Before recording approval, show one single human-readable 人工确认报告 / a
 
 Record pre-write approval with `record-human-approval --scope run-wiki-ingest-agent`; it writes `human-approval.json` and lets `wiki-ingest-handoff` show `ready_for_agent=true`. `wiki-ingest-trigger` writes a resume package for the current Claude, Codex, or other wiki-capable agent; it does not write final pages.
 
-After Paper Wiki or another wiki-capable agent writes final pages and `final-source-review.json`, run `record-wiki-ingest`. Paper Wiki writes `paper-wiki-record-request.json` in ask-mode automation; Paper Source consumes it with `record-wiki-ingest --from-paper-wiki-request`, validates live page hashes, and writes or replaces `wiki-ingest-record.json`. Legacy `prw-record-request.json` and `--from-prw-request` remain accepted only for existing artifacts.
+After Paper Wiki or another wiki-capable agent writes final pages and `final-source-review.json`, run `record-wiki-ingest`. Paper Wiki writes `paper-wiki-record-request.json` in ask-mode automation; Paper Source consumes it with `record-wiki-ingest --from-paper-wiki-request`, validates live page hashes, and writes or replaces `wiki-ingest-record.json`.
 
-If a prior completion is corrected as `premature-wiki-ingest-record`, Paper Wiki repairs pages and `final-source-review.json`; Paper Source writes or replaces `wiki-ingest-record.json` when the correction becomes `paper-wiki-reviewed-ready-for-paper-source-record`. Legacy `prw-reviewed-ready-for-epi-record` remains accepted only as an old status label.
+If a prior completion is corrected as `premature-wiki-ingest-record`, Paper Wiki repairs pages and `final-source-review.json`; Paper Source writes or replaces `wiki-ingest-record.json` when the correction becomes `paper-wiki-reviewed-ready-for-paper-source-record`.
 
 ## Read-Only Wiki Ask
 
@@ -90,4 +104,4 @@ Quality gates require Obsidian wikilinks, source bundle paths, `provenance.extra
 
 `final-source-review.json` must still record `theory_reconstruction`, `formula_derivation`, `figure_table_evidence`, `novelty_type`, `implementability`, `reproducibility_risk`, `research_gap`, and `cost_level`. Novelty review separates author-claimed novelty from Paper Source-confirmed novelty.
 
-`wiki-ingest-brief.json` is the canonical Paper Source-to-Paper Wiki handoff. New staging does not require `wiki_deposition_task.json`; `wiki_deposition_task.json is legacy` compatibility only. The next formal write step is Paper Wiki `$paper-research-wiki`, while Paper Source keeps ownership of `paper-gate`, human approval, `wiki-ingest-trigger`, and `record-wiki-ingest`. `paper-source-paper-deposition` remains the compatibility adapter, and external wiki skills are optional helpers / policy references.
+`wiki-ingest-brief.json` is the canonical Paper Source-to-Paper Wiki handoff. New staging does not require or generate `wiki_deposition_task.json`. The next formal write step is Paper Wiki `$paper-research-wiki`, while Paper Source keeps ownership of `paper-gate`, human approval, `wiki-ingest-trigger`, and `record-wiki-ingest`. `paper-source-paper-deposition` is only for historical handoff cleanup, and external wiki skills are optional helpers / policy references.

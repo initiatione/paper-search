@@ -85,21 +85,19 @@ def test_current_docs_do_not_use_pre_stage2_plugin_paths_as_live_paths():
     assert offenders == []
 
 
-def test_paper_source_runtime_package_uses_current_directory_name_with_legacy_shim_only():
+def test_paper_source_runtime_package_uses_current_directory_name_without_legacy_import_package():
     source_root = ROOT / "plugins" / "paper-source"
 
     assert (source_root / "scripts" / "build" / "paper_source" / "__init__.py").is_file()
     assert (source_root / "scripts" / "build" / "paper_source" / "paper_source_repository.py").is_file()
     assert (source_root / "scripts" / "build" / "paper_source" / "epi_repository.py").is_file()
-    assert (source_root / "scripts" / "build" / "epi" / "__init__.py").is_file()
-    assert not (source_root / "scripts" / "build" / "epi" / "artifacts.py").exists()
+    assert not (source_root / "scripts" / "build" / "epi").exists()
     assert not (ROOT / "tests" / "epi").exists()
     assert (ROOT / "tests" / "paper_source").is_dir()
 
 
 def test_current_file_and_directory_names_do_not_use_legacy_plugin_names():
     allowed_legacy_paths = {
-        Path("plugins/paper-source/scripts/build/epi/__init__.py"),
         Path("plugins/paper-source/scripts/build/paper_source/epi_repository.py"),
     }
     scanned_roots = [
@@ -127,6 +125,36 @@ def test_current_file_and_directory_names_do_not_use_legacy_plugin_names():
                 continue
             name = path.name.lower()
             if "epi" in name or "prw" in name:
+                offenders.append(str(relative).replace("\\", "/"))
+
+    assert offenders == []
+
+
+def test_active_design_docs_do_not_preserve_retired_alias_contracts():
+    scanned_roots = [
+        ROOT / "docs" / "audits",
+        ROOT / "docs" / "superpowers" / "plans",
+        ROOT / "docs" / "superpowers" / "specs",
+    ]
+    banned = re.compile(
+        r"from-prw|prw-record|epi-repository|EPI_|scripts[\\/]build[\\/]epi|"
+        r"\bfrom\s+epi\b|\bimport\s+epi\b|compatibility adapter|"
+        r"compatibility package|remain readable|fallback checks|legacy shim",
+        re.IGNORECASE,
+    )
+    offenders = []
+
+    for scanned_root in scanned_roots:
+        if not scanned_root.exists():
+            continue
+        for path in scanned_root.rglob("*"):
+            if not path.is_file():
+                continue
+            relative = path.relative_to(ROOT)
+            if any(part in {"archive", "completed", "superseded"} for part in relative.parts):
+                continue
+            text = path.read_text(encoding="utf-8")
+            if banned.search(text):
                 offenders.append(str(relative).replace("\\", "/"))
 
     assert offenders == []

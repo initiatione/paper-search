@@ -108,7 +108,7 @@ def test_update_page_only_renders_formal_page_relationship_targets(tmp_path):
                 "    type: related_to",
                 '  - target: "[[entities/non-paper-node]]"',
                 "    type: related_to",
-                '  - target: "[[_epi/meta/formal-page-snapshots/old/references/source-paper]]"',
+                '  - target: "[[_paper_source/meta/formal-page-snapshots/old/references/source-paper]]"',
                 "    type: related_to",
                 "---",
                 "",
@@ -127,7 +127,7 @@ def test_update_page_only_renders_formal_page_relationship_targets(tmp_path):
     assert "- [[references/source-paper]]" in related
     assert "loose-unresolved-page" not in related
     assert "entities/non-paper-node" not in related
-    assert "_epi" not in related
+    assert "_paper_source" not in related
 
 
 def test_snapshot_formal_pages_detaches_wikilinks_in_snapshot_copy(tmp_path):
@@ -160,7 +160,7 @@ def test_snapshot_formal_pages_detaches_wikilinks_in_snapshot_copy(tmp_path):
 def test_detach_internal_markdown_links_breaks_backlinks_from_internal_trees(tmp_path):
     module = _load_module()
     vault = tmp_path / "vault"
-    internal = vault / "_epi" / "staging" / "papers" / "fixture" / "draft.md"
+    internal = vault / "_paper_source" / "staging" / "papers" / "fixture" / "draft.md"
     raw = vault / "_paper_source" / "raw" / "fixture" / "mineru" / "paper.md"
     internal.parent.mkdir(parents=True)
     raw.parent.mkdir(parents=True)
@@ -172,6 +172,6 @@ def test_detach_internal_markdown_links_breaks_backlinks_from_internal_trees(tmp
 
     result = module.detach_internal_markdown_links(vault, execute=True)
 
-    assert result["changed"] == ["_epi/staging/papers/fixture/draft.md"]
+    assert result["changed"] == ["_paper_source/staging/papers/fixture/draft.md"]
     assert "[[" not in internal.read_text(encoding="utf-8")
     assert "[[not-a-formal-link]]" in raw.read_text(encoding="utf-8")

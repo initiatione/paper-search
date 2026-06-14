@@ -15,7 +15,6 @@ EXPECTED_PAGE_FAMILIES = [
 
 EXPECTED_CORE_SKILLS = [
     "paper-research-wiki",
-    "paper-source-paper-deposition",
 ]
 
 EXPECTED_FRONTMATTER_FIELDS = [
@@ -96,7 +95,7 @@ def test_stage_paper_writes_brief_canonical_handoff_by_default(tmp_path):
     assert legacy["task_path"] is None
     assert legacy["canonical_handoff"] == "wiki-ingest-brief.json"
     assert legacy["reason"] == "wiki-ingest-brief.json is the canonical Paper Source-to-Paper Wiki handoff"
-    assert "epi-wiki-deposition" in legacy["compatibility_aliases"]
+    assert legacy["compatibility_aliases"] == []
     assert brief["formal_page_families"] == EXPECTED_PAGE_FAMILIES
     assert brief["formal_frontmatter_schema"]["required_fields"] == EXPECTED_FRONTMATTER_FIELDS
     assert plan["wiki_ingest_brief_path"] == str(brief_path)
@@ -123,8 +122,7 @@ def test_stage_paper_can_emit_legacy_wiki_deposition_task_when_requested(tmp_pat
     assert task["vault_schema"] == "paper-source-paper-research"
     assert task["page_families"] == EXPECTED_PAGE_FAMILIES
     assert task["required_skills"] == EXPECTED_CORE_SKILLS
-    assert task["required_skills"][:2] == ["paper-research-wiki", "paper-source-paper-deposition"]
-    assert "epi-wiki-deposition" in task["compatibility_aliases"]
+    assert task["compatibility_aliases"] == []
     assert task["handoff_boundary"]["paper_source_core_role"] == "source-bundle-and-audit-only"
     assert "epi_core_role" not in task["handoff_boundary"]
     assert task["handoff_boundary"]["formal_writer_role"] == "obsidian-wiki-skill-layer"
@@ -190,8 +188,8 @@ def test_stage_paper_can_emit_legacy_wiki_deposition_task_when_requested(tmp_pat
     for skill in EXPECTED_CORE_SKILLS:
         assert skill in minimum_role
     assert "load paper-research-wiki first" in minimum_role
-    assert "paper-source-paper-deposition" in minimum_role
-    assert "compatibility adapter" in minimum_role
+    assert "paper-source-paper-deposition" not in minimum_role
+    assert "compatibility adapter" not in minimum_role
     assert "load paper-source-paper-deposition, llm-wiki" not in minimum_role
     assert brief["formal_frontmatter_schema"] == frontmatter
     assert plan["legacy_wiki_deposition_task_path"] == str(task_path)
@@ -211,9 +209,9 @@ def test_paper_source_paper_deposition_skill_documents_adapter_boundary():
 
     assert "name: paper-source-paper-deposition" in text
     assert "wiki-ingest-brief.json" in text
-    assert "legacy `wiki_deposition_task.json`" in text
     assert "$paper-research-wiki" in text
-    assert "epi-wiki-deposition" in text
+    assert "Historical `wiki_deposition_task.json` cleanup" in text
+    assert "epi-wiki-deposition" not in text
     assert "llm-wiki" not in text
     assert "wiki-stage-commit" not in text
     assert "Required frontmatter fields" not in text

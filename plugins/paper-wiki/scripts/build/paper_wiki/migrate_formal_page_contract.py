@@ -21,8 +21,8 @@ FORMAL_ROOTS = (
 
 FRONTMATTER = re.compile(r"\A---\r?\n(?P<frontmatter>.*?)\r?\n---\r?\n?", re.DOTALL)
 WIKILINK = re.compile(r"\[\[(?P<body>[^\]\n]+)\]\]")
-ENCODED_RAW_SLUG = re.compile(r"_(?:paper_source|epi)%2Fraw%2F(?P<slug>[^%/]+)%2Fpaper\.pdf", re.IGNORECASE)
-PLAIN_RAW_SLUG = re.compile(r"(?:_paper_source|_epi)/raw/(?P<slug>[^/\s`'\"]+)/paper\.pdf", re.IGNORECASE)
+ENCODED_RAW_SLUG = re.compile(r"_paper_source%2Fraw%2F(?P<slug>[^%/]+)%2Fpaper\.pdf", re.IGNORECASE)
+PLAIN_RAW_SLUG = re.compile(r"_paper_source/raw/(?P<slug>[^/\s`'\"]+)/paper\.pdf", re.IGNORECASE)
 PAPER_SOURCE_PDF_MARKDOWN_LINK = re.compile(
     r"\[(?P<label>[^\]\n]+)\]\("
     r"(?P<uri>obsidian://open\?[^)\n]*file=_paper_source%2Fraw%2F(?P<slug>[^%/)]+)%2Fpaper\.pdf"
@@ -31,22 +31,12 @@ PAPER_SOURCE_PDF_MARKDOWN_LINK = re.compile(
 )
 ANY_PDF_MARKDOWN_LINK = re.compile(
     r"\[(?P<label>[^\]\n]+)\]\("
-    r"(?P<uri>obsidian://open\?[^)\n]*file=_(?:paper_source|epi)%2Fraw%2F(?P<slug>[^%/)]+)%2Fpaper\.pdf"
+    r"(?P<uri>obsidian://open\?[^)\n]*file=_paper_source%2Fraw%2F(?P<slug>[^%/)]+)%2Fpaper\.pdf"
     r"(?:[&#][^)\n]*)?)\)",
     re.IGNORECASE,
 )
 
 REPLACEMENTS = (
-    ("_epi%2Fraw%2F", "_paper_source%2Fraw%2F"),
-    ("_epi%2Fstaging%2F", "_paper_source%2Fstaging%2F"),
-    ("_epi%2Fmeta%2Fformal-page-snapshots%2F", "_paper_source%2Fmeta%2Fformal-page-snapshots%2F"),
-    ("../_epi/raw/", "../_paper_source/raw/"),
-    ("../_epi/staging/", "../_paper_source/staging/"),
-    ("_epi/raw/", "_paper_source/raw/"),
-    ("_epi/staging/", "_paper_source/staging/"),
-    ("_epi/meta/formal-page-snapshots/", "_paper_source/meta/formal-page-snapshots/"),
-    ("EPI source bundle", "Paper Source source bundle"),
-    ("EPI metadata", "Paper Source metadata"),
 )
 
 
@@ -189,18 +179,17 @@ def _frontmatter_title(lines: list[str]) -> str | None:
 
 def _source_title_map(vault: Path) -> dict[str, str]:
     titles: dict[str, str] = {}
-    for root_name in ("_paper_source", "_epi"):
-        raw_root = vault / root_name / "raw"
-        if not raw_root.exists():
+    raw_root = vault / "_paper_source" / "raw"
+    if not raw_root.exists():
+        return titles
+    for metadata_path in raw_root.glob("*/metadata.json"):
+        try:
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
             continue
-        for metadata_path in raw_root.glob("*/metadata.json"):
-            try:
-                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                continue
-            title = str(metadata.get("title") or "").strip()
-            if title:
-                titles[metadata_path.parent.name] = title
+        title = str(metadata.get("title") or "").strip()
+        if title:
+            titles[metadata_path.parent.name] = title
     return titles
 
 

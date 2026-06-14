@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Any
 
 PAPER_SOURCE_ROOT_NAME = "_paper_source"
+# Historical roots are for explicit migration, reset cleanup, or repair diagnostics only.
+# Normal runtime helpers must resolve to the current Paper Source root.
 LEGACY_EPI_ROOT_NAME = "_epi"
-# Legacy import alias for cached scripts and old plugin versions.
-EPI_ROOT_NAME = LEGACY_EPI_ROOT_NAME
 LEGACY_RAW_ROOT_NAME = "_raw"
 LEGACY_STAGING_ROOT_NAME = "_staging"
 LEGACY_RUNS_ROOT_NAME = "_runs"
@@ -49,16 +49,6 @@ def legacy_epi_root(vault_path: Path) -> Path:
 
 
 def existing_paper_source_root(vault_path: Path) -> Path:
-    current = paper_source_root(vault_path)
-    if current.exists():
-        return current
-    legacy = legacy_epi_root(vault_path)
-    if legacy.exists():
-        return legacy
-    return current
-
-
-def epi_root(vault_path: Path) -> Path:
     return paper_source_root(vault_path)
 
 
@@ -87,19 +77,7 @@ def legacy_epi_raw_paper_root(vault_path: Path, slug: str) -> Path:
 
 
 def existing_raw_paper_root(vault_path: Path, slug: str) -> Path:
-    current = raw_paper_root(vault_path, slug)
-    if current.exists():
-        return current
-    legacy_epi = legacy_epi_raw_paper_root(vault_path, slug)
-    if legacy_epi.exists():
-        return legacy_epi
-    legacy_nested = legacy_nested_epi_raw_paper_root(vault_path, slug)
-    if legacy_nested.exists():
-        return legacy_nested
-    legacy = legacy_raw_paper_root(vault_path, slug)
-    if legacy.exists():
-        return legacy
-    return current
+    return raw_paper_root(vault_path, slug)
 
 
 def staging_root(vault_path: Path) -> Path:
@@ -123,16 +101,7 @@ def legacy_epi_staging_paper_root(vault_path: Path, slug: str) -> Path:
 
 
 def existing_staging_paper_root(vault_path: Path, slug: str) -> Path:
-    current = staging_paper_root(vault_path, slug)
-    if current.exists():
-        return current
-    legacy_epi = legacy_epi_staging_paper_root(vault_path, slug)
-    if legacy_epi.exists():
-        return legacy_epi
-    legacy = legacy_staging_paper_root(vault_path, slug)
-    if legacy.exists():
-        return legacy
-    return current
+    return staging_paper_root(vault_path, slug)
 
 
 def wiki_batches_root(vault_path: Path) -> Path:
@@ -164,29 +133,11 @@ def legacy_epi_runs_root(vault_path: Path) -> Path:
 
 
 def existing_runs_root(vault_path: Path) -> Path:
-    current = runs_root(vault_path)
-    if current.exists():
-        return current
-    legacy_epi = legacy_epi_runs_root(vault_path)
-    if legacy_epi.exists():
-        return legacy_epi
-    legacy = legacy_runs_root(vault_path)
-    if legacy.exists():
-        return legacy
-    return current
+    return runs_root(vault_path)
 
 
 def existing_run_dir(vault_path: Path, run_id: str) -> Path:
-    current = runs_root(vault_path) / run_id
-    if current.exists():
-        return current
-    legacy_epi = legacy_epi_runs_root(vault_path) / run_id
-    if legacy_epi.exists():
-        return legacy_epi
-    legacy = legacy_runs_root(vault_path) / run_id
-    if legacy.exists():
-        return legacy
-    return current
+    return runs_root(vault_path) / run_id
 
 
 def quarantine_root(vault_path: Path) -> Path:
@@ -195,10 +146,6 @@ def quarantine_root(vault_path: Path) -> Path:
 
 def evolution_root(vault_path: Path) -> Path:
     return paper_source_root(vault_path) / "evolution"
-
-
-def epi_meta_root(vault_path: Path) -> Path:
-    return paper_source_meta_root(vault_path)
 
 
 def legacy_meta_root(vault_path: Path) -> Path:

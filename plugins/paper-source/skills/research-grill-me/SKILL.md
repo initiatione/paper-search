@@ -23,7 +23,7 @@ Use this to turn an under-specified research direction into a confirmed Paper So
 
 ## Boundaries
 
-Use current names: Paper Source for source discovery/staging and Paper Wiki for formal wiki writing. Old EPI/PRW names are legacy-only when explaining existing artifacts.
+Use current names: Paper Source for source discovery/staging and Paper Wiki for formal wiki writing. Retired names may appear only when quoting historical artifacts.
 
 Paper Source uses `paper-search-mcp` for paper search. A Research Brief may guide discovery, but it cannot bypass source-staging, `wiki-ingest-brief.json`, human approval, or Paper Wiki handoff gates.
 

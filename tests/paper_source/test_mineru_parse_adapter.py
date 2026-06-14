@@ -2,7 +2,7 @@ import json
 import sys
 
 from paper_source.orchestrator import parse_paper_with_mineru
-from paper_source.run_mineru_parse import run_mineru_command
+from paper_source.run_mineru_parse import _vault_path_from_paper_root, run_mineru_command
 
 
 def _seed_paper_root(tmp_path, slug="paper"):
@@ -270,6 +270,13 @@ def test_parse_paper_with_mineru_uses_vault_slug_boundary(tmp_path):
     assert not (paper_root / "mineru" / "paper.md").exists()
 
 
+def test_vault_path_from_paper_root_does_not_accept_retired_epi_root(tmp_path):
+    vault = tmp_path / "vault"
+
+    assert _vault_path_from_paper_root(vault / "_paper_source" / "raw" / "paper-a") == vault.resolve()
+    assert _vault_path_from_paper_root(vault / "_epi" / "raw" / "paper-a") is None
+
+
 def test_mineru_command_success_writes_evidence_index_and_aggregate(tmp_path):
     paper_root = _seed_paper_root(tmp_path, slug="fixture-paper")
     (paper_root / "metadata.json").write_text(
@@ -311,7 +318,6 @@ def test_resolve_mineru_timeout_prefers_param_then_env_then_default(monkeypatch)
     from paper_source.run_mineru_parse import _resolve_mineru_timeout
 
     monkeypatch.delenv("PAPER_SOURCE_MINERU_TIMEOUT", raising=False)
-    monkeypatch.delenv("EPI_MINERU_TIMEOUT", raising=False)
     assert _resolve_mineru_timeout(None) == 7200
     assert _resolve_mineru_timeout(120) == 120
 
@@ -327,16 +333,15 @@ def test_resolve_mineru_timeout_prefers_param_then_env_then_default(monkeypatch)
     assert _resolve_mineru_timeout(None) == 7200
     # booleans are not valid timeouts
     monkeypatch.delenv("PAPER_SOURCE_MINERU_TIMEOUT", raising=False)
-    monkeypatch.delenv("EPI_MINERU_TIMEOUT", raising=False)
     assert _resolve_mineru_timeout(True) == 7200
 
 
-def test_resolve_mineru_timeout_accepts_legacy_env_fallback(monkeypatch):
+def test_resolve_mineru_timeout_ignores_old_alias_env(monkeypatch):
     from paper_source.run_mineru_parse import _resolve_mineru_timeout
 
     monkeypatch.delenv("PAPER_SOURCE_MINERU_TIMEOUT", raising=False)
     monkeypatch.setenv("EPI_MINERU_TIMEOUT", "300")
-    assert _resolve_mineru_timeout(None) == 300
+    assert _resolve_mineru_timeout(None) == 7200
 
     monkeypatch.setenv("PAPER_SOURCE_MINERU_TIMEOUT", "180")
     assert _resolve_mineru_timeout(None) == 180
@@ -366,7 +371,6 @@ def test_mineru_command_times_out_using_env_timeout(tmp_path, monkeypatch):
     paper_root = _seed_paper_root(tmp_path)
     command = [sys.executable, str(_write_sleeping_command(tmp_path))]
     monkeypatch.setenv("PAPER_SOURCE_MINERU_TIMEOUT", "1")
-    monkeypatch.delenv("EPI_MINERU_TIMEOUT", raising=False)
 
     record = run_mineru_command(paper_root, command=command)
 

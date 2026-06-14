@@ -281,8 +281,6 @@ def build_wiki_ingest_handoff(vault_path: Path, slug: str) -> dict[str, Any]:
         "paper_source_write_scope": (
             plan.get("paper_source_write_scope")
             or ingest_policy.get("paper_source_write_scope")
-            or plan.get("epi_write_scope")
-            or ingest_policy.get("epi_write_scope")
         ),
         "formal_routes_suggested": bool(brief.get("formal_routes_suggested", True)),
         "formal_page_families": (

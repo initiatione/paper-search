@@ -278,13 +278,13 @@ def test_wiki_setup_documents_lean_paper_source_bootstrap_contract():
 
 
 def test_paper_wiki_documents_core_paper_source_bootstrap_without_requiring_on_demand_dirs():
-    prw_root = ROOT.parent / "paper-wiki"
+    paper_wiki_root = ROOT.parent / "paper-wiki"
     files = [
-        prw_root / "skills" / "paper-research-wiki" / "SKILL.md",
-        prw_root / "docs" / "workflow.md",
-        prw_root / "docs" / "paper-source-integration.md",
-        prw_root / "skills" / "paper-research-wiki" / "workflows" / "check-wiki.md",
-        prw_root / "skills" / "paper-research-wiki" / "workflows" / "extract-papers.md",
+        paper_wiki_root / "skills" / "paper-research-wiki" / "SKILL.md",
+        paper_wiki_root / "docs" / "workflow.md",
+        paper_wiki_root / "docs" / "paper-source-integration.md",
+        paper_wiki_root / "skills" / "paper-research-wiki" / "workflows" / "check-wiki.md",
+        paper_wiki_root / "skills" / "paper-research-wiki" / "workflows" / "extract-papers.md",
     ]
     combined = "\n".join(path.read_text(encoding="utf-8") for path in files)
 
@@ -320,6 +320,10 @@ def test_paper_discovery_query_planner_wrapper_imports_current_runtime_package()
 
     assert "from paper_source.query_planner import main" in wrapper
     assert "from epi.query_planner import main" not in wrapper
+
+
+def test_paper_source_runtime_does_not_ship_retired_epi_import_package():
+    assert not (BUILD_ROOT / "epi").exists()
 
 
 def test_all_skill_entrypoints_stay_thin():
@@ -429,7 +433,7 @@ def test_paper_discovery_keeps_policy_in_skill_and_references():
     assert not (SKILLS / "paper-discovery" / "README.md").exists()
 
 
-def test_paper_source_paper_deposition_is_thin_legacy_adapter():
+def test_paper_source_paper_deposition_is_thin_handoff_cleanup_entry():
     deposition = (SKILLS / "paper-source-paper-deposition" / "SKILL.md").read_text(encoding="utf-8")
     formal_workflow = (
         SKILLS / "paper-source-paper-deposition" / "workflows" / "formal-wiki-write.md"
@@ -438,13 +442,13 @@ def test_paper_source_paper_deposition_is_thin_legacy_adapter():
 
     assert "workflows/formal-wiki-write.md" in deposition
     assert "wiki-ingest-brief.json" in combined
-    assert "legacy `wiki_deposition_task.json`" in combined
-    assert "legacy epi-wiki-deposition" in deposition
-    assert "legacy `_epi/`" in combined
+    assert "Historical `wiki_deposition_task.json` cleanup" in combined
+    assert "epi-wiki-deposition" not in combined
+    assert "legacy `_epi/`" not in combined
     assert "legacy `_paper_source/`" not in combined
     assert "Existing `_paper_source/` handoffs remain readable as legacy artifacts." not in combined
     assert "$paper-research-wiki" in combined
-    assert "compatibility adapter" in combined
+    assert "cleanup workflow" in combined
     assert "llm-wiki" not in combined
     assert "wiki-stage-commit" not in combined
     assert "Required frontmatter fields" not in combined
@@ -463,7 +467,8 @@ def test_paper_source_wiki_boundary_skill_docs_are_brief_first():
     for phrase in [
         "wiki-ingest-brief.json",
         "canonical Paper Source-to-Paper Wiki handoff",
-        "wiki_deposition_task.json is legacy",
+        "wiki_deposition_task.json",
+        "historical",
         "paper-research-wiki",
         "paper-source-paper-deposition",
         "external wiki skills are optional helpers",
@@ -473,7 +478,7 @@ def test_paper_source_wiki_boundary_skill_docs_are_brief_first():
         assert phrase in combined
 
 
-def test_current_skill_docs_prefer_current_env_names_with_legacy_fallbacks_only():
+def test_current_skill_docs_prefer_current_env_names_without_old_alias_fallbacks():
     mineru = (SKILLS / "mineru-paper-parser" / "SKILL.md").read_text(encoding="utf-8")
     prepare_ranked = (
         SKILLS / "paper-ingest" / "workflows" / "prepare-ranked.md"
@@ -481,17 +486,18 @@ def test_current_skill_docs_prefer_current_env_names_with_legacy_fallbacks_only(
     combined = "\n".join([mineru, prepare_ranked])
 
     assert "PAPER_SOURCE_MINERU_TIMEOUT" in combined
-    assert "Legacy `EPI_MINERU_TIMEOUT`" in combined
+    assert "EPI_MINERU_TIMEOUT" not in combined
     assert "set `EPI_MINERU_TIMEOUT`" not in combined
     assert "reads `EPI_MINERU_TIMEOUT`" not in combined
 
 
-def test_wiki_setup_legacy_root_is_epi_not_current_paper_source_root():
+def test_wiki_setup_marks_retired_root_as_migration_input_only():
     wiki_setup = (SKILLS / "wiki-setup" / "SKILL.md").read_text(encoding="utf-8")
 
-    assert "Existing `_epi` roots remain legacy-readable" in wiki_setup
+    assert "Historical `_epi` roots are migration inputs only" in wiki_setup
+    assert "Existing `_epi` roots remain legacy-readable" not in wiki_setup
     assert "Existing `_paper_source` roots remain legacy-readable" not in wiki_setup
-    assert "legacy `_epi\\meta\\paper-source-config.yaml`" in wiki_setup
+    assert "legacy `_epi\\meta\\paper-source-config.yaml`" not in wiki_setup
     assert "legacy `_paper_source\\meta\\paper-source-config.yaml`" not in wiki_setup
 
 
@@ -510,7 +516,9 @@ def test_page_provenance_migrates_legacy_internal_pdf_links_to_title_display_pdf
     assert "_paper_source/raw/<slug>/paper.pdf" in page_provenance
     assert "Frontmatter `sources` must contain title-display Markdown links to canonical source PDFs" in page_provenance
     assert "link text must be the source paper title" in page_provenance
-    assert "Legacy `_epi` or `_paper_source` wikilinks may be read for compatibility" in page_provenance
+    assert "Retired `_epi` links and internal PDF wikilinks are repair candidates" in page_provenance
+    assert "normal evidence fallbacks" in page_provenance
+    assert "Legacy `_epi` or `_paper_source` wikilinks may be read for compatibility" not in page_provenance
     assert (
         "recorded formal pages must convert them to canonical `_paper_source` title-display PDF links"
         in page_provenance
@@ -560,13 +568,14 @@ def test_paper_wiki_qmd_boundary_is_explicit_in_plugin_contracts():
         assert ignored in combined
 
 
-def test_paper_source_formal_deposition_route_is_compatibility_adapter():
+def test_paper_source_formal_deposition_route_is_handoff_cleanup():
     routing = _load_routing()
     routes = routing["routes"]
 
     assert routes["wiki_setup"]["category"] == "primary"
 
     deposition = routes["paper_source_paper_deposition"]
-    assert deposition["category"] == "compatibility"
+    assert deposition["category"] == "maintenance"
     assert deposition["skill"] == "paper-source-paper-deposition/SKILL.md"
     assert "$paper-research-wiki" in "\n".join(deposition.get("notes", []))
+    assert "epi-wiki-deposition" not in "\n".join(map(str, deposition.get("triggers", [])))

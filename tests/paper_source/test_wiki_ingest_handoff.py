@@ -8,7 +8,6 @@ from paper_source.wiki_ingest_trigger import build_wiki_ingest_trigger, render_w
 
 EXPECTED_RESEARCH_WIKI_SKILLS = [
     "paper-research-wiki",
-    "paper-source-paper-deposition",
 ]
 
 EXPECTED_FORMAL_PAGE_FAMILIES = [
@@ -193,7 +192,7 @@ def _seed_agent_handoff(vault, slug="fixture-paper"):
                     {"source": "_meta/taxonomy.md", "role": "taxonomy"},
                     {
                         "source": "paper-research-wiki (Paper Wiki canonical paper wiki layer)",
-                        "role": "canonical paper wiki workflow layer; paper-source-paper-deposition remains compatibility adapter",
+                        "role": "canonical paper wiki workflow layer for Paper Source bundles",
                     },
                     {"source": "Ar9av/obsidian-wiki", "role": "framework"},
                     {"source": "kepano/obsidian-skills", "role": "format"},
@@ -475,7 +474,8 @@ def test_wiki_ingest_trigger_writes_agent_neutral_trigger_after_approval(tmp_pat
     assert "source-first" in trigger["instruction"]
     assert "Preserve support status" in trigger["instruction"]
     assert "Paper Wiki provenance" in trigger["instruction"]
-    assert "legacy compatibility adapter" in trigger["instruction"]
+    assert "historical handoff cleanup" in trigger["instruction"]
+    assert "new formal writes" in trigger["instruction"]
     for family in ["derivations/", "experiments/", "opportunities/"]:
         assert family in trigger["instruction"]
     assert "final-source-review.json" in trigger["instruction"]
@@ -505,7 +505,8 @@ def test_render_wiki_ingest_trigger_shows_resume_command_after_approval(tmp_path
     assert "next_action: run-current-agent-as-wiki-ingest-agent" in output
     assert "wiki-ingest-brief.json" in output
     assert "Paper Wiki provenance" in output
-    assert "legacy compatibility adapter" in output
+    assert "historical handoff cleanup" in output
+    assert "new formal writes" in output
     assert "derivations/" in output
     assert "experiments/" in output
     assert "opportunities/" in output

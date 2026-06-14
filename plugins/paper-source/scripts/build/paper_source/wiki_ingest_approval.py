@@ -8,10 +8,8 @@ from paper_source.artifacts import staging_paper_root, utc_now, write_json_atomi
 
 
 HUMAN_APPROVAL_SCHEMA_VERSION = "paper-source-human-approval-v1"
-LEGACY_HUMAN_APPROVAL_SCHEMA_VERSION = "epi-human-approval-v1"
 ACCEPTED_HUMAN_APPROVAL_SCHEMA_VERSIONS = {
     HUMAN_APPROVAL_SCHEMA_VERSION,
-    LEGACY_HUMAN_APPROVAL_SCHEMA_VERSION,
 }
 HUMAN_APPROVAL_SCOPE = "run-wiki-ingest-agent"
 

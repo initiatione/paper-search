@@ -1,12 +1,12 @@
 # Paper Source 插件进度说明
 
-更新时间：2026-06-08。文档权威分工（doc map）见 `docs/paper-source-linkage.md` 顶部；本文档只记录当前源码树的状态快照、已知风险和下一步计划。逐轮变更历史见 `docs/CHANGELOG.md`。
+更新时间：2026-06-14。文档权威分工（doc map）见 `docs/paper-source-linkage.md` 顶部；本文档只记录当前源码树的状态快照、已知风险和下一步计划。逐轮变更历史见 `docs/CHANGELOG.md`。
 
 ## 当前定位
 
 Paper Source 当前聚焦“按用户画像/config 衍生的高质量论文收集和整理 -> Obsidian/LLM Wiki 知识沉淀 -> 轻阅读负担报告”。它是通用学术论文插件，不默认任何学科方向；AUV、机器人、AI、医学等词只能来自用户配置、当前请求或显式领域 hint。
 
-当前 `plugin.json` 中的版本：Paper Source `0.2.5`，Paper Wiki `0.2.4`。历史 source manifest 曾从 Paper Source `0.1.12` / Paper Wiki `0.1.5` 到 Paper Source `0.1.13` / Paper Wiki `0.1.6`，再到 Paper Source `0.1.14` / Paper Wiki `0.1.7`、`0.2.1`、`0.2.2`、`0.2.3`、Paper Source `0.2.4` / Paper Wiki `0.2.3`；installed cache 曾见 Paper Source `0.1.11`、`0.1.10`、`0.1.8` 和 source `0.2.0`，因此 runtime claims 必须区分 source checkout、installed cache 和当前 Codex session。
+当前 `plugin.json` 中的版本：Paper Source `1.0.0`，Paper Wiki `1.0.0`。历史 source manifest 曾从 Paper Source `0.1.12` / Paper Wiki `0.1.5` 到 Paper Source `0.1.13` / Paper Wiki `0.1.6`，再到 Paper Source `0.1.14` / Paper Wiki `0.1.7`、`0.2.1`、`0.2.2`、`0.2.3`、Paper Source `0.2.4` / Paper Wiki `0.2.3`、Paper Source `0.2.5` / Paper Wiki `0.2.4`、Paper Source `0.2.6` / Paper Wiki `1.0.0`；installed cache 曾见 Paper Source `0.1.11`、`0.1.10`、`0.1.8` 和 source `0.2.0`，因此 runtime claims 必须区分 source checkout、installed cache 和当前 Codex session。
 
 ## 能力快照
 
@@ -35,9 +35,9 @@ git diff --check
 
 Historical focused results preserved for comparison: `107 passed in 1.35s`、`55 passed in 0.42s`、`70 passed in 1.16s`、`287 passed in 30.16s`、`45 passed in 10.19s`。质量门历史信号：pass rate `1`，Plugin Eval `82/100`。Source coverage / read-preview full run historically reached `391 passed in 53.81s`; current release must rerun rather than inherit that snapshot.
 
-S3a 文档/契约 canonical 化已完成并归档。当前实现队列是 S3b brief-first machine-contract：`wiki-ingest-brief.json` is the canonical Paper Source-to-Paper Wiki handoff，`wiki_deposition_task.json is legacy` compatibility only，`REQUIRED_WIKI_SKILLS` 要收敛到 Paper Wiki `$paper-research-wiki` 和 Paper Source `paper-source-paper-deposition` 两项，external wiki skills are optional helpers / policy references。
+S3a 文档/契约 canonical 化已完成并归档。当前实现队列是 S3b brief-first machine-contract：`wiki-ingest-brief.json` is the only new Paper Source-to-Paper Wiki handoff，`wiki_deposition_task.json` 只作为历史 handoff 清理对象，用户黄金路径收敛到 Paper Wiki `$paper-research-wiki`，external wiki skills are optional helpers / policy references。
 
-- Paper Source/Paper Wiki boundary: `wiki-ingest-brief.json` is the canonical Paper Source-to-Paper Wiki handoff; `wiki_deposition_task.json is legacy` compatibility only; Paper Wiki `$paper-research-wiki` is the formal paper wiki writing layer; `paper-source-paper-deposition` is the compatibility adapter; external wiki skills are optional helpers / policy references.
+- Paper Source/Paper Wiki boundary: `wiki-ingest-brief.json` is the canonical Paper Source-to-Paper Wiki handoff; `wiki_deposition_task.json` is historical cleanup only; Paper Wiki `$paper-research-wiki` is the formal paper wiki writing layer; `paper-source-paper-deposition` is a retired handoff cleanup entry; external wiki skills are optional helpers / policy references.
 
 本轮 S3b 验收目标：`tests/paper_source/test_wiki_deposition_task.py`、`tests/paper_source/test_wiki_ingest_handoff.py`、`tests/paper_source/test_wiki_ingest_record.py`、`tests/paper_source/test_one_paper_ingest.py`、`tests/paper_source/test_paper_gate.py`、`tests/paper_research_wiki/test_plugin_contract.py`、`tests/paper_source/test_current_docs.py` 和 `tests/paper_source/test_skill_bundle_contract.py` 必须保持通过；再跑 JSON manifest 校验、stale wording grep 和 `git diff --check`。
 
@@ -66,7 +66,7 @@ git diff --check
 
 1. 完成 S3b brief-first machine-contract 的剩余 metadata/full verification：`wiki-ingest-brief.json` 已是 canonical Paper Source-to-Paper Wiki handoff，默认 staging 不再要求 `wiki_deposition_task.json`。
 2. 继续 S3b metadata、manifest、stale wording grep、full verification 和 integration decision。
-3. 发布本轮修复 commit，并从 GitHub/marketplace 重新安装 Paper Source/Paper Wiki，确认 installed cache 版本变为 Paper Source `0.2.5`、Paper Wiki `0.2.4`。
+3. 发布本轮修复 commit，并从 GitHub/marketplace 重新安装 Paper Source/Paper Wiki，确认 installed cache 版本变为 Paper Source `1.0.0`、Paper Wiki `1.0.0`。
 4. 从新 Codex thread 运行 `doctor --json`、`config-status --json`、dry-run fixture smoke 和 `research-queue` 验证安装体验。
 5. 对目标 vault 补齐 `AGENTS.md` 和 `_meta/*.md`，再让 Paper Wiki 消费 `wiki-ingest-brief.json` 和 reading report。
 

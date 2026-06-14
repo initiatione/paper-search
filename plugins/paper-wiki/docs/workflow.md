@@ -1,8 +1,8 @@
 # Paper Wiki Workflow
 
-Naming: Paper Wiki is this plugin's user-visible name. The current machine-facing plugin name is `paper-wiki`; `prw` is only a pre-Stage-2 legacy alias. Paper Source is the source-preparation sibling plugin; its current machine-facing plugin name is `paper-source`; `epi` is only a pre-Stage-2 legacy alias. PW/PS are conversational aliases only.
+Naming: Paper Wiki is this plugin's user-visible name. The current machine-facing plugin name is `paper-wiki`. Paper Source is the source-preparation sibling plugin; its current machine-facing plugin name is `paper-source`. PW/PS are conversational aliases only.
 
-The plugin exposes one user-facing assistant for direct Paper Source paper deposition, read-only wiki Q&A, redo/deep extraction, wiki checks, wiki updates, and relink maintenance. `prw` is only a legacy alias for Paper Wiki.
+The plugin exposes one user-facing assistant for direct Paper Source paper deposition, read-only wiki Q&A, redo/deep extraction, wiki checks, wiki updates, and relink maintenance.
 
 Paper Wiki is a closed-loop paper wiki maintenance system. The fixed loop is:
 
@@ -26,9 +26,9 @@ Question -> Scope -> Formal graph retrieval -> Evidence check -> Answer labels -
 
 Paper Wiki owns reading the paper wiki vault state, reading Paper Source handoff artifacts, writing or repairing formal wiki pages, fixing links/tags/aliases/duplicate concepts/orphan pages, updating `.manifest.json` or `manifest`, `index.md`, `log.md`, `hot.md`, refreshing `final-source-review.json`, and running post-task checks.
 
-Paper Source owns paper discovery, ranking, download, MinerU parsing, paper wiki vault bootstrap through Paper Source `wiki-setup`, `paper-gate`, human approval, and `record-wiki-ingest`.
+Paper Source owns paper discovery, ranking, download, MinerU parsing, paper-level deduplication, paper wiki vault bootstrap through Paper Source `wiki-setup`, `paper-gate`, human approval, and `record-wiki-ingest`.
 
-Paper Wiki assumes Paper Source `wiki-setup` has initialized the target vault contract. It checks the core `_paper_source` bootstrap (`_paper_source/`, `_paper_source/raw/`, `_paper_source/staging/`, `_paper_source/meta/`, `_paper_source/policies/`), `_meta/`, `.obsidian`, `.git`, and the seven formal page roots; when missing core vault structure blocks work, Paper Wiki reports the capability gap and points back to Paper Source `wiki-setup`. Paper Wiki does not initialize, repair, silently create, or reset the vault, and it does not reset Paper Source state. Missing legacy `_epi/`, `_paper_source/runs/`, `_paper_source/cache/`, `_paper_source/tmp/`, `_paper_source/tmp-manual-pdfs/`, `_paper_source/quarantine/`, or `_paper_source/evolution/` is not a bootstrap failure because `_epi/` is read-only compatibility residue and Paper Source creates on-demand directories when needed.
+Paper Wiki assumes Paper Source `wiki-setup` has initialized the target vault contract. It checks the core `_paper_source` bootstrap (`_paper_source/`, `_paper_source/raw/`, `_paper_source/staging/`, `_paper_source/meta/`, `_paper_source/policies/`), `_meta/`, `.obsidian`, `.git`, and the seven formal page roots; when missing core vault structure blocks work, Paper Wiki reports the capability gap and points back to Paper Source `wiki-setup`. Paper Wiki does not initialize, repair, silently create, or reset the vault, and it does not reset Paper Source state. Missing `_paper_source/runs/`, `_paper_source/cache/`, `_paper_source/tmp/`, `_paper_source/tmp-manual-pdfs/`, `_paper_source/quarantine/`, or `_paper_source/evolution/` is not a bootstrap failure because Paper Source creates on-demand directories when needed.
 
 Default checks are Quick + Targeted. Quick check reads manifest/index/log/hot, pending Paper Source handoffs, and recently changed pages. Targeted check scans only the current source, concept, tag, alias, page-family, and link neighborhood. Full check is reserved for explicit comprehensive audits or systemic link/tag chaos.
 
@@ -40,9 +40,9 @@ Frontmatter-only metadata repair is the lightweight path for non-semantic proper
 
 QMD is QMD-compatible support, not the wiki source of truth. Paper Wiki may use QMD for retrieval and freshness checks, then run `qmd update` and `qmd embed` after write-heavy work. If QMD is unavailable, stale, slow, or noisy, Paper Wiki must fallback to manifest, `.manifest.json`, `index.md`, `log.md`, `hot.md`, and direct file search. It must not block on qmd query.
 
-Paper Wiki health checks do not use a separate Paper Wiki CLI. Treat Paper Wiki as healthy only after plugin validation, source/cache manifest checks, `tests\paper_research_wiki\test_plugin_contract.py`, and the Paper Source bridge tests that protect `paper-research-wiki` handoff semantics pass. For runtime surface checks, confirm the QMD collection can see formal page roots and that `_paper_source/**`, legacy `_epi/**`, and formal-page snapshot internals remain absent from the indexed surface. If a Codex CLI marketplace command cannot see configured marketplaces in the current shell, report that as a CLI visibility caveat and verify cache/config/new-session skill loading separately.
+Paper Wiki health checks do not use a separate Paper Wiki CLI. Treat Paper Wiki as healthy only after plugin validation, source/cache manifest checks, `tests\paper_research_wiki\test_plugin_contract.py`, and the Paper Source bridge tests that protect `paper-research-wiki` handoff semantics pass. For runtime surface checks, confirm the QMD collection can see formal page roots and that `_paper_source/**` and formal-page snapshot internals remain absent from the indexed surface. If a Codex CLI marketplace command cannot see configured marketplaces in the current shell, report that as a CLI visibility caveat and verify cache/config/new-session skill loading separately.
 
-Paper Source prepares source bundles and handoff artifacts. Paper Wiki/PW reads them and performs the formal wiki-side work without taking over Paper Source discovery, MinerU parsing, paper-gate, human approval, or record-only completion.
+Paper Source prepares source bundles and handoff artifacts, including paper-level deduplication before Paper Wiki receives a handoff. Paper Wiki/PW reads new-paper handoffs and performs the formal wiki-side work without taking over Paper Source discovery, MinerU parsing, deduplication, paper-gate, human approval, or record-only completion.
 
 Completion reports must include pages created or updated, links/tags/aliases repaired, tracking files updated, QMD refreshed / skipped / failed with fallback, remaining risks, and the next Paper Source/Paper Wiki action.
 

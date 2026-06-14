@@ -149,7 +149,7 @@ One record per normalization run:
 1. Require an audit and explicit approval unless the repair is a narrow, already-clean patch.
 2. Snapshot current formal pages to `_epi/meta/formal-page-snapshots/<timestamp>-pre-figure-repair/` with a hash manifest.
 3. Patch only source paths, figure cards, image embeds, formula evidence references, and provenance records.
-4. Refresh `final-source-review.json`, `prw-record-request.json`, or related sidecars only when their hashes or reviewed artifacts changed.
+4. Refresh `final-source-review.json`, `paper-wiki-record-request.json`, or related sidecars only when their hashes or reviewed artifacts changed.
 5. Run vault validation and QMD refresh when available.
 
 ## Error Handling

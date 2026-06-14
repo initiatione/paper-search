@@ -39,10 +39,8 @@ _INTERNAL_VAULT_ROOTS = {
     ".obsidian",
 }
 FINAL_SOURCE_REVIEW_SCHEMA_VERSION = "paper-source-final-source-review-v1"
-LEGACY_FINAL_SOURCE_REVIEW_SCHEMA_VERSION = "epi-final-source-review-v1"
 ACCEPTED_FINAL_SOURCE_REVIEW_SCHEMA_VERSIONS = {
     FINAL_SOURCE_REVIEW_SCHEMA_VERSION,
-    LEGACY_FINAL_SOURCE_REVIEW_SCHEMA_VERSION,
 }
 _AUDIT_PAGE_MARKERS = [
     "Source-Grounded Claim Cards",
@@ -68,18 +66,14 @@ _LEGACY_OBSIDIAN_URI_SOURCE_PDF_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _WIKILINK_PATTERN = re.compile(r"\[\[(?P<body>[^\]\n]+)\]\]")
+_RETIRED_SOURCE_REVIEW_ROOTS = {LEGACY_EPI_ROOT_NAME, "_staging", "_raw"}
 PAPER_WIKI_RECORD_REQUEST_SCHEMA_VERSION = "paper-wiki-record-request-v1"
-LEGACY_PRW_RECORD_REQUEST_SCHEMA_VERSION = "prw-record-request-v1"
-PRW_RECORD_REQUEST_SCHEMA_VERSION = PAPER_WIKI_RECORD_REQUEST_SCHEMA_VERSION
 ACCEPTED_PAPER_WIKI_RECORD_REQUEST_SCHEMA_VERSIONS = {
     PAPER_WIKI_RECORD_REQUEST_SCHEMA_VERSION,
-    LEGACY_PRW_RECORD_REQUEST_SCHEMA_VERSION,
 }
 PAPER_WIKI_RECORD_READY_STATUS = "ready_for_paper_source_record"
-LEGACY_PRW_RECORD_READY_STATUS = "ready_for_epi_record"
 ACCEPTED_PAPER_WIKI_RECORD_READY_STATUSES = {
     PAPER_WIKI_RECORD_READY_STATUS,
-    LEGACY_PRW_RECORD_READY_STATUS,
 }
 
 
@@ -527,8 +521,23 @@ def _source_first_confirmed(brief: dict[str, Any]) -> bool:
 def _resolve_review_candidate(value: str, *, vault_path: Path, staging_root: Path) -> Path:
     candidate = Path(value)
     if candidate.is_absolute():
-        return candidate
-    if candidate.parts and candidate.parts[0] in {PAPER_SOURCE_ROOT_NAME, LEGACY_EPI_ROOT_NAME, "_staging", "_raw"}:
+        resolved = candidate.resolve()
+        try:
+            relative = resolved.relative_to(vault_path.resolve())
+        except ValueError:
+            return resolved
+        if relative.parts and relative.parts[0] in _RETIRED_SOURCE_REVIEW_ROOTS:
+            raise ValueError(
+                "source review path must use current _paper_source or staging-relative paths, "
+                f"not retired internal root {relative.parts[0]}: {value}"
+            )
+        return resolved
+    if candidate.parts and candidate.parts[0] in _RETIRED_SOURCE_REVIEW_ROOTS:
+        raise ValueError(
+            "source review path must use current _paper_source or staging-relative paths, "
+            f"not retired internal root {candidate.parts[0]}: {value}"
+        )
+    if candidate.parts and candidate.parts[0] == PAPER_SOURCE_ROOT_NAME:
         return vault_path / candidate
     staging_candidate = staging_root / candidate
     if staging_candidate.exists() or len(candidate.parts) == 1:
@@ -583,10 +592,6 @@ def _load_paper_wiki_record_request(vault_path: Path, request_path: str | Path) 
     return payload, resolved, relative_path
 
 
-def _load_prw_record_request(vault_path: Path, request_path: str | Path) -> tuple[dict[str, Any], Path, str]:
-    return _load_paper_wiki_record_request(vault_path, request_path)
-
-
 def _request_dict(payload: dict[str, Any], key: str) -> dict[str, Any]:
     value = payload.get(key)
     if not isinstance(value, dict):
@@ -601,7 +606,7 @@ def _request_string(payload: dict[str, Any], key: str) -> str:
     return value
 
 
-def _validate_prw_request_pages(vault_path: Path, payload: dict[str, Any]) -> list[str]:
+def _validate_paper_wiki_request_pages(vault_path: Path, payload: dict[str, Any]) -> list[str]:
     final_pages = payload.get("final_pages")
     if not isinstance(final_pages, list) or not final_pages:
         raise ValueError("Paper Wiki record request must include final_pages[]")
@@ -626,7 +631,7 @@ def _validate_prw_request_pages(vault_path: Path, payload: dict[str, Any]) -> li
     return pages
 
 
-def _validate_prw_request_source_review(
+def _validate_paper_wiki_request_source_review(
     *,
     vault_path: Path,
     staging_root: Path,
@@ -669,8 +674,6 @@ def _paper_wiki_source_request_metadata(
             metadata[key] = payload.get(key)
     if isinstance(payload.get("paper_wiki_task"), dict):
         metadata["paper_wiki_task"] = payload.get("paper_wiki_task")
-    if isinstance(payload.get("prw_task"), dict):
-        metadata["legacy_prw_task"] = payload.get("prw_task")
     return metadata
 
 
@@ -685,14 +688,11 @@ def create_wiki_ingest_record_from_paper_wiki_request(
     if payload.get("schema_version") not in ACCEPTED_PAPER_WIKI_RECORD_REQUEST_SCHEMA_VERSIONS:
         raise ValueError("Paper Wiki record request has unsupported schema_version")
     if payload.get("status") not in ACCEPTED_PAPER_WIKI_RECORD_READY_STATUSES:
-        raise ValueError(
-            "Paper Wiki record request status must be ready_for_paper_source_record "
-            "or legacy ready_for_epi_record"
-        )
+        raise ValueError("Paper Wiki record request status must be ready_for_paper_source_record")
     slug = _request_string(payload, "paper_slug")
     staging_root = staging_paper_root(vault_path, slug)
-    pages = _validate_prw_request_pages(vault_path, payload)
-    source_review_path = _validate_prw_request_source_review(
+    pages = _validate_paper_wiki_request_pages(vault_path, payload)
+    source_review_path = _validate_paper_wiki_request_source_review(
         vault_path=vault_path,
         staging_root=staging_root,
         payload=payload,
@@ -715,16 +715,6 @@ def create_wiki_ingest_record_from_paper_wiki_request(
         source_review_path=source_review_path,
         source_request=source_request,
     )
-
-
-def create_wiki_ingest_record_from_prw_request(
-    vault_path: Path,
-    request_path: str | Path,
-    *,
-    notes: str | None = None,
-) -> dict[str, Any]:
-    return create_wiki_ingest_record_from_paper_wiki_request(vault_path, request_path, notes=notes)
-
 
 def _read_required_json(path: Path) -> dict[str, Any]:
     try:

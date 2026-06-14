@@ -22,7 +22,6 @@ FORMAL_ROOTS = (
 )
 INTERNAL_LINK_ROOTS = (
     "_paper_source",
-    "_epi",
     "_raw",
     "_staging",
     "_runs",
@@ -31,8 +30,6 @@ INTERNAL_LINK_ROOTS = (
     ".git",
 )
 INTERNAL_DETACH_ROOTS = (
-    "_epi/meta/formal-page-snapshots",
-    "_epi/staging",
     "_paper_source/staging",
     "_paper_source/meta/formal-page-snapshots",
 )

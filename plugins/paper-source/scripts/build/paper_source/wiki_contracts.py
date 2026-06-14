@@ -4,17 +4,10 @@ from __future__ import annotations
 PAPER_WIKI_CANONICAL_SKILL = "paper-research-wiki"
 PAPER_SOURCE_DEPOSITION_SKILL = "paper-source-paper-deposition"
 
-# Legacy aliases retained for import compatibility.
-PRW_CANONICAL_SKILL = PAPER_WIKI_CANONICAL_SKILL
-EPI_DEPOSITION_SKILL = PAPER_SOURCE_DEPOSITION_SKILL
-
-DEPOSITION_SKILL_COMPATIBILITY_ALIASES: tuple[str, ...] = (
-    "epi-wiki-deposition",
-)
+DEPOSITION_SKILL_COMPATIBILITY_ALIASES: tuple[str, ...] = ()
 
 REQUIRED_WIKI_SKILLS: tuple[str, ...] = (
     PAPER_WIKI_CANONICAL_SKILL,
-    PAPER_SOURCE_DEPOSITION_SKILL,
 )
 
 QUALITY_ENHANCEMENT_WIKI_SKILLS: tuple[str, ...] = (

@@ -20,8 +20,6 @@ HANDLER_NAMES: dict[str, str] = {
     "wiki-repair": "_handle_wiki_repair",
     "paper-source-repository-migrate": "_handle_paper_source_repository_migrate",
     "paper-source-repository-cleanup": "_handle_paper_source_repository_cleanup",
-    "epi-repository-migrate": "_handle_paper_source_repository_migrate",
-    "epi-repository-cleanup": "_handle_paper_source_repository_cleanup",
     "dry-run": "_handle_dry_run",
     "ingest-one": "_handle_ingest_one",
     "acquire-paper": "_handle_acquire_paper",

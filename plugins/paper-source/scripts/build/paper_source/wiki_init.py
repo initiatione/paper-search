@@ -336,7 +336,7 @@ def main() -> int:
     parser.add_argument(
         "--vault",
         type=Path,
-        default=Path(os.environ.get("PAPER_SOURCE_VAULT") or os.environ.get("EPI_VAULT", Path.cwd() / "paper-research-wiki")),
+        default=Path(os.environ.get("PAPER_SOURCE_VAULT") or Path.cwd() / "paper-research-wiki"),
     )
     args = parser.parse_args()
     created = initialize_paper_wiki(args.vault)

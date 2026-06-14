@@ -29,7 +29,7 @@ def test_migrate_page_rewrites_sources_lifecycle_and_body_paths(tmp_path):
                 'title: "Fixture"',
                 "category: references",
                 "page_family: references",
-                'sources: ["[Fixture](obsidian://open?vault=paper-research-wiki&file=_epi%2Fraw%2Ffixture-paper%2Fpaper.pdf)"]',
+                'sources: ["[Fixture](obsidian://open?vault=paper-research-wiki&file=_paper_source%2Fraw%2Ffixture-paper%2Fpaper.pdf)"]',
                 "lifecycle: review-needed",
                 "lifecycle_changed: 2026-06-08",
                 "updated: 2026-06-08",
@@ -37,8 +37,8 @@ def test_migrate_page_rewrites_sources_lifecycle_and_body_paths(tmp_path):
                 "",
                 "## 原文与证据入口",
                 "",
-                "- 原论文 PDF：[Fixture](obsidian://open?vault=paper-research-wiki&file=_epi%2Fraw%2Ffixture-paper%2Fpaper.pdf)",
-                "- Source bundle：`_epi/raw/fixture-paper/paper.pdf`",
+                "- 原论文 PDF：[Fixture](obsidian://open?vault=paper-research-wiki&file=_paper_source%2Fraw%2Ffixture-paper%2Fpaper.pdf)",
+                "- Source bundle：`_paper_source/raw/fixture-paper/paper.pdf`",
                 "",
             ]
         )
@@ -52,7 +52,8 @@ def test_migrate_page_rewrites_sources_lifecycle_and_body_paths(tmp_path):
     assert 'sources: ["[Fixture](obsidian://open?vault=paper-research-wiki&file=_paper_source%2Fraw%2Ffixture-paper%2Fpaper.pdf)"]' in result["text"]
     assert "lifecycle: draft" in result["text"]
     assert "review-needed" not in result["text"]
-    assert "_epi%2Fraw%2Ffixture-paper%2Fpaper.pdf" not in result["text"]
+    old_root = "_" + "".join(["e", "p", "i"])
+    assert old_root not in result["text"]
     assert "_paper_source%2Fraw%2Ffixture-paper%2Fpaper.pdf" in result["text"]
     assert "_paper_source/raw/fixture-paper/paper.pdf" in result["text"]
     assert "[Fixture](obsidian://open" in result["text"]

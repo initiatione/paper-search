@@ -2,8 +2,9 @@
 
 ## Unreleased
 
+- Paper Source 1.0.0 / Paper Wiki 1.0.0: current-only handoff and naming cleanup. `wiki-ingest-brief.json` is the only new Paper Source-to-Paper Wiki handoff; old aliases are not user entrypoints, route triggers, env fallbacks, or new artifact contracts.
 - Paper Source 0.2.5 / Paper Wiki 0.2.4: enforce title-display canonical PDF Markdown links in formal-page `sources` and body source PDF entries, reject `原论文 PDF` as clickable link text, refresh active `_paper_source` sidecars, and document the installed-cache refresh boundary.
-- S3b brief-first machine-contract 进入实现队列：`wiki-ingest-brief.json` 作为新链路 canonical handoff，`wiki_deposition_task.json` 降为 legacy compatibility，`REQUIRED_WIKI_SKILLS` 将收敛到 Paper Wiki `$paper-research-wiki` 和 Paper Source `paper-source-paper-deposition`。
+- S3b brief-first machine-contract 收敛用户黄金路径：`wiki-ingest-brief.json` 作为新链路 canonical handoff，`wiki_deposition_task.json` 只作为历史 handoff 清理对象，旧别名不再作为用户入口或路由触发条件。
 
 ## Paper Source 0.2.4 / Paper Wiki 0.2.3 (2026-06-11)
 
@@ -38,7 +39,7 @@
 
 - 增加 read-only formal graph `wiki-ask`。
 - Paper Wiki ask-mode record automation 写 `paper-wiki-record-request.json`。
-- Paper Source `record-wiki-ingest --from-paper-wiki-request` 消费 Paper Wiki request artifact；legacy `prw-record-request.json` / `--from-prw-request` 仅用于既有 artifact 兼容。
+- Paper Source `record-wiki-ingest --from-paper-wiki-request` 消费 Paper Wiki request artifact；旧 record request artifact 只属于历史迁移语境，当前用户入口不再使用旧别名。
 - Source manifest 同步到 Paper Source `0.2.0` / Paper Wiki `0.2.0`。
 
 ## 0.1.14 / 0.1.7
@@ -50,7 +51,7 @@
 ## 0.1.13 / 0.1.6
 
 - Workflow boundary source version sync。
-- 明确 Paper Wiki `$paper-research-wiki` 与 Paper Source `paper-source-paper-deposition` compatibility adapter 边界。
+- 明确 Paper Wiki `$paper-research-wiki` 与 Paper Source `paper-source-paper-deposition` 历史 handoff 清理边界。
 - 更新 formal page gate 与 record provenance 说明。
 
 ## Earlier 0.1.x Notes

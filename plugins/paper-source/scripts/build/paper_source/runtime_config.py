@@ -8,9 +8,7 @@ from typing import Any
 
 
 RUNTIME_CONFIG_ENV = "PAPER_SOURCE_RUNTIME_CONFIG"
-LEGACY_RUNTIME_CONFIG_ENV = "EPI_RUNTIME_CONFIG"
 RUNTIME_CONFIG_SCHEMA = "paper-source-runtime-config-v1"
-LEGACY_RUNTIME_CONFIG_SCHEMA = "epi-runtime-config-v1"
 PAPER_SEARCH_PROVIDER_ENV_KEYS = {
     "PAPER_SEARCH_MCP_UNPAYWALL_EMAIL",
     "UNPAYWALL_EMAIL",
@@ -34,8 +32,6 @@ def _codex_home() -> Path:
 
 def runtime_config_path() -> Path:
     configured = os.environ.get(RUNTIME_CONFIG_ENV)
-    if not configured:
-        configured = os.environ.get(LEGACY_RUNTIME_CONFIG_ENV)
     if configured:
         return Path(configured).expanduser()
     return _codex_home() / "plugins" / "paperflow" / "paper-source" / "runtime.json"
@@ -56,7 +52,6 @@ def _empty_status(path: Path) -> dict[str, Any]:
 def _safe_env_key(key: str) -> bool:
     return (
         (key.startswith("PAPER_SOURCE_") and key != RUNTIME_CONFIG_ENV)
-        or (key.startswith("EPI_") and key != LEGACY_RUNTIME_CONFIG_ENV)
         or key in PAPER_SEARCH_PROVIDER_ENV_KEYS
     )
 
@@ -217,10 +212,8 @@ def apply_runtime_config() -> dict[str, Any]:
         return status
     status["loaded"] = True
     schema_version = payload.get("schema_version")
-    if schema_version and schema_version not in {RUNTIME_CONFIG_SCHEMA, LEGACY_RUNTIME_CONFIG_SCHEMA}:
+    if schema_version and schema_version != RUNTIME_CONFIG_SCHEMA:
         status["warnings"].append(f"unexpected runtime config schema_version: {schema_version}")
-    elif schema_version == LEGACY_RUNTIME_CONFIG_SCHEMA:
-        status["warnings"].append(f"legacy runtime config schema_version accepted: {schema_version}")
     _apply_runtime_payload(status, payload)
     status["applied_env"] = sorted(set(status["applied_env"]))
     status["skipped_env"] = sorted(set(status["skipped_env"]))

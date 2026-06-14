@@ -30,7 +30,7 @@ python scripts\orchestrator.py normalize-mineru-assets --slug <slug> --vault <va
 python scripts\orchestrator.py normalize-mineru-assets --slug <slug> --vault <vault> --execute --json
 ```
 
-Use `--mineru-timeout <seconds>` for one-off runs. If omitted, Paper Source reads `PAPER_SOURCE_MINERU_TIMEOUT`; invalid/non-positive values fall back to 7200 seconds. Legacy `EPI_MINERU_TIMEOUT` remains accepted for existing environments.
+Use `--mineru-timeout <seconds>` for one-off runs. If omitted, Paper Source reads `PAPER_SOURCE_MINERU_TIMEOUT`; invalid/non-positive values fall back to 7200 seconds.
 
 `normalize-mineru-assets` may read `_paper_source/raw/<slug>` or legacy `_epi/raw/<slug>` and may change raw image names, Markdown image references, and index sidecars. It must not edit formal wiki pages.
 

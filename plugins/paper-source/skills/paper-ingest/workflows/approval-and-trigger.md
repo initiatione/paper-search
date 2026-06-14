@@ -22,7 +22,7 @@ python scripts\orchestrator.py wiki-ingest-trigger --slug <slug> --vault <vault>
 python scripts\orchestrator.py wiki-ingest-trigger --slug <slug> --vault <vault> --json
 ```
 
-`wiki-ingest-trigger` writes `_paper_source/staging/papers/<slug>/wiki-agent-trigger.json`, a resume package for Paper Wiki `$paper-research-wiki` or another wiki-capable agent following the Paper Wiki/vault contract. It does not spawn a hidden LLM process or write final pages. The trigger points at `wiki-ingest-brief.json`, the canonical Paper Source-to-Paper Wiki handoff; `wiki_deposition_task.json is legacy` compatibility only.
+`wiki-ingest-trigger` writes `_paper_source/staging/papers/<slug>/wiki-agent-trigger.json`, a resume package for Paper Wiki `$paper-research-wiki` or another wiki-capable agent following the Paper Wiki/vault contract. It does not spawn a hidden LLM process or write final pages. The trigger points at `wiki-ingest-brief.json`, the canonical Paper Source-to-Paper Wiki handoff.
 
 ## Record Final Wiki Ingest
 
@@ -33,13 +33,13 @@ python scripts\orchestrator.py record-wiki-ingest --slug <slug> --page <final-pa
 python scripts\orchestrator.py record-wiki-ingest --from-paper-wiki-request _paper_source/staging/papers/<slug>/paper-wiki-record-request.json --vault <vault> --json
 ```
 
-Paper Wiki writes the request artifact; Paper Source consumes it. The request uses schema `paper-wiki-record-request-v1` and `automation_mode=ask`. Paper Source validates live page hashes, `final-source-review.json`, matching human approval, `paper-gate`, and formal-page rules before writing `wiki-ingest-record.json`. Legacy `prw-record-request-v1` remains accepted only for existing artifacts.
+Paper Wiki writes the request artifact; Paper Source consumes it. The request uses schema `paper-wiki-record-request-v1` and `automation_mode=ask`. Paper Source validates live page hashes, `final-source-review.json`, matching human approval, `paper-gate`, and formal-page rules before writing `wiki-ingest-record.json`.
 
 `record-wiki-ingest` is record-only: it rechecks `paper-gate`, requires matching pre-write `human-approval.json` / `approved-by`, validates final pages stay inside the vault and outside Paper Source internal folders, records sha256 hashes in raw/staging, marks `wiki_ingest_recorded`, and writes `zotero-record.json` when Zotero is enabled.
 
 ## Corrections And Buckets
 
-If `_paper_source/meta/record-corrections/` marks `correction_type=premature-wiki-ingest-record`, send the paper to Paper Wiki while status is `pending-paper-wiki-review`. After Paper Wiki repairs pages and `final-source-review.json`, Paper Source writes or replaces `wiki-ingest-record.json` when status is `paper-wiki-reviewed-ready-for-paper-source-record` and `paper-gate` returns `ready_for_wiki_ingest_agent`; rerun `record-wiki-ingest` to replace the premature record. Legacy `pending-prw-review` and `prw-reviewed-ready-for-epi-record` remain compatibility-only. Paper Wiki reports readiness but must not write the Paper Source replacement record. Paper Wiki repairs pages and `final-source-review.json`; Paper Source writes or replaces `wiki-ingest-record.json`.
+If `_paper_source/meta/record-corrections/` marks `correction_type=premature-wiki-ingest-record`, send the paper to Paper Wiki while status is `pending-paper-wiki-review`. After Paper Wiki repairs pages and `final-source-review.json`, Paper Source writes or replaces `wiki-ingest-record.json` when status is `paper-wiki-reviewed-ready-for-paper-source-record` and `paper-gate` returns `ready_for_wiki_ingest_agent`; rerun `record-wiki-ingest` to replace the premature record. Paper Wiki reports readiness but must not write the Paper Source replacement record.
 
 ```powershell
 python scripts\orchestrator.py research-queue --bucket needs_reader_repair --vault <vault>

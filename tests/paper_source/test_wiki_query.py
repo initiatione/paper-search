@@ -228,6 +228,38 @@ def test_ask_wiki_reports_internal_frontmatter_pdf_wikilink_as_repair_candidate(
     )
 
 
+def test_ask_wiki_reports_retired_epi_pdf_uri_without_using_it_as_evidence(tmp_path):
+    vault = tmp_path / "vault"
+    _write_formal_page(
+        vault,
+        "references/retired-epi-source-link.md",
+        "Retired EPI Source Link",
+        (
+            "Retired EPI Source Link discusses source evidence handling.\n\n"
+            "## 原文与证据入口\n\n"
+            "- 原论文 PDF：[Retired EPI Source Link](obsidian://open?vault=vault&file=_epi%2Fraw%2Fexample%2Fpaper.pdf)"
+        ),
+        aliases=["Retired EPI Source Link"],
+        sources=['"[Retired EPI Source Link](obsidian://open?vault=vault&file=_epi%2Fraw%2Fexample%2Fpaper.pdf)"'],
+    )
+
+    result = ask_wiki(vault, question="Retired EPI Source Link", limit=3)
+
+    pages = {page["path"]: page for page in result["pages"]}
+    assert "source_evidence" not in pages["references/retired-epi-source-link.md"]
+    assert result["summary"]["source_evidence_count"] == 0
+    assert any(
+        candidate["kind"] == "source_frontmatter_mismatch"
+        and "canonical _paper_source/raw/<slug>/paper.pdf" in candidate["message"]
+        for candidate in result["correction_candidates"]
+    )
+    assert any(
+        candidate["kind"] == "source_pdf_body_link_missing"
+        and "not retired _epi links" in candidate["message"]
+        for candidate in result["correction_candidates"]
+    )
+
+
 def test_ask_wiki_accepts_title_display_markdown_pdf_link_in_frontmatter_sources(tmp_path):
     vault = tmp_path / "vault"
     raw_root = vault / "_paper_source" / "raw" / "example"

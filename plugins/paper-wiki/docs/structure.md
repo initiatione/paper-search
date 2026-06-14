@@ -1,8 +1,8 @@
 # Paper Wiki Structure
 
-This plugin lives at `plugins/paper-wiki`; its user-visible display name is Paper Wiki, and its current machine-facing plugin name is `paper-wiki`. `prw` is a pre-Stage-2 legacy alias.
+This plugin lives at `plugins/paper-wiki`; its user-visible display name is Paper Wiki, and its current machine-facing plugin name is `paper-wiki`.
 
-Paper Wiki's source-preparation sibling is Paper Source, whose current machine-facing plugin name is `paper-source`; `epi` is a pre-Stage-2 legacy alias.
+Paper Wiki's source-preparation sibling is Paper Source, whose current machine-facing plugin name is `paper-source`.
 
 Paper Wiki has one public router skill: `skills/paper-research-wiki/SKILL.md`. PW/PS are conversational aliases only.
 
@@ -20,4 +20,4 @@ Read-only wiki Q&A lives in `skills/paper-research-wiki/workflows/ask-wiki.md`. 
 
 Paper Wiki assumes Paper Source `wiki-setup` has initialized the target vault. It checks bootstrap structure and reports missing vault structure as a capability gap, but bootstrap, repair, and reset remain Paper Source responsibilities.
 
-Operational health is checked at three layers: source plugin validation, installed-cache plugin validation, and contract tests. Paper Wiki has no standalone CLI; its runtime correctness is protected by `paper-research-wiki` routing metadata, Paper Wiki contract tests, Paper Source handoff/record tests, and QMD surface checks that keep formal page roots visible while `_paper_source/**` and legacy `_epi/**` remain outside the indexed formal graph.
+Operational health is checked at three layers: source plugin validation, installed-cache plugin validation, and contract tests. Paper Wiki has no standalone CLI; its runtime correctness is protected by `paper-research-wiki` routing metadata, Paper Wiki contract tests, Paper Source handoff/record tests, and QMD surface checks that keep formal page roots visible while `_paper_source/**` and formal-page snapshot internals remain outside the indexed formal graph.

@@ -146,7 +146,7 @@ def test_plugin_manifest_exposes_simple_user_prompts():
     manifest = _read_json(PLUGIN / ".codex-plugin" / "plugin.json")
 
     assert manifest["name"] == "paper-wiki"
-    assert manifest["version"] == "0.2.4"
+    assert manifest["version"] == "1.0.0"
     assert manifest["skills"] == "./skills/"
     assert manifest["interface"]["displayName"] == "Paper Wiki"
     assert "Paper Wiki" in manifest["description"]
@@ -157,7 +157,7 @@ def test_plugin_manifest_exposes_simple_user_prompts():
     assert "link repair" in manifest["interface"]["longDescription"]
     assert "QMD-compatible" in manifest["interface"]["longDescription"]
     assert "post-task check" in manifest["interface"]["longDescription"]
-    assert manifest["interface"]["shortDescription"].startswith("v0.2.4 | Paper Wiki:")
+    assert manifest["interface"]["shortDescription"].startswith("v1.0.0 | Paper Wiki:")
     for phrase in ["Paper Wiki", "ask", "deposit", "check", "update", "relink", "redo"]:
         assert phrase in manifest["interface"]["shortDescription"]
     prompt_text = "\n".join(manifest["interface"]["defaultPrompt"])
@@ -165,15 +165,15 @@ def test_plugin_manifest_exposes_simple_user_prompts():
         assert phrase in prompt_text
 
 
-def test_paper_source_manifest_describes_brief_first_prw_boundary():
+def test_paper_source_manifest_describes_brief_first_paper_wiki_boundary():
     manifest = _read_json(PAPER_SOURCE_PLUGIN / ".codex-plugin" / "plugin.json")
 
-    assert manifest["version"] == "0.2.5"
+    assert manifest["version"] == "1.0.0"
     assert manifest["name"] == "paper-source"
     assert manifest["interface"]["displayName"] == "Paper Source"
     assert "Paper Source" in manifest["description"]
     assert "Paper Wiki-compatible" in manifest["description"]
-    assert manifest["interface"]["shortDescription"].startswith("v0.2.5 | Paper Source:")
+    assert manifest["interface"]["shortDescription"].startswith("v1.0.0 | Paper Source:")
     assert "record" in manifest["interface"]["shortDescription"]
     assert "Paper Source" in manifest["interface"]["longDescription"]
     assert "Paper Wiki" in manifest["interface"]["longDescription"]
@@ -206,7 +206,7 @@ def test_plugin_has_one_public_skill_plus_language_gate():
     }
     assert skill_dirs == PUBLIC_SKILLS | SUPPORT_SKILLS
     language_skill = _read(PLUGIN / "skills" / "paper-wiki-language" / "SKILL.md")
-    assert "Paper Wiki/Paper Source legacy wording" in language_skill
+    assert "source-grounded Chinese research-wiki prose" in language_skill
     assert "Language Gate" in language_skill
     assert "references/style-guide.md" in language_skill
 
@@ -433,12 +433,11 @@ def test_public_skill_defaults_paper_source_wiki_requests_to_deposition():
         "preflight",
         "沉淀",
         "wiki-ingest-brief.json",
-        "legacy `wiki_deposition_task.json`",
-        "wiki_deposition_task.json",
         "workflows/extract-papers.md",
         "workflows/check-wiki.md",
     ]:
         assert phrase in skill
+    assert "only Paper Source-to-Paper Wiki handoff contract" in skill
 
 
 def test_required_docs_and_rules_exist():
@@ -475,9 +474,7 @@ def test_paper_source_integration_docs_name_handoff_and_record_contracts():
     text = _read(PLUGIN / "docs" / "paper-source-integration.md")
 
     for phrase in [
-        "canonical handoff",
-        "legacy compatibility",
-        "wiki_deposition_task.json",
+        "canonical Paper Source-to-Paper Wiki handoff",
         "wiki-ingest-brief.json",
         "final-source-review.json",
         "record-wiki-ingest",
@@ -485,6 +482,7 @@ def test_paper_source_integration_docs_name_handoff_and_record_contracts():
         "human approval",
     ]:
         assert phrase in text
+    assert "Historical aliases are not Paper Wiki user entrypoints" in text
 
 
 def test_provenance_docs_preserve_claim_support_statuses():
@@ -850,7 +848,7 @@ def test_paper_wiki_supports_single_and_batch_redo_deep_extraction():
         "one confirmation",
         "final-source-review.json",
         "record-wiki-ingest",
-        "do not write human approval",
+        "Do not write human approval",
     ]:
         assert phrase in redo
 
@@ -943,7 +941,6 @@ def test_internal_snapshot_and_source_trees_are_excluded_from_formal_indexing():
 
     combined = "\n".join([standard, check, update, workflow_doc])
     for phrase in [
-        "_epi/meta/formal-page-snapshots",
         "_paper_source/meta/formal-page-snapshots",
         "premature-formal-pages",
         "must stay outside the formal graph",
@@ -963,14 +960,14 @@ def test_paper_wiki_active_docs_use_paper_source_root_as_primary_path():
     upstream = _read(PUBLIC_SKILL / "references" / "upstream-obsidian-wiki-map.md")
 
     assert "Use `_paper_source/raw` as primary source evidence" in ask
-    assert "legacy `_epi/raw` only for existing artifacts" in ask
     assert "core `_paper_source` roots" in check
-    assert "using `_paper_source/staging/papers/*/wiki-ingest-brief.json` as canonical" in check
-    assert "Forbidden formal roots are `_paper_source/`, legacy `_epi/`" in page_family
-    assert "forbidden internal links from formal pages into `_paper_source/`, legacy `_epi/`" in upstream
-    assert "confirm `_paper_source/` and legacy `_epi/` remain outside the formal graph/index" in update
+    assert "using `_paper_source/staging/papers/*/wiki-ingest-brief.json` as the only Paper Source-to-Paper Wiki handoff contract" in check
+    assert "Forbidden formal roots are `_paper_source/`, `_raw/`, `_staging/`, `_runs/`, `_quarantine/`, and `.obsidian/`" in page_family
+    assert "forbidden internal links from formal pages into `_paper_source/` or other internal folders" in upstream
+    assert "forbidden internal links" in update
     assert "file=_paper_source%2Fraw%2F<slug>%2Fpaper.pdf" in anatomy
-    assert "file=_epi%2Fraw%2F<slug>%2Fpaper.pdf" not in anatomy
+    old_root = "_" + "".join(["e", "p", "i"])
+    assert old_root not in "\n".join([ask, check, update, page_family, anatomy, upstream])
     assert "full source map remains in `_paper_source/raw/<slug>/mineru/*`" in anatomy
     assert "file:///D:/paper-research-wiki/_paper_source/raw/<slug>/mineru/images/<hash>.jpg" in anatomy
 
@@ -1191,22 +1188,19 @@ def test_paper_wiki_user_docs_use_paper_wiki_and_paper_source_stage2_names():
         "machine-facing",
         "`paper-wiki`",
         "`paper-source`",
-        "`prw` is a pre-Stage-2 legacy alias",
-        "`epi` is a pre-Stage-2 legacy alias",
-        "pre-Stage-2",
+        "Historical aliases are not Paper Wiki user entrypoints",
     ]:
         assert phrase in combined
 
     for phrase in [
         "Paper Source `wiki-setup`",
         "wiki-ingest-brief.json",
-        "wiki_deposition_task.json",
         "paper-wiki-record-request.json",
     ]:
         assert phrase in combined
 
 
-def test_stage1_keeps_legacy_paper_source_paper_wiki_contract_terms_for_compatibility():
+def test_current_names_do_not_keep_old_aliases_as_user_contracts():
     files = [
         PLUGIN / "skills" / "routing.yaml",
         PLUGIN / "skills" / "paper-research-wiki" / "SKILL.md",
@@ -1217,15 +1211,16 @@ def test_stage1_keeps_legacy_paper_source_paper_wiki_contract_terms_for_compatib
     combined = "\n".join(path.read_text(encoding="utf-8") for path in files)
 
     for phrase in [
-        "epi",
-        "prw",
-        "legacy",
         "wiki-ingest-brief.json",
-        "wiki_deposition_task.json",
-        "paper-source-paper-deposition",
         "paper-research-wiki",
+        "Historical aliases are not user entrypoints",
     ]:
         assert phrase in combined
+    old_paper_wiki_alias = "`" + "".join(["p", "r", "w"]) + "`"
+    old_paper_source_alias = "`" + "".join(["e", "p", "i"]) + "`"
+    assert old_paper_wiki_alias not in combined
+    assert old_paper_source_alias not in combined
+    assert ("compatibility " + "adapter") not in combined
 
 
 def test_all_paper_wiki_skills_have_ui_metadata():
@@ -1261,8 +1256,9 @@ def test_paper_source_bridge_points_to_plugin_level_experience():
         assert "paper-research-wiki" in text
     assert "$paper-research-wiki" in skill
     assert "wiki-ingest-brief.json" in skill
-    assert "legacy `wiki_deposition_task.json`" in skill
-    assert "compatibility adapter" in skill
+    retired_task = "wiki_" + "deposition_task"
+    assert f"Historical `{retired_task}.json` cleanup" in skill
+    assert ("compatibility " + "adapter") not in skill
     for text in [skill, workflow]:
         assert "graph-aware rewrite" in text
         assert "$paper-research-wiki" in text
@@ -1280,7 +1276,8 @@ def test_paper_source_handoff_and_paper_wiki_routing_share_canonical_contract():
     assert 'PAPER_WIKI_CANONICAL_SKILL = "paper-research-wiki"' in wiki_contracts
     assert "PAPER_WIKI_CANONICAL_SKILL" in stage_wiki
     assert "first as the canonical paper wiki layer" in stage_wiki
-    assert "wiki_deposition_task" in stage_wiki
+    retired_task = "wiki_" + "deposition_task"
+    assert retired_task in stage_wiki
 
     deposition_match = re.search(
         r"(?ms)^  paper_source_paper_deposition:\n(?P<body>.*?)(?=^  [a-z0-9_]+:|\Z)",
@@ -1288,7 +1285,7 @@ def test_paper_source_handoff_and_paper_wiki_routing_share_canonical_contract():
     )
     assert deposition_match
     deposition_route = deposition_match.group("body")
-    assert "category: compatibility" in deposition_route
+    assert "category: maintenance" in deposition_route
     assert "skill: paper-source-paper-deposition/SKILL.md" in deposition_route
     assert "$paper-research-wiki" in deposition_route
 
@@ -1314,10 +1311,10 @@ def test_paper_wiki_defers_vault_bootstrap_to_paper_source_wiki_setup():
 
 def test_paper_wiki_artifact_contract_marks_task_deprecated():
     contract = _read(PUBLIC_SKILL / "references" / "paper-source-artifact-contract.md")
+    retired_task = "wiki_" + "deposition_task"
 
     assert "wiki-ingest-brief.json" in contract
-    assert "wiki_deposition_task.json" in contract
-    assert "deprecated" in contract.lower() or "已废弃" in contract
+    assert f"{retired_task}.json" not in contract
 
 
 def test_paper_wiki_paper_source_artifact_contract_is_brief_first():
@@ -1326,13 +1323,13 @@ def test_paper_wiki_paper_source_artifact_contract_is_brief_first():
     check = _read(PUBLIC_SKILL / "workflows" / "check-wiki.md")
     integration = _read(PLUGIN / "docs" / "paper-source-integration.md")
     combined = "\n".join([contract, extract, check, integration])
+    retired_task = "wiki_" + "deposition_task"
 
     assert "canonical handoff" in contract
     assert "wiki-ingest-brief.json" in contract
-    assert "wiki_deposition_task.json" in contract
-    assert "legacy compatibility" in contract
     assert "Locate `_paper_source/staging/papers/*/wiki-ingest-brief.json`" in extract
-    assert "Do not treat task-only legacy handoffs as ready" in combined
+    assert f"{retired_task}.json" not in contract
+    assert "compatibility artifact" not in combined
 
 
 def test_wiki_writing_standard_declares_itself_canonical():

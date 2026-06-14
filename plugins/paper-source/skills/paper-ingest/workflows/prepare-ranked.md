@@ -17,7 +17,7 @@ Use `--max-papers 10 --skip-existing` for real testing; `--max-papers 1` is a sm
 
 ## Acquisition Policy
 
-OA-first order: paper-search MCP `download_with_fallback` with source id/DOI/title; Sci-Hub disabled unless `PAPER_SOURCE_PAPER_SEARCH_MCP_USE_SCIHUB=1` (legacy `EPI_PAPER_SEARCH_MCP_USE_SCIHUB` still accepted); if no direct candidate PDF URL and OA fallback yields no PDF, stop with `failure_class=manual-download-required`, write `manual_download`, and avoid weak fallbacks; if direct PDF URLs exist and fallback fails, try source-native MCP `download_<source>`, then CLI/direct URL behavior with the same failure recording; after any PDF download, run DOI/title identity check and on `failure_class=identity-mismatch` keep `identity-check.json`, quarantine `_paper_source/quarantine/papers/<slug>/paper.pdf`, and do not run MinerU.
+OA-first order: paper-search MCP `download_with_fallback` with source id/DOI/title; Sci-Hub disabled unless `PAPER_SOURCE_PAPER_SEARCH_MCP_USE_SCIHUB=1`; if no direct candidate PDF URL and OA fallback yields no PDF, stop with `failure_class=manual-download-required`, write `manual_download`, and avoid weak fallbacks; if direct PDF URLs exist and fallback fails, try source-native MCP `download_<source>`, then CLI/direct URL behavior with the same failure recording; after any PDF download, run DOI/title identity check and on `failure_class=identity-mismatch` keep `identity-check.json`, quarantine `_paper_source/quarantine/papers/<slug>/paper.pdf`, and do not run MinerU.
 
 Successful MCP acquisition records `fallback_chain`, `use_scihub=false`, DOI/title, `mcp_server_probe`, `upstream.tool`, and `identity_check` in `acquire-record.json`. Optional `read_<source>_paper`/CLI read writes `paper-search-read-preview.txt` and `acquire-record.json.retrieval_preview`; this is non-authoritative and does not replace `paper.pdf` plus MinerU Markdown/images/manifest and optional non-empty native TeX.
 
@@ -31,7 +31,7 @@ Inspect `acquire_failed`, `parse_failed`, and `prepare_failed`. Failed `acquire-
 
 Failed acquire attempts without `paper.pdf` are not library entries; `prepare-ranked` cleans raw folders only when there is no source PDF, staging plan, wiki-ingest record, or Zotero record, and writes cleanup manifest under `_paper_source/meta/raw-cleanup/`.
 
-For slow MinerU jobs, pass `--mineru-timeout <seconds>` or set `PAPER_SOURCE_MINERU_TIMEOUT`. Legacy `EPI_MINERU_TIMEOUT` remains accepted for existing environments. Complete parse reuse requires `parse-record.json status=success`, not just a Markdown file.
+For slow MinerU jobs, pass `--mineru-timeout <seconds>` or set `PAPER_SOURCE_MINERU_TIMEOUT`. Complete parse reuse requires `parse-record.json status=success`, not just a Markdown file.
 
 After MinerU parse success, Paper Source writes `_paper_source/raw/<slug>/evidence-index.json` and refreshes `_paper_source/meta/evidence-index.json`; this supports claim provenance but does not replace `paper.pdf`, `mineru/<slug>.md`, `mineru/images/*`, `mineru/mineru-manifest.json`, figure/formula indexes, or optional non-empty native `mineru/paper.tex`.
 
